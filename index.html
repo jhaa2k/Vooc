@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>AUDIOVIS Studio Pro</title>
+<meta name="theme-color" content="#262624">
+<link rel="manifest" href='data:application/manifest+json,{"name":"AUDIOVIS Studio Pro","short_name":"AUDIOVIS","display":"standalone","background_color":"#262624","theme_color":"#262624","start_url":"."}'>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;800&family=Roboto:wght@400;900&family=Montserrat:wght@400;800&family=Oswald:wght@400;700&family=Bebas+Neue&family=Anton&family=Poppins:wght@400;800&family=Playfair+Display:wght@400;800&family=Lobster&family=Pacifico&family=Orbitron:wght@400;800&family=Audiowide&family=Righteous&family=Press+Start+2P&family=Bungee&family=Permanent+Marker&family=Caveat:wght@400;700&family=Dancing+Script:wght@400;700&family=Abril+Fatface&family=Russo+One&family=Teko:wght@400;700&family=Space+Mono:wght@400;700&family=Cinzel:wght@400;800&family=Raleway:wght@400;800&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z" fill="currentColor"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></symbol>
+<symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14M19 5L8 12l11 7z"/></symbol>
+<symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M5 5l11 7L5 19z"/></symbol>
+<symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M3 7h4l10 10h4M3 17h4l3-3M14 10l3-3h4M18 4l3 3-3 3M18 14l3 3-3 3"/></symbol>
+<symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9a3 3 0 0 1 3-3h13M17 3l3 3-3 3M20 13v2a3 3 0 0 1-3 3H4M7 21l-3-3 3-3"/></symbol>
+<symbol id="i-lib" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM20 16a3 3 0 1 1-3-3 3 3 0 0 1 3 3z"/></symbol>
+<symbol id="i-lay" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+<symbol id="i-pre" viewBox="0 0 24 24"><path d="M12 20.5s-8.5-5.2-8.5-11.1A4.9 4.9 0 0 1 12 6.6a4.9 4.9 0 0 1 8.5 2.8c0 5.9-8.5 11.1-8.5 11.1z"/></symbol>
+<symbol id="i-aud" viewBox="0 0 24 24"><path d="M4 16V8M8 20V4M12 14V10M16 18V6M20 15V9"/></symbol>
+<symbol id="i-scn" viewBox="0 0 24 24"><path d="M3 4h18v16H3zM3 16l5-4 4 3 4-5 5 5"/></symbol>
+<symbol id="i-exp" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+<symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><path d="M3 4h18v16H3zM15 4v16"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h10M18 18h2M14 4v4h4V4zM6 10v4h4v-4zM14 16v4h4v-4z"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a18.4 18.4 0 0 1-3.1 4M6.2 6.2A18.6 18.6 0 0 0 2 12s3.5 7 10 7a10.4 10.4 0 0 0 4.1-.8"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+<symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+<symbol id="i-dup" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v6M14 10v6"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+<symbol id="i-paste" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</defs></svg>
+
+<div id="app">
+  <header>
+    <span class="logo">AUDIOVIS PRO</span>
+    <span id="beatDot" title="Live beat indicator"></span>
+    <span class="sp"></span>
+    <button class="ib" data-act="undo" aria-label="Undo"><svg class="i"><use href="#i-undo"/></svg></button>
+    <button class="ib" data-act="redo" aria-label="Redo"><svg class="i"><use href="#i-redo"/></svg></button>
+    <button class="ib" data-act="panel" aria-label="Panel"><svg class="i"><use href="#i-panel"/></svg></button>
+    <button class="ib" data-act="set" aria-label="Settings"><svg class="i"><use href="#i-set"/></svg></button>
+  </header>
+
+  <main id="mn">
+    <section class="stage">
+      <div class="cvw">
+        <canvas id="cv" width="960" height="540"></canvas>
+        <div class="hud"><span id="bdg">PREVIEW</span><span id="res"></span><span id="fps"></span></div>
+      </div>
+      <div class="tp">
+        <div class="tr1"><span id="tt">No track loaded</span><span id="tc">0:00 / 0:00</span></div>
+        <div class="tr2">
+          <button id="bsh" data-act="shuf" aria-label="Shuffle"><svg class="i"><use href="#i-shuffle"/></svg></button>
+          <button data-act="prev" aria-label="Previous"><svg class="i"><use href="#i-prev"/></svg></button>
+          <button id="pl" class="pri" data-act="play" aria-label="Play or pause"><svg class="i"><use href="#i-play"/></svg></button>
+          <button data-act="next" aria-label="Next"><svg class="i"><use href="#i-next"/></svg></button>
+          <button id="brp" data-act="rpt" aria-label="Repeat"><svg class="i"><use href="#i-repeat"/></svg></button>
+        </div>
+        <div class="wfw" id="wfw"><canvas id="wf"></canvas><div id="ph"></div></div>
+      </div>
+    </section>
+
+    <aside id="side">
+      <div class="sh">
+        <span id="st"></span>
+        <span class="hb">
+          <button class="ib" id="pl2" data-act="play" aria-label="Play or pause"><svg class="i"><use href="#i-play"/></svg></button>
+          <button class="ib" id="oszb" data-act="osz" aria-label="Panel size"><svg class="i"><use href="#i-chev"/></svg></button>
+          <button class="ib" data-act="close" aria-label="Close"><svg class="i"><use href="#i-close"/></svg></button>
+        </span>
+      </div>
+      <div id="sb"></div>
+    </aside>
+  </main>
+
+  <nav id="nav">
+    <button data-act="tab" data-t="lib"><svg class="i"><use href="#i-lib"/></svg>Media</button>
+    <button data-act="tab" data-t="lay"><svg class="i"><use href="#i-lay"/></svg>Layers</button>
+    <button data-act="tab" data-t="pre"><svg class="i"><use href="#i-pre"/></svg>Presets</button>
+    <button data-act="tab" data-t="aud"><svg class="i"><use href="#i-aud"/></svg>Audio</button>
+    <button data-act="tab" data-t="scn"><svg class="i"><use href="#i-scn"/></svg>Scene</button>
+    <button data-act="tab" data-t="exp"><svg class="i"><use href="#i-exp"/></svg>Export</button>
+  </nav>
+
+  <div id="set" hidden>
+    <div class="sh"><span>Settings</span><button class="pri" data-act="setx">Close</button></div>
+    <div class="bd">
+      <label class="f">Theme<select id="theme"></select></label>
+      <label class="f">Rotation<select data-s="rot"><option value="auto">Auto (device)</option><option value="portrait">Manual portrait</option><option value="landscape">Manual landscape</option></select></label>
+      <div class="dm">Manual rotation turns the app itself, so it works with the phone's rotation lock on.</div>
+      <label class="f">Preview quality<select data-s="pq" data-n="1"><option value="40">Low 40%</option><option value="60">Medium 60%</option><option value="75">High 75%</option><option value="100">Full 100%</option></select></label>
+      <label class="f">Frame limit<select data-s="fps" data-n="1"><option value="24">24</option><option value="30">30 (low power)</option><option value="60">60</option></select></label>
+      <label class="f">Rounded CapCut look<input type="checkbox" data-s="cc"></label>
+      <label class="f">Smart performance<input type="checkbox" data-s="auto"></label>
+      <div class="dm">Smart performance lowers the preview resolution automatically if playback starts to stutter. Exports always use full quality.</div>
+      <label class="f">Show FPS<input type="checkbox" data-s="showFps"></label>
+      <label class="f">Guides<input type="checkbox" data-s="guides"></label>
+      <div class="dm">Guides show centre lines, thirds and a 90% safe area in the preview only. Drag on the canvas to move the selected layer. Keys: Space play, arrows seek, Ctrl+Z/Y undo/redo, Ctrl+D duplicate, Delete remove layer, B trigger a beat, T tap tempo.</div>
+      <div class="row"><button data-act="rstset">Reset settings</button><button class="dg" data-act="clr">Clear saved projects</button></div>
+    </div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

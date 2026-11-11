@@ -18,13 +18,20 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 - Palette selection (Amber, Cyan, Purple, Green, White), adjustable band count, sensitivity and smoothing.
 - Visualizer settings persist in project JSON and refresh the preview immediately.
 
+## Newly implemented layer editing foundation
+
+- Selected-layer inspector with name/text, X/Y position, scale, opacity and rotation controls.
+- Lock/unlock and move layer up/down actions.
+- Text layers render in the spectrum preview using their normalized position and transform settings.
+- Existing project layer records remain compatible through default values when a field is absent.
+
 ## Remaining work, in dependency order
 
 1. **Android playback hardening:** validate runtime permission, callback delivery, URI/path handling, pause/seek/completion, audio focus and lifecycle on physical Android devices. Legacy AudioManager focus request and focus-loss/duck handling are now wired into native playback. Validate on devices, then add a foreground playback service and notification controls; migrate to Media3 if required.
 2. **Storage Access Framework:** resolve selected document URIs into a supported playback source or use a URI-capable native data source; current native adapter only accepts local filesystem paths.
 3. **Connect analysis:** tune capture callback delivery and beat threshold/refractory logic against real music. Add waveform, BPM estimation, beat map and LFO analysis.
 4. **Actual audio DSP:** implement and validate 10-band EQ, gain, bass shelf, pan, speed, reverb, delay, distortion and normalization in the audio output path. UI state changes alone are not audio processing.
-5. **Scene graph and interaction:** OpenGL ES rendering for text/image, spectrum bars, particles, transforms, mirror, RGB split, blur, motion blur and custom shaders; add inspector controls, drag handles, keyframes, undo/redo and preset import.
+5. **Scene graph and interaction:** OpenGL ES rendering for image layers, particles, mirror, RGB split, blur, motion blur and custom shaders; add drag handles, keyframes, undo/redo, font selection and preset import.
 6. **Video export:** MediaCodec + MediaMuxer (H.264/AAC), deterministic frame timestamps, audio/video sync, progress, cancellation/resume, bitrate controls and scoped-storage destination URI.
 7. **Validation:** unit/instrumentation tests; Android 8–15, ARM64, scoped storage, backgrounding, orientation, long tracks, memory pressure and export cancellation. Verify every advertised control on device.
 

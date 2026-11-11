@@ -7,7 +7,8 @@ class ProjectState:
         self.eq_freqs=[32,64,125,250,500,1000,2000,4000,8000,16000]
         for i in range(10):self.audio["eq_"+str(i)]=0
         self.scene={"ratio":"16:9","resolution":"1080p","fps":"30","theme":"Claude Dark"}
-        self.visualizer={"style":"Bars","palette":"Amber","bar_count":64,"sensitivity":1.0,"smoothing":0.35}\n        self.properties={}
+        self.visualizer={"style":"Bars","palette":"Amber","bar_count":64,"sensitivity":1.0,"smoothing":0.35}
+        self.properties={}
         self.presets={"Classic Bars":dict(self.audio),"Deep Bass":dict(self.audio,bass=8),"Ambient":dict(self.audio,reverb=60,delay=25)}
     def data(self):
         return {k:getattr(self,k) for k in ["layers","selected","playlist","current_track","repeat","audio","scene","presets","visualizer","properties"]}

@@ -54,3 +54,8 @@ The Layers workspace now includes a selected-layer inspector with editable name/
 The FFT and analysis module and its thread-safe UI-dispatch pipeline are implemented. The optional Android backend uses `MediaPlayer` plus `Visualizer` on that player's own audio session and forwards waveform samples into the PCM pipeline when permission and device policy allow it. This is not system-wide audio capture. The existing Kivy SoundLoader path remains the default unless native mode is explicitly selected. Audio sliders still update project values; they do not yet process the playing audio. Full OpenGL effects and actual video encoding are also not implemented.
 
 No APK build or physical-device test is claimed for this update. Audio focus callbacks, interruption behavior, playback, listener callbacks, capture permission, and lifecycle behavior still require Android device validation. See `docs/PORTING_PLAN.md` for the remaining integration sequence.
+
+ 
+## Image layer preview update
+
+Image layers can open the platform file chooser and, when the picker returns a filesystem path that Kivy can decode, render the selected image in the preview. Image layers use the same normalized X/Y, scale, opacity and rotation inspector values as text layers. Android document providers may return `content://` URIs rather than filesystem paths; URI decoding and persisted URI permissions are not implemented yet, so image import is not guaranteed for every Android picker/provider. No APK build or device validation is claimed.

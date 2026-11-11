@@ -148,6 +148,23 @@ class VoocRoot(BoxLayout):
                 slider(label,key,lo,hi,step,suf)
             heading("10-BAND EQ")
             for i,f in enumerate(self.s.eq_freqs): slider(str(f)+" Hz","eq_"+str(i),-12,12,.5," dB")
+        elif tab=="Visualizer":
+            heading("SPECTRUM RENDERER")
+            self.spinner(col,"Visualization style",["Bars","Mirror Bars","Dots","Line","Radial"],"visualizer_style")
+            self.spinner(col,"Color palette",["Amber","Cyan","Purple","Green","White"],"visualizer_palette")
+            def vslider(label,key,lo,hi,step):
+                r=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
+                r.add_widget(Label(text=label,size_hint_x=.34,font_size="10sp"))
+                val=Label(text=str(self.s.visualizer.get(key,lo)),size_hint_x=.16,font_size="10sp")
+                sl=Slider(min=lo,max=hi,step=step,value=self.s.visualizer.get(key,lo))
+                def changed(_,v):
+                    self.s.visualizer[key]=round(v,2); val.text=str(self.s.visualizer[key]); self.preview.refresh()
+                sl.bind(value=changed); r.add_widget(sl); r.add_widget(val); col.add_widget(r)
+            vslider("Bar count","bar_count",16,128,8)
+            vslider("Sensitivity","sensitivity",0.2,3.0,0.1)
+            vslider("Smoothing","smoothing",0.0,0.95,0.05)
+            heading("LIVE PREVIEW")
+            action("RESET VISUALIZER",self.reset_visualizer)
         elif tab=="Scene":
             heading("SCENE / CANVAS")
             self.spinner(col,"Aspect ratio",["16:9","9:16","1:1","4:5","4:3"],"ratio")
@@ -163,10 +180,19 @@ class VoocRoot(BoxLayout):
             self.spinner(col,"Quality",["Draft","Standard","High","Maximum"],"quality")
             action("RENDER VIDEO",lambda:self.popup("Video encoder adapter is not yet connected. See docs/PORTING_PLAN.md."))
             action("SAVE PROJECT JSON",self.save)
+    def reset_visualizer(self):
+        self.s.visualizer={"style":"Bars","palette":"Amber","bar_count":64,"sensitivity":1.0,"smoothing":0.35}
+        self.preview.smoothed=[]; self.preview.refresh(); self.show("Visualizer")
     def spinner(self,col,label,values,key):
         r=BoxLayout(size_hint_y=None,height=dp(42)); r.add_widget(Label(text=label,size_hint_x=.35,font_size="11sp"))
-        sp=Spinner(text=self.s.scene.get(key,values[0]),values=values)
-        sp.bind(text=lambda _,v:self.s.scene.__setitem__(key,v)); r.add_widget(sp); col.add_widget(r)
+        if key.startswith("visualizer_"):
+            setting=key.replace("visualizer_","")
+            sp=Spinner(text=self.s.visualizer.get(setting,values[0]),values=values)
+            sp.bind(text=lambda _,v:(self.s.visualizer.__setitem__(setting,v),self.preview.refresh()))
+        else:
+            sp=Spinner(text=self.s.scene.get(key,values[0]),values=values)
+            sp.bind(text=lambda _,v:self.s.scene.__setitem__(key,v))
+        r.add_widget(sp); col.add_widget(r)
     def import_audio(self):
         choose_audio(self.load_track)
     def enable_native_audio(self):

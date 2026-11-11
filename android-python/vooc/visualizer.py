@@ -148,7 +148,7 @@ class Spectrum(Widget):
                     continue
                 layer_type = layer.get("type")
                 if layer_type == "image":
-                    path = layer.get("image_path")
+                    path = layer.get("image_path") or self._prop("IMAGE", "Image Source", "Source", "Pick Image", "")
                     if not path:
                         continue
                     try:
@@ -165,14 +165,17 @@ class Spectrum(Widget):
                     ratio = texture.width / max(1.0, texture.height)
                     image_w = min(max_w, max_h * ratio)
                     image_h = image_w / max(.001, ratio)
-                    if image_h > max_h:
+                    keep_ratio = bool(self._prop("IMAGE", "Image Source", "Source", "Keep Aspect Ratio", True))
+                    if not keep_ratio:
+                        image_w, image_h = max_w, max_h
+                    if image_h > max_h and keep_ratio:
                         image_h = max_h
                         image_w = image_h * ratio
                     x = self.x + self.width * float(layer.get("x", 50)) / 100.0 - image_w / 2
                     y = self.y + self.height * float(layer.get("y", 50)) / 100.0 - image_h / 2
                     opacity_value = self._prop("IMAGE", "General", "Visibility", "Visible", layer.get("visible", True))
                     opacity = max(0.0, min(1.0, float(layer.get("opacity", 1.0)))) if opacity_value else 0.0
-                    opacity *= max(0.0, min(1.0, float(self._prop("IMAGE", "General", "Transform", "Scale Y", 1.0))))
+                    image_h *= max(.05, min(8.0, float(self._prop("IMAGE", "General", "Transform", "Scale Y", 1.0))))
                     PushMatrix()
                     Rotate(angle=float(layer.get("rotation", 0)), origin=(x + image_w / 2, y + image_h / 2))
                     Color(1, 1, 1, opacity)

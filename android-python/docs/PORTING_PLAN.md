@@ -1,11 +1,30 @@
-# Remaining work for complete Vooc parity
+# Vooc Android port — implementation plan
 
-1. Replace Kivy SoundLoader with Android MediaPlayer/Media3 via PyJNIus for reliable seeking, playlists, audio focus, background service and media controls.
-2. Attach Android audio Visualizer / PCM capture and implement FFT bands, RMS, beat/onset detection, beat map, LFO and waveform analysis.
-3. Implement actual audio DSP: 10-band EQ, gain, bass shelf, pan, speed, reverb, delay, distortion and normalization. Current controls update state only.
-4. Implement the full scene graph in OpenGL ES: text/image, spectrum bars, particles, transforms, mirror, RGB split, blur, motion blur and custom shaders.
-5. Implement MediaCodec + MediaMuxer export (H.264/AAC), timestamps, render progress, cancel/resume, scoped-storage destination URI and audio/video sync.
-6. Add full inspector controls, drag handles, keyframes, undo/redo, preset import, export ranges, bitrate controls and project migration.
-7. Test Android 8–15, ARM64, scoped storage, backgrounding, orientation, long tracks, memory pressure and export cancellation.
+This is a staged port, not yet feature parity. Keep the original browser implementation intact.
 
-Do not claim these unfinished integrations are complete until tested on device. Retain the repository's existing MIT license notice in derivative distributions.
+## Completed in this Python foundation
+
+- Kivy six-workspace shell and project state persistence.
+- Basic playlist/transport controls (Kivy audio-provider dependent).
+- Layer and preset state management.
+- Pure-Python radix-2 FFT with Hann window, logarithmic band mapping, RMS/peak metering and energy-onset beat detection.
+- Visualizer API that can render normalized externally supplied spectrum bands.
+
+## Remaining work, in dependency order
+
+1. **Android playback and PCM bridge:** replace or supplement Kivy SoundLoader with Android MediaPlayer/Media3 via PyJNIus/native code; expose a stable playback session and decoded PCM stream. Implement audio focus, lifecycle handling, foreground playback service and notification controls.
+2. **Connect analysis:** feed PCM frames into `AudioAnalyzer.process()`, use monotonic timestamps, tune beat threshold/refractory logic against real music, and call `Spectrum.set_spectrum()` on the UI thread at a bounded refresh rate. Add waveform, BPM estimation, beat map and LFO analysis.
+3. **Actual audio DSP:** implement and validate 10-band EQ, gain, bass shelf, pan, speed, reverb, delay, distortion and normalization in the audio output path. UI state changes alone are not audio processing.
+4. **Scene graph and interaction:** OpenGL ES rendering for text/image, spectrum bars, particles, transforms, mirror, RGB split, blur, motion blur and custom shaders; add inspector controls, drag handles, keyframes, undo/redo and preset import.
+5. **Video export:** MediaCodec + MediaMuxer (H.264/AAC), deterministic frame timestamps, audio/video sync, progress, cancellation/resume, bitrate controls and scoped-storage destination URI.
+6. **Validation:** unit/instrumentation tests; Android 8–15, ARM64, scoped storage, backgrounding, orientation, long tracks, memory pressure and export cancellation. Verify every advertised control on device.
+
+## Current limitations
+
+- No Android PCM capture is wired to the analyzer yet; the preview remains a synthetic placeholder until a capture backend feeds it.
+- The DSP module analyzes samples but does not modify audio output.
+- Kivy SoundLoader seek/pause/URI behavior varies by Android provider.
+- Video export, native notification controls and full visual effects are not implemented.
+- No successful APK build or physical-device validation is asserted by this plan.
+
+Retain the repository's existing MIT license notice in derivative distributions.

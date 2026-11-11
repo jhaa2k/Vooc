@@ -59,3 +59,17 @@ No APK build or physical-device test is claimed for this update. Audio focus cal
 ## Image layer preview update
 
 Image layers can open the platform file chooser and, when the picker returns a filesystem path that Kivy can decode, render the selected image in the preview. Image layers use the same normalized X/Y, scale, opacity and rotation inspector values as text layers. Android document providers may return `content://` URIs rather than filesystem paths; URI decoding and persisted URI permissions are not implemented yet, so image import is not guaranteed for every Android picker/provider. No APK build or device validation is claimed.
+
+## Advanced hierarchical property editor
+
+The **Properties** workspace adds a two-column category menu and accordion-based inspector for COMPOSITION, IMAGE, TEXT, BARS / SEGMENTS, PARTICLES, AUDIOPROVIDER, BLUR EFFECT, RGBSPLITEFFECT, MOTIONBLUREFFECT, MIRROR EFFECT and CUSTOM SHADER. The declarative definitions live in `vooc/property_schema.py`; the reusable Kivy controls and property-path binding live in `vooc/property_editor.py`.
+
+- Dropdown lists are centralized and shared (including the complete Measure Engine and blend-mode lists).
+- Each property is stored under a stable dotted key in `ProjectState.properties` and serialized with the project JSON. Property edits autosave the project file.
+- Reset clears one category's overrides; the next view rebuild restores schema defaults.
+- Supported generic controls currently include sliders, checkboxes, dropdowns, text/number fields and editable code/text fields. Color, font and image values currently use editable text/path fields; dedicated native pickers are not yet connected.
+- Shader compile/apply and dynamic uniform creation currently emit persisted runtime request flags only. There is no GLSL compiler, GPU uniform bridge, or live custom-shader renderer connected yet.
+- The full property hierarchy is now configurable and persisted, but not every property is consumed by the renderer. Measure Engine evaluation, particle simulation, multi-pass blur, chroma key, RGB split, motion blur, mirror compositing, album-art metadata, audio routing and final video rendering still require their respective engine implementations. The existing preview remains the current 2D Kivy renderer.
+- The particle count control exposes a 5,000 maximum; use caution with high counts on mobile hardware. The UI does not silently spawn particles.
+
+Run the schema checks with `python -m unittest discover -s tests -v`.

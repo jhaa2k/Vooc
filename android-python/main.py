@@ -16,6 +16,7 @@ from pathlib import Path
 import json, random
 from vooc.state import ProjectState, THEMES
 from vooc.visualizer import Spectrum
+from vooc.pcm_pipeline import PCMAnalysisPipeline
 from vooc.android_media import choose_audio
 
 class B(Button):
@@ -35,6 +36,7 @@ class VoocRoot(BoxLayout):
             b=B(text=name,size_hint_x=None,width=dp(58)); b.bind(on_release=lambda _,f=fn:f()); top.add_widget(b)
         self.add_widget(top)
         self.preview=Spectrum(self.s,size_hint_y=.38); self.add_widget(self.preview)
+        self.pcm_pipeline=PCMAnalysisPipeline(self._on_audio_analysis, scheduler=lambda callback: Clock.schedule_once(lambda _dt: callback(), 0), sample_rate=44100, fft_size=1024, band_count=64, min_interval=1/30)
         self.track_label=Label(text="No track loaded",size_hint_y=None,height=dp(25),font_size="11sp")
         self.add_widget(self.track_label)
         transport=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
@@ -53,6 +55,14 @@ class VoocRoot(BoxLayout):
         self.add_widget(nav)
         self.show("Media"); Clock.schedule_interval(self.tick,1/20)
 
+    def feed_pcm_samples(self, samples, timestamp=None):
+        """Entry point for a future Android PCM backend; samples must be mono float [-1, 1]."""
+        return self.pcm_pipeline.submit(samples, timestamp)
+    def _on_audio_analysis(self, result):
+        self.preview.set_spectrum(result["bands"], result["beat"])
+    def on_stop(self):
+        if hasattr(self, "pcm_pipeline"):
+            self.pcm_pipeline.close()
     def popup(self,msg):
         Popup(title="Vooc",content=Label(text=msg),size_hint=(.85,None),height=dp(140)).open()
     def show(self,tab):

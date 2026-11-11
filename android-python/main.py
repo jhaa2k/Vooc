@@ -1,0 +1,174 @@
+from kivy.app import App
+from kivy.clock import Clock
+from kivy.metrics import dp
+from kivy.core.window import Window
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.slider import Slider
+from kivy.uix.spinner import Spinner
+from kivy.uix.textinput import TextInput
+from kivy.uix.popup import Popup
+from pathlib import Path
+import json, random
+from vooc.state import ProjectState, THEMES
+from vooc.visualizer import Spectrum
+from vooc.android_media import choose_audio
+
+class B(Button):
+    def __init__(self, **kw):
+        kw.setdefault("size_hint_y", None); kw.setdefault("height", dp(40))
+        kw.setdefault("font_size", "12sp")
+        super().__init__(**kw); self.background_normal=""; self.background_color=(.17,.17,.17,1)
+
+class VoocRoot(BoxLayout):
+    tabs=["Media","Layers","Presets","Audio","Scene","Export"]
+    def __init__(self, **kw):
+        super().__init__(orientation="vertical",padding=dp(7),spacing=dp(5),**kw)
+        self.s=ProjectState(); self.sound=None; self.playing=False; self.track=""
+        top=BoxLayout(size_hint_y=None,height=dp(40))
+        top.add_widget(Label(text="[b]AUDIOVIS PRO[/b]",markup=True,halign="left"))
+        for name,fn in [("SAVE",self.save),("LOAD",self.load)]:
+            b=B(text=name,size_hint_x=None,width=dp(58)); b.bind(on_release=lambda _,f=fn:f()); top.add_widget(b)
+        self.add_widget(top)
+        self.preview=Spectrum(self.s,size_hint_y=.38); self.add_widget(self.preview)
+        self.track_label=Label(text="No track loaded",size_hint_y=None,height=dp(25),font_size="11sp")
+        self.add_widget(self.track_label)
+        transport=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
+        for text,fn in [("IMPORT",self.import_audio),("PLAY / PAUSE",self.toggle),("STOP",self.stop)]:
+            b=B(text=text); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
+        self.add_widget(transport)
+        self.seek=Slider(min=0,max=100,value=0,size_hint_y=None,height=dp(22)); self.add_widget(self.seek)
+        self.body=BoxLayout()
+        self.add_widget(self.body)
+        nav=GridLayout(cols=6,size_hint_y=None,height=dp(50),spacing=dp(2))
+        for tab in self.tabs:
+            b=B(text=tab,font_size="9sp"); b.bind(on_release=lambda _,t=tab:self.show(t)); nav.add_widget(b)
+        self.add_widget(nav)
+        self.show("Media"); Clock.schedule_interval(self.tick,1/20)
+
+    def popup(self,msg):
+        Popup(title="Vooc",content=Label(text=msg),size_hint=(.85,None),height=dp(140)).open()
+    def show(self,tab):
+        self.tab=tab; self.body.clear_widgets()
+        scroll=ScrollView(); col=BoxLayout(orientation="vertical",size_hint_y=None,spacing=dp(5),padding=dp(4))
+        col.bind(minimum_height=col.setter("height")); scroll.add_widget(col); self.body.add_widget(scroll)
+        def heading(t): col.add_widget(Label(text="[b]"+t+"[/b]",markup=True,size_hint_y=None,height=dp(28),halign="left"))
+        def action(t,f):
+            b=B(text=t); b.bind(on_release=lambda *_:f()); col.add_widget(b)
+        def slider(label,key,lo,hi,step=1,suffix=""):
+            r=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
+            r.add_widget(Label(text=label,size_hint_x=.3,font_size="10sp"))
+            val=Label(text=str(self.s.audio.get(key,lo))+suffix,size_hint_x=.16,font_size="10sp")
+            sl=Slider(min=lo,max=hi,step=step,value=self.s.audio.get(key,lo))
+            def changed(_,v):
+                self.s.audio[key]=round(v,2); val.text=str(self.s.audio[key])+suffix; self.preview.refresh()
+            sl.bind(value=changed); r.add_widget(sl); r.add_widget(val); col.add_widget(r)
+        if tab=="Media":
+            heading("MEDIA LIBRARY"); action("＋ IMPORT AUDIO",self.import_audio)
+            action("PLAY / PAUSE",self.toggle); action("STOP",self.stop)
+            action("SHUFFLE PLAYLIST",lambda:random.shuffle(self.s.playlist))
+            action("REPEAT: "+self.s.repeat.upper(),self.repeat)
+            for path in self.s.playlist: action("♫ "+Path(path).name,lambda p=path:self.load_track(p))
+        elif tab=="Layers":
+            heading("LAYER STACK")
+            for i,l in enumerate(self.s.layers):
+                action(("● " if l["visible"] else "○ ")+l["name"],lambda ix=i:self.select_layer(ix))
+            action("＋ ADD SPECTRUM",lambda:self.add_layer("Spectrum"))
+            action("＋ ADD TEXT",lambda:self.add_layer("Text"))
+            action("＋ ADD IMAGE",lambda:self.add_layer("Image"))
+            action("DUPLICATE SELECTED",self.duplicate)
+            action("TOGGLE VISIBILITY",self.visibility)
+            action("DELETE SELECTED",self.delete_layer)
+            if self.s.layers:
+                l=self.s.layers[self.s.selected]
+                ti=TextInput(text=l["name"],multiline=False,size_hint_y=None,height=dp(40))
+                ti.bind(text=lambda _,v:l.__setitem__("name",v)); col.add_widget(ti)
+        elif tab=="Presets":
+            heading("VISUALIZER PRESETS")
+            for n in self.s.presets: action("APPLY "+n,lambda name=n:self.apply_preset(name))
+            action("SAVE CURRENT PRESET",self.save_preset)
+            action("DELETE LAST PRESET",self.delete_preset)
+        elif tab=="Audio":
+            heading("AUDIO PROCESSING CONTROLS")
+            for label,key,lo,hi,step,suf in [
+                ("Volume","volume",0,150,1,"%"),("Pre gain","pre",-24,24,1," dB"),
+                ("Bass","bass",-12,12,.5," dB"),("Balance","balance",-100,100,1,""),
+                ("Speed","speed",50,200,1,"%"),("Reverb","reverb",0,100,1,"%"),
+                ("Delay","delay",0,100,1,"%"),("Distortion","distortion",0,100,1,"%")]:
+                slider(label,key,lo,hi,step,suf)
+            heading("10-BAND EQ")
+            for i,f in enumerate(self.s.eq_freqs): slider(str(f)+" Hz","eq_"+str(i),-12,12,.5," dB")
+        elif tab=="Scene":
+            heading("SCENE / CANVAS")
+            self.spinner(col,"Aspect ratio",["16:9","9:16","1:1","4:5","4:3"],"ratio")
+            self.spinner(col,"Resolution",["720p","1080p","1440p","2160p"],"resolution")
+            self.spinner(col,"Frame rate",["24","30","60"],"fps")
+            heading("THEME")
+            self.spinner(col,"Theme",list(THEMES),"theme")
+        elif tab=="Export":
+            heading("VIDEO EXPORT SETTINGS")
+            self.spinner(col,"Format",["MP4","WEBM","GIF"],"format")
+            self.spinner(col,"Resolution",["720p","1080p","1440p","2160p"],"resolution")
+            self.spinner(col,"FPS",["24","30","60"],"fps")
+            self.spinner(col,"Quality",["Draft","Standard","High","Maximum"],"quality")
+            action("RENDER VIDEO",lambda:self.popup("Video encoder adapter is not yet connected. See docs/PORTING_PLAN.md."))
+            action("SAVE PROJECT JSON",self.save)
+    def spinner(self,col,label,values,key):
+        r=BoxLayout(size_hint_y=None,height=dp(42)); r.add_widget(Label(text=label,size_hint_x=.35,font_size="11sp"))
+        sp=Spinner(text=self.s.scene.get(key,values[0]),values=values)
+        sp.bind(text=lambda _,v:self.s.scene.__setitem__(key,v)); r.add_widget(sp); col.add_widget(r)
+    def import_audio(self): choose_audio(self.load_track)
+    def load_track(self,path):
+        if not path:return
+        try:
+            if self.sound:self.sound.stop()
+            self.sound=SoundLoader.load(path)
+            if not self.sound:self.popup("This audio format is not supported by the installed Android audio provider.");return
+            self.track=path; self.s.current_track=path
+            if path not in self.s.playlist:self.s.playlist.append(path)
+            self.track_label.text=Path(path).name; self.seek.max=max(1,self.sound.length or 1)
+            self.playing=False; self.preview.refresh()
+        except Exception as e:self.popup(str(e))
+    def toggle(self):
+        if not self.sound:self.import_audio();return
+        if self.playing:self.sound.stop();self.playing=False
+        else:self.sound.play();self.playing=True
+    def stop(self):
+        if self.sound:self.sound.stop()
+        self.playing=False;self.seek.value=0
+    def tick(self,dt):
+        if self.sound and self.playing:
+            try:self.seek.value=self.sound.get_pos()
+            except Exception:pass
+        self.preview.refresh()
+    def add_layer(self,k):
+        self.s.layers.append({"type":k.lower(),"name":k+" "+str(len(self.s.layers)+1),"visible":True,"locked":False,"x":50,"y":50})
+        self.s.selected=len(self.s.layers)-1;self.show("Layers")
+    def select_layer(self,i):self.s.selected=i;self.show("Layers")
+    def duplicate(self):
+        if self.s.layers:
+            x=dict(self.s.layers[self.s.selected]);x["name"]+=" copy";self.s.layers.append(x);self.s.selected=len(self.s.layers)-1;self.show("Layers")
+    def visibility(self):
+        if self.s.layers:self.s.layers[self.s.selected]["visible"]=not self.s.layers[self.s.selected]["visible"];self.preview.refresh();self.show("Layers")
+    def delete_layer(self):
+        if self.s.layers:self.s.layers.pop(self.s.selected);self.s.selected=max(0,min(self.s.selected,len(self.s.layers)-1));self.show("Layers")
+    def repeat(self):self.s.repeat={"off":"all","all":"one","one":"off"}[self.s.repeat];self.show("Media")
+    def save_preset(self):self.s.presets["Custom "+str(len(self.s.presets)+1)]=dict(self.s.audio);self.show("Presets")
+    def apply_preset(self,n):self.s.audio.update(self.s.presets[n]);self.show("Audio")
+    def delete_preset(self):
+        if self.s.presets:self.s.presets.pop(list(self.s.presets)[-1]);self.show("Presets")
+    def save(self):
+        p=Path(App.get_running_app().user_data_dir)/"vooc_project.json"
+        p.write_text(json.dumps(self.s.data(),indent=2));self.popup("Project saved: "+str(p))
+    def load(self):
+        p=Path(App.get_running_app().user_data_dir)/"vooc_project.json"
+        if p.exists():self.s=ProjectState.from_data(json.loads(p.read_text()));self.show(self.tab);self.popup("Project loaded")
+        else:self.popup("No saved project found.")
+
+class VoocApp(App):
+    def build(self):
+        self.title="Vooc";Window.clearcolor=(.08,.08,.08,1);return VoocRoot()
+if __name__=="__main__":VoocApp().run()

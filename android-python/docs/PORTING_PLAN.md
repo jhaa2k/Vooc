@@ -13,7 +13,7 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 
 ## Remaining work, in dependency order
 
-1. **Android playback and PCM bridge:** replace or supplement Kivy SoundLoader with Android MediaPlayer/Media3 via PyJNIus/native code; expose a stable playback session and decoded PCM stream. Implement audio focus, lifecycle handling, foreground playback service and notification controls.
+1. **Android playback and PCM bridge:** an opt-in PyJNIus `MediaPlayer` + session-scoped `Visualizer` adapter is now present and connected to the PCM pipeline. Validate runtime permission, callback delivery, URI/path handling, pause/seek/completion, audio focus and lifecycle on physical Android devices. Then add foreground playback service and notification controls; migrate to Media3 if required.
 2. **Connect analysis:** implement the platform capture backend and call `VoocRoot.feed_pcm_samples()` with normalized mono PCM frames. The pipeline already runs `AudioAnalyzer`, throttles UI dispatch and routes results to `Spectrum.set_spectrum()` on the Kivy UI thread. Use monotonic timestamps and tune beat threshold/refractory logic against real music. Add waveform, BPM estimation, beat map and LFO analysis.
 3. **Actual audio DSP:** implement and validate 10-band EQ, gain, bass shelf, pan, speed, reverb, delay, distortion and normalization in the audio output path. UI state changes alone are not audio processing.
 4. **Scene graph and interaction:** OpenGL ES rendering for text/image, spectrum bars, particles, transforms, mirror, RGB split, blur, motion blur and custom shaders; add inspector controls, drag handles, keyframes, undo/redo and preset import.
@@ -22,7 +22,7 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 
 ## Current limitations
 
-- No Android PCM capture is wired to the analyzer yet; the preview remains a synthetic placeholder until a capture backend feeds it.
+- The optional Android MediaPlayer/Visualizer backend is wired to the analyzer, but its waveform callback has not been validated on a physical device. The default Kivy path still shows the synthetic placeholder.
 - The DSP module analyzes samples but does not modify audio output.
 - Kivy SoundLoader seek/pause/URI behavior varies by Android provider.
 - Video export, native notification controls and full visual effects are not implemented.

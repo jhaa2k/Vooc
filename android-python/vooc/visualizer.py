@@ -31,6 +31,7 @@ class Spectrum(Widget):
         self._image_textures = {}
         self.measure_engine = MeasureEngine()
         self.particle_system = ParticleSystem()
+        self.particles = []
         self._audio_level = 0.0
         self._last_beat = False
         self.bind(pos=self.refresh, size=self.refresh)
@@ -86,6 +87,25 @@ class Spectrum(Widget):
         self.beat_pulse = max(0.0, self.beat_pulse - dt * 3.5)
         self.measure_engine.update(dt, beat=self._last_beat, rms=self._audio_level, peak=self._audio_level)
         self._last_beat = False
+        particle_settings = {
+            "count": self._prop("PARTICLES", "Overall Settings", "Emitter", "Count Limit", 120),
+            "lifetime": self._prop("PARTICLES", "Behaviour", "Motion", "Lifetime", 2.0),
+            "spawn_time": self._prop("PARTICLES", "Behaviour", "Motion", "Spawn Time", .035),
+            "speed": self._prop("PARTICLES", "Behaviour", "Motion", "Speed", 65.0),
+            "speed_random": self._prop("PARTICLES", "Behaviour", "Motion", "Speed Random", .35),
+            "gravity_x": self._prop("PARTICLES", "Behaviour", "Motion", "Gravity X", 0.0),
+            "gravity_y": self._prop("PARTICLES", "Behaviour", "Motion", "Gravity Y", -20.0),
+            "spawn_area": self._prop("PARTICLES", "Overall Settings", "Emitter", "Spawn Area", "Rectangle"),
+            "angle": self._prop("PARTICLES", "Overall Settings", "Emitter", "Vector Angle", 90.0),
+            "force_field": self._prop("PARTICLES", "Overall Settings", "Emitter", "Force Field", "None"),
+            "size": self._prop("PARTICLES", "Appearance", "Particle Appearance", "Start Size", 2.5),
+            "audio_reactive": True,
+        }
+        if bool(self._prop("PARTICLES", "General", "Visibility", "Visible", False)):
+            self.particles = self.particle_system.update(dt, particle_settings, self.width, self.height,
+                audio_level=self._audio_level, beat=self.beat_pulse > .75)
+        else:
+            self.particles = []
         self.refresh()
 
     def refresh(self, *_):
@@ -156,28 +176,10 @@ class Spectrum(Widget):
                          width=dp(2), cap="round")
                 Color(*rgb, .22 + self.beat_pulse * .35)
                 Ellipse(pos=(cx-radius*.12, cy-radius*.12), size=(radius*.24, radius*.24))
-            # Bounded particle simulation: only draws active particles and honors the configured cap.
-            particle_settings = {
-                "count": self._prop("PARTICLES", "Overall Settings", "Emitter", "Count Limit", 120),
-                "lifetime": self._prop("PARTICLES", "Behaviour", "Motion", "Lifetime", 2.0),
-                "spawn_time": self._prop("PARTICLES", "Behaviour", "Motion", "Spawn Time", .035),
-                "speed": self._prop("PARTICLES", "Behaviour", "Motion", "Speed", 65.0),
-                "speed_random": self._prop("PARTICLES", "Behaviour", "Motion", "Speed Random", .35),
-                "gravity_x": self._prop("PARTICLES", "Behaviour", "Motion", "Gravity X", 0.0),
-                "gravity_y": self._prop("PARTICLES", "Behaviour", "Motion", "Gravity Y", -20.0),
-                "spawn_area": self._prop("PARTICLES", "Overall Settings", "Emitter", "Spawn Area", "Rectangle"),
-                "angle": self._prop("PARTICLES", "Overall Settings", "Emitter", "Vector Angle", 90.0),
-                "force_field": self._prop("PARTICLES", "Overall Settings", "Emitter", "Force Field", "None"),
-                "size": self._prop("PARTICLES", "Appearance", "Particle Appearance", "Start Size", 2.5),
-                "audio_reactive": True,
-            }
-            particle_enabled = bool(self._prop("PARTICLES", "General", "Visibility", "Visible", False))
-            if particle_enabled:
-                particles = self.particle_system.update(dt=1.0/30.0, settings=particle_settings,
-                    width=self.width, height=self.height, audio_level=self._audio_level,
-                    beat=self.beat_pulse > .75)
+            # Draw cached particle state; simulation advances only on the fixed preview tick.
+            if self.particles:
                 particle_color = self._rgba(self._prop("PARTICLES", "Overall Settings", "Emitter", "Color", "#FFFFFFFF"))
-                for particle in particles:
+                for particle in self.particles:
                     life_ratio = max(0.0, min(1.0, 1.0 - particle["age"] / max(.001, particle["life"])))
                     Color(particle_color[0], particle_color[1], particle_color[2], particle_color[3] * life_ratio)
                     size = dp(particle["size"])

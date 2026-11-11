@@ -18,7 +18,8 @@ from vooc.state import ProjectState, THEMES
 from vooc.visualizer import Spectrum
 from vooc.pcm_pipeline import PCMAnalysisPipeline
 from vooc.android_audio import AndroidMediaPlayerSource
-from vooc.android_media import choose_audio, choose_image\nfrom vooc.property_editor import AdvancedProperties
+from vooc.android_media import choose_audio, choose_image
+from vooc.property_editor import AdvancedProperties
 
 class B(Button):
     def __init__(self, **kw):

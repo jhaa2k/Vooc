@@ -8,15 +8,16 @@ import time
 
 
 class AndroidMediaPlayerSource:
-    def __init__(self, on_pcm, on_error=None):
+    def __init__(self, on_pcm, on_error=None, on_completion=None):
         self.on_pcm = on_pcm
         self.on_error = on_error or (lambda message: None)
+        self.on_completion = on_completion or (lambda: None)
         self.player = None
         self.visualizer = None
-        self._listener = None
+        self._capture_listener = None
+        self._player_listener = None
         self._lock = threading.RLock()
         self._released = False
-        self._pending_capture = False
 
     @staticmethod
     def is_available():
@@ -30,21 +31,53 @@ class AndroidMediaPlayerSource:
 
     def load(self, path, autoplay=False):
         """Prepare a local filesystem audio path using Android MediaPlayer."""
+        player = None
         try:
-            from jnius import autoclass
+            from jnius import autoclass, PythonJavaClass, java_method
             MediaPlayer = autoclass("android.media.MediaPlayer")
+            source = self
+
+            class PlayerListener(PythonJavaClass):
+                __javainterfaces__ = [
+                    "android/media/MediaPlayer$OnCompletionListener",
+                    "android/media/MediaPlayer$OnErrorListener",
+                ]
+                __javacontext__ = "app"
+
+                @java_method("(Landroid/media/MediaPlayer;)V")
+                def onCompletion(self, media_player):
+                    source.on_completion()
+
+                @java_method("(Landroid/media/MediaPlayer;II)Z")
+                def onError(self, media_player, what, extra):
+                    source.on_error(
+                        "Android MediaPlayer error (what=%s, extra=%s)." % (what, extra)
+                    )
+                    return True
+
             player = MediaPlayer()
+            listener = PlayerListener()
+            player.setOnCompletionListener(listener)
+            player.setOnErrorListener(listener)
             player.setDataSource(str(path))
             player.prepare()
+
             with self._lock:
                 self.release()
                 self.player = player
+                self._player_listener = listener
                 self._released = False
+
             self._request_capture_permission()
             if autoplay:
-                self.play()
+                return self.play()
             return True
         except Exception as exc:
+            if player is not None:
+                try:
+                    player.release()
+                except Exception:
+                    pass
             self.on_error("Android MediaPlayer load failed: " + str(exc))
             return False
 
@@ -72,9 +105,7 @@ class AndroidMediaPlayerSource:
                 session_id = self.player.getAudioSessionId()
                 visualizer = Visualizer(session_id)
                 capture_range = Visualizer.getCaptureSizeRange()
-                capture_size = int(capture_range[1])
-                visualizer.setCaptureSize(capture_size)
-
+                visualizer.setCaptureSize(int(capture_range[1]))
                 source = self
 
                 class CaptureListener(PythonJavaClass):
@@ -103,64 +134,74 @@ class AndroidMediaPlayerSource:
                 visualizer.setDataCaptureListener(listener, rate, True, False)
                 visualizer.setEnabled(True)
                 self.visualizer = visualizer
-                self._listener = listener
+                self._capture_listener = listener
         except Exception as exc:
             self.on_error("Android Visualizer could not start: " + str(exc))
 
     def play(self):
         try:
-            if self.player is not None:
+            with self._lock:
+                if self.player is None or self._released:
+                    return False
                 self.player.start()
                 if self.visualizer is not None:
                     self.visualizer.setEnabled(True)
-                return True
+            return True
         except Exception as exc:
             self.on_error("Playback start failed: " + str(exc))
-        return False
+            return False
 
     def pause(self):
         try:
-            if self.player is not None and self.player.isPlaying():
-                self.player.pause()
-                return True
+            with self._lock:
+                if self.player is not None and self.player.isPlaying():
+                    self.player.pause()
+                    return True
         except Exception as exc:
             self.on_error("Playback pause failed: " + str(exc))
         return False
 
     def stop(self):
         try:
-            if self.player is not None:
-                self.player.pause()
-                self.player.seekTo(0)
-                return True
+            with self._lock:
+                if self.player is not None:
+                    self.player.pause()
+                    self.player.seekTo(0)
+                    return True
         except Exception as exc:
             self.on_error("Playback stop failed: " + str(exc))
         return False
 
     def seek(self, position_ms):
         try:
-            if self.player is not None:
-                self.player.seekTo(max(0, int(position_ms)))
-                return True
+            with self._lock:
+                if self.player is not None:
+                    duration = max(0, int(self.player.getDuration()))
+                    target = max(0, min(int(position_ms), duration))
+                    self.player.seekTo(target)
+                    return True
         except Exception as exc:
             self.on_error("Playback seek failed: " + str(exc))
         return False
 
     def position_ms(self):
         try:
-            return int(self.player.getCurrentPosition()) if self.player is not None else 0
+            with self._lock:
+                return int(self.player.getCurrentPosition()) if self.player is not None else 0
         except Exception:
             return 0
 
     def duration_ms(self):
         try:
-            return int(self.player.getDuration()) if self.player is not None else 0
+            with self._lock:
+                return int(self.player.getDuration()) if self.player is not None else 0
         except Exception:
             return 0
 
     def is_playing(self):
         try:
-            return bool(self.player is not None and self.player.isPlaying())
+            with self._lock:
+                return bool(self.player is not None and self.player.isPlaying())
         except Exception:
             return False
 
@@ -174,10 +215,13 @@ class AndroidMediaPlayerSource:
                 except Exception:
                     pass
                 self.visualizer = None
-                self._listener = None
+                self._capture_listener = None
             if self.player is not None:
                 try:
+                    self.player.setOnCompletionListener(None)
+                    self.player.setOnErrorListener(None)
                     self.player.release()
                 except Exception:
                     pass
                 self.player = None
+                self._player_listener = None

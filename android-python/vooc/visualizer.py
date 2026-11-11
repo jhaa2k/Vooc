@@ -3,6 +3,7 @@ from kivy.clock import Clock
 from kivy.graphics import Color, Rectangle, Ellipse, Line
 from kivy.metrics import dp
 from kivy.core.text import Label as CoreLabel
+from kivy.core.image import Image as CoreImage
 from kivy.graphics import PushMatrix, PopMatrix, Rotate
 import math
 
@@ -25,6 +26,7 @@ class Spectrum(Widget):
         self.bands = None
         self.smoothed = []
         self.beat_pulse = 0.0
+        self._image_textures = {}
         self.bind(pos=self.refresh, size=self.refresh)
         Clock.schedule_interval(self.tick, 1 / 30)
 
@@ -114,8 +116,42 @@ class Spectrum(Widget):
                          width=dp(2), cap="round")
                 Color(*rgb, .22 + self.beat_pulse * .35)
                 Ellipse(pos=(cx-radius*.12, cy-radius*.12), size=(radius*.24, radius*.24))
-            # Text layers are rendered in normalized scene coordinates.
+            # Image and text layers share normalized scene coordinates and transforms.
             for layer in getattr(self.state, "layers", []):
+                if not layer.get("visible", True):
+                    continue
+                layer_type = layer.get("type")
+                if layer_type == "image":
+                    path = layer.get("image_path")
+                    if not path:
+                        continue
+                    try:
+                        if path not in self._image_textures:
+                            self._image_textures[path] = CoreImage(path).texture
+                        texture = self._image_textures[path]
+                    except Exception:
+                        continue
+                    if not texture:
+                        continue
+                    scale = max(.25, min(4.0, float(layer.get("scale", 1.0))))
+                    max_w, max_h = self.width * .48 * scale, self.height * .72 * scale
+                    ratio = texture.width / max(1.0, texture.height)
+                    image_w = min(max_w, max_h * ratio)
+                    image_h = image_w / max(.001, ratio)
+                    if image_h > max_h:
+                        image_h = max_h
+                        image_w = image_h * ratio
+                    x = self.x + self.width * float(layer.get("x", 50)) / 100.0 - image_w / 2
+                    y = self.y + self.height * float(layer.get("y", 50)) / 100.0 - image_h / 2
+                    opacity = max(0.0, min(1.0, float(layer.get("opacity", 1.0))))
+                    PushMatrix()
+                    Rotate(angle=float(layer.get("rotation", 0)), origin=(x + image_w / 2, y + image_h / 2))
+                    Color(1, 1, 1, opacity)
+                    Rectangle(texture=texture, pos=(x, y), size=(image_w, image_h))
+                    PopMatrix()
+                    continue
+                if layer_type != "text":
+                    continue
                 if not layer.get("visible", True) or layer.get("type") != "text":
                     continue
                 label = CoreLabel(text=str(layer.get("name", "Text")),

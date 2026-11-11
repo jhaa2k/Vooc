@@ -38,10 +38,12 @@ class VoocRoot(BoxLayout):
         self.track_label=Label(text="No track loaded",size_hint_y=None,height=dp(25),font_size="11sp")
         self.add_widget(self.track_label)
         transport=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
-        for text,fn in [("IMPORT",self.import_audio),("PLAY / PAUSE",self.toggle),("STOP",self.stop)]:
-            b=B(text=text); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
+        for text,fn in [("PREV",self.previous),("IMPORT",self.import_audio),("PLAY / PAUSE",self.toggle),("STOP",self.stop),("NEXT",self.next)]:
+            b=B(text=text,font_size="10sp"); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
         self.add_widget(transport)
-        self.seek=Slider(min=0,max=100,value=0,size_hint_y=None,height=dp(22)); self.add_widget(self.seek)
+        self.seek=Slider(min=0,max=100,value=0,size_hint_y=None,height=dp(22))
+        self.seek.bind(on_touch_up=self.seek_audio); self.add_widget(self.seek)
+        self._last_track_pos=0; self._end_handled=False
         self.body=BoxLayout()
         self.add_widget(self.body)
         nav=GridLayout(cols=6,size_hint_y=None,height=dp(50),spacing=dp(2))
@@ -72,7 +74,9 @@ class VoocRoot(BoxLayout):
             action("PLAY / PAUSE",self.toggle); action("STOP",self.stop)
             action("SHUFFLE PLAYLIST",lambda:random.shuffle(self.s.playlist))
             action("REPEAT: "+self.s.repeat.upper(),self.repeat)
-            for path in self.s.playlist: action("♫ "+Path(path).name,lambda p=path:self.load_track(p))
+            for i,path in enumerate(self.s.playlist):
+                action(("▶ " if path==self.track else "♫ ")+Path(path).name,lambda p=path:self.load_track(p))
+            if not self.s.playlist: col.add_widget(Label(text="Your imported tracks will appear here.",size_hint_y=None,height=dp(36),font_size="11sp"))
         elif tab=="Layers":
             heading("LAYER STACK")
             for i,l in enumerate(self.s.layers):
@@ -131,7 +135,8 @@ class VoocRoot(BoxLayout):
             self.track=path; self.s.current_track=path
             if path not in self.s.playlist:self.s.playlist.append(path)
             self.track_label.text=Path(path).name; self.seek.max=max(1,self.sound.length or 1)
-            self.playing=False; self.preview.refresh()
+            self.playing=False; self._last_track_pos=0; self._end_handled=False; self.seek.value=0
+            self.preview.refresh(); self.show("Media")
         except Exception as e:self.popup(str(e))
     def toggle(self):
         if not self.sound:self.import_audio();return
@@ -140,9 +145,37 @@ class VoocRoot(BoxLayout):
     def stop(self):
         if self.sound:self.sound.stop()
         self.playing=False;self.seek.value=0
+    def seek_audio(self, slider, touch):
+        if not self.sound or not slider.collide_point(*touch.pos): return
+        try:
+            self.sound.seek(max(0,min(float(slider.value),float(self.sound.length or slider.value))))
+            self._last_track_pos=float(slider.value); self._end_handled=False
+        except Exception: pass
+    def previous(self):
+        if not self.s.playlist:return
+        try:i=self.s.playlist.index(self.track)
+        except ValueError:i=0
+        if self.sound and self.sound.get_pos()>3:
+            self.sound.seek(0);return
+        self.load_track(self.s.playlist[(i-1)%len(self.s.playlist)]);self.toggle()
+    def next(self):
+        if not self.s.playlist:return
+        try:i=self.s.playlist.index(self.track)
+        except ValueError:i=-1
+        if self.s.repeat=="one" and self.track:
+            self.load_track(self.track);self.toggle();return
+        if i+1<len(self.s.playlist): self.load_track(self.s.playlist[i+1]);self.toggle()
+        elif self.s.repeat=="all": self.load_track(self.s.playlist[0]);self.toggle()
+        else:self.stop()
     def tick(self,dt):
         if self.sound and self.playing:
-            try:self.seek.value=self.sound.get_pos()
+            try:
+                pos=float(self.sound.get_pos() or 0); duration=float(self.sound.length or 0)
+                if not self.seek.is_touching: self.seek.value=pos
+                if duration>0 and pos>=duration-.25 and not self._end_handled:
+                    self._end_handled=True; self.playing=False
+                    if self.s.repeat=="one": self.load_track(self.track);self.toggle()
+                    else:self.next()
             except Exception:pass
         self.preview.refresh()
     def add_layer(self,k):

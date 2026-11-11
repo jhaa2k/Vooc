@@ -17,6 +17,7 @@ import json, random
 from vooc.state import ProjectState, THEMES
 from vooc.visualizer import Spectrum
 from vooc.pcm_pipeline import PCMAnalysisPipeline
+from vooc.android_audio import AndroidMediaPlayerSource
 from vooc.android_media import choose_audio
 
 class B(Button):
@@ -30,6 +31,8 @@ class VoocRoot(BoxLayout):
     def __init__(self, **kw):
         super().__init__(orientation="vertical",padding=dp(7),spacing=dp(5),**kw)
         self.s=ProjectState(); self.sound=None; self.playing=False; self.track=""; self._paused_at=0.0
+        self.native_mode=False
+        self.native_audio=AndroidMediaPlayerSource(self.feed_pcm_samples, self._native_error)
         top=BoxLayout(size_hint_y=None,height=dp(40))
         top.add_widget(Label(text="[b]AUDIOVIS PRO[/b]",markup=True,halign="left"))
         for name,fn in [("SAVE",self.save),("LOAD",self.load)]:
@@ -63,6 +66,8 @@ class VoocRoot(BoxLayout):
     def on_stop(self):
         if hasattr(self, "pcm_pipeline"):
             self.pcm_pipeline.close()
+        if hasattr(self, "native_audio"):
+            self.native_audio.release()
     def popup(self,msg):
         Popup(title="Vooc",content=Label(text=msg),size_hint=(.85,None),height=dp(140)).open()
     def show(self,tab):
@@ -82,6 +87,7 @@ class VoocRoot(BoxLayout):
             sl.bind(value=changed); r.add_widget(sl); r.add_widget(val); col.add_widget(r)
         if tab=="Media":
             heading("MEDIA LIBRARY"); action("＋ IMPORT AUDIO",self.import_audio)
+            action("USE ANDROID NATIVE PLAYER",self.enable_native_audio)
             action("PLAY / PAUSE",self.toggle); action("STOP",self.stop)
             action("SHUFFLE PLAYLIST",lambda:random.shuffle(self.s.playlist))
             action("REPEAT: "+self.s.repeat.upper(),self.repeat)
@@ -137,19 +143,43 @@ class VoocRoot(BoxLayout):
         sp=Spinner(text=self.s.scene.get(key,values[0]),values=values)
         sp.bind(text=lambda _,v:self.s.scene.__setitem__(key,v)); r.add_widget(sp); col.add_widget(r)
     def import_audio(self): choose_audio(self.load_track)
+    def _native_error(self, message):
+        Clock.schedule_once(lambda _dt: self.popup(message), 0)
+    def enable_native_audio(self):
+        if not AndroidMediaPlayerSource.is_available():
+            self.popup("Android native audio is available only in the Android build.")
+            return
+        if not self.track:
+            self.import_audio()
+            return
+        if self.native_audio.load(self.track, autoplay=True):
+            self.native_mode=True; self.playing=True
+            self.seek.max=max(1, self.native_audio.duration_ms()/1000.0)
+            self.popup("Android native playback started. Waveform capture requires RECORD_AUDIO permission.")
     def load_track(self,path):
         if not path:return
         try:
-            if self.sound:self.sound.stop()
-            self.sound=SoundLoader.load(path)
-            if not self.sound:self.popup("This audio format is not supported by the installed Android audio provider.");return
+            if self.native_mode:
+                if not self.native_audio.load(path, autoplay=False): return
+                self.sound=None
+                duration=self.native_audio.duration_ms()/1000.0
+            else:
+                if self.sound:self.sound.stop()
+                self.sound=SoundLoader.load(path)
+                if not self.sound:self.popup("This audio format is not supported by the installed Android audio provider.");return
+                duration=float(self.sound.length or 1)
             self.track=path; self.s.current_track=path
             if path not in self.s.playlist:self.s.playlist.append(path)
-            self.track_label.text=Path(path).name; self.seek.max=max(1,self.sound.length or 1)
+            self.track_label.text=Path(path).name; self.seek.max=max(1,duration)
             self.playing=False; self._paused_at=0.0; self._last_track_pos=0; self._end_handled=False; self.seek.value=0
             self.preview.refresh(); self.show("Media")
         except Exception as e:self.popup(str(e))
     def toggle(self):
+        if self.native_mode:
+            if not self.track:self.import_audio();return
+            if self.playing:self.native_audio.pause();self.playing=False
+            else:self.playing=self.native_audio.play()
+            return
         if not self.sound:self.import_audio();return
         if self.playing:
             try:self._paused_at=float(self.sound.get_pos() or self.seek.value)
@@ -162,6 +192,7 @@ class VoocRoot(BoxLayout):
                 except Exception:pass
             self.playing=True
     def stop(self):
+        if self.native_mode:self.native_audio.stop()
         if self.sound:self.sound.stop()
         self.playing=False;self._paused_at=0.0;self._end_handled=False;self.seek.value=0
     def seek_touch_down(self, slider, touch):
@@ -169,6 +200,9 @@ class VoocRoot(BoxLayout):
     def seek_audio(self, slider, touch):
         if not slider.collide_point(*touch.pos): return
         self._seek_dragging=False
+        if self.native_mode:
+            self.native_audio.seek(float(slider.value)*1000.0); self._last_track_pos=float(slider.value); self._end_handled=False
+            return
         if not self.sound:return
         try:
             self.sound.seek(max(0,min(float(slider.value),float(self.sound.length or slider.value))))
@@ -191,6 +225,13 @@ class VoocRoot(BoxLayout):
         elif self.s.repeat=="all": self.load_track(self.s.playlist[0]);self.toggle()
         else:self.stop()
     def tick(self,dt):
+        if self.native_mode and self.playing:
+            pos=self.native_audio.position_ms()/1000.0; duration=self.native_audio.duration_ms()/1000.0
+            if not self._seek_dragging:self.seek.value=pos
+            if duration>0 and pos>=duration-.25 and not self._end_handled:
+                self._end_handled=True; self.playing=False
+                if self.s.repeat=="one": self.load_track(self.track);self.toggle()
+                else:self.next()
         if self.sound and self.playing:
             try:
                 pos=float(self.sound.get_pos() or 0); duration=float(self.sound.length or 0)

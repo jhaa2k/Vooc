@@ -11,6 +11,7 @@ from kivy.uix.slider import Slider
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
+from kivy.core.audio import SoundLoader
 from pathlib import Path
 import json, random
 from vooc.state import ProjectState, THEMES

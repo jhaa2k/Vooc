@@ -41,6 +41,10 @@ The native backend now registers Android `MediaPlayer.OnCompletionListener` and 
 
 These callbacks and the permission/capture flow are code-level integrations only; they have not been validated on a physical Android device. The native backend currently accepts local filesystem paths, not Storage Access Framework content URIs. Android legacy AudioManager focus is now requested before native playback. Transient loss pauses and resumes on focus gain; duck requests lower the player volume; permanent loss does not auto-resume. A foreground playback service, lock-screen/notification media controls, and background-resilient playback are not implemented.
 
+## Avee-inspired visualizer controls
+
+The Visualizer workspace adds five render styles (Bars, Mirror Bars, Dots, Line and Radial), five color palettes, adjustable band count, sensitivity and smoothing. Settings are stored in project JSON and update the preview immediately. The renderer consumes FFT-derived band amplitudes when the PCM pipeline supplies them; its animated fallback is only a preview placeholder when no audio analysis data is available. This is a foundational 2D Kivy renderer, not yet the planned OpenGL ES effect/layer engine.
+
 ## Important implementation status
 
 The FFT and analysis module and its thread-safe UI-dispatch pipeline are implemented. The optional Android backend uses `MediaPlayer` plus `Visualizer` on that player's own audio session and forwards waveform samples into the PCM pipeline when permission and device policy allow it. This is not system-wide audio capture. The existing Kivy SoundLoader path remains the default unless native mode is explicitly selected. Audio sliders still update project values; they do not yet process the playing audio. Full OpenGL effects and actual video encoding are also not implemented.

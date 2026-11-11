@@ -12,6 +12,12 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 - Thread-safe PCM analysis pipeline with scheduler-based UI delivery, lifecycle shutdown, and an app-level `feed_pcm_samples()` integration point.
 - Optional PyJNIus Android `MediaPlayer` backend with session-scoped `Visualizer` capture, runtime permission request, and completion/error listener integration. Native mode selection is retained while the user picks a track.
 
+## Newly implemented visualizer foundation
+
+- Dedicated Visualizer workspace with Bars, Mirror Bars, Dots, Line and Radial spectrum render styles.
+- Palette selection (Amber, Cyan, Purple, Green, White), adjustable band count, sensitivity and smoothing.
+- Visualizer settings persist in project JSON and refresh the preview immediately.
+
 ## Remaining work, in dependency order
 
 1. **Android playback hardening:** validate runtime permission, callback delivery, URI/path handling, pause/seek/completion, audio focus and lifecycle on physical Android devices. Legacy AudioManager focus request and focus-loss/duck handling are now wired into native playback. Validate on devices, then add a foreground playback service and notification controls; migrate to Media3 if required.

@@ -42,7 +42,8 @@ class VoocRoot(BoxLayout):
             b=B(text=text,font_size="10sp"); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
         self.add_widget(transport)
         self.seek=Slider(min=0,max=100,value=0,size_hint_y=None,height=dp(22))
-        self.seek.bind(on_touch_up=self.seek_audio); self.add_widget(self.seek)
+        self._seek_dragging=False
+        self.seek.bind(on_touch_down=self.seek_touch_down,on_touch_up=self.seek_audio); self.add_widget(self.seek)
         self._last_track_pos=0; self._end_handled=False
         self.body=BoxLayout()
         self.add_widget(self.body)
@@ -145,8 +146,12 @@ class VoocRoot(BoxLayout):
     def stop(self):
         if self.sound:self.sound.stop()
         self.playing=False;self.seek.value=0
+    def seek_touch_down(self, slider, touch):
+        if slider.collide_point(*touch.pos): self._seek_dragging=True
     def seek_audio(self, slider, touch):
-        if not self.sound or not slider.collide_point(*touch.pos): return
+        if not slider.collide_point(*touch.pos): return
+        self._seek_dragging=False
+        if not self.sound:return
         try:
             self.sound.seek(max(0,min(float(slider.value),float(self.sound.length or slider.value))))
             self._last_track_pos=float(slider.value); self._end_handled=False
@@ -171,7 +176,7 @@ class VoocRoot(BoxLayout):
         if self.sound and self.playing:
             try:
                 pos=float(self.sound.get_pos() or 0); duration=float(self.sound.length or 0)
-                if not self.seek.is_touching: self.seek.value=pos
+                if not self._seek_dragging: self.seek.value=pos
                 if duration>0 and pos>=duration-.25 and not self._end_handled:
                     self._end_handled=True; self.playing=False
                     if self.s.repeat=="one": self.load_track(self.track);self.toggle()

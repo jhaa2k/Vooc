@@ -45,6 +45,10 @@ These callbacks and the permission/capture flow are code-level integrations only
 
 The Visualizer workspace adds five render styles (Bars, Mirror Bars, Dots, Line and Radial), five color palettes, adjustable band count, sensitivity and smoothing. Settings are stored in project JSON and update the preview immediately. The renderer consumes FFT-derived band amplitudes when the PCM pipeline supplies them; its animated fallback is only a preview placeholder when no audio analysis data is available. This is a foundational 2D Kivy renderer, not yet the planned OpenGL ES effect/layer engine.
 
+## Layer inspector update
+
+The Layers workspace now includes a selected-layer inspector with editable name/text, normalized X/Y position, scale, opacity and rotation, plus lock/unlock and layer ordering controls. Text layers are drawn over the spectrum preview using these transform values. This is a basic 2D text-layer implementation; image decoding/placement, drag handles, font selection and full compositing remain future work.
+
 ## Important implementation status
 
 The FFT and analysis module and its thread-safe UI-dispatch pipeline are implemented. The optional Android backend uses `MediaPlayer` plus `Visualizer` on that player's own audio session and forwards waveform samples into the PCM pipeline when permission and device policy allow it. This is not system-wide audio capture. The existing Kivy SoundLoader path remains the default unless native mode is explicitly selected. Audio sliders still update project values; they do not yet process the playing audio. Full OpenGL effects and actual video encoding are also not implemented.

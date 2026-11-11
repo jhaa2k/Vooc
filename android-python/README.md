@@ -32,10 +32,11 @@ python -m unittest discover -s tests -v
 - `vooc/dsp.py`: dependency-free radix-2 FFT, Hann windowing, logarithmic spectrum-band mapping, RMS/peak metering and an adaptive energy-onset beat detector.
 - `Spectrum.set_spectrum(bands, beat=False)`: renders normalized band amplitudes.
 - `vooc/pcm_pipeline.py`: thread-safe PCM submission pipeline with scheduler-based UI dispatch and shutdown handling.
+- `vooc/android_audio.py`: optional Android `MediaPlayer` backend with session-scoped `Visualizer` waveform capture; the Media workspace exposes an opt-in native-player action.
 - `VoocRoot.feed_pcm_samples(samples, timestamp=None)`: integration entry point for a future Android PCM capture backend; accepted samples are analyzed and sent to the live preview.
 
 ## Important implementation status
 
-The FFT and analysis module and its thread-safe UI-dispatch pipeline are implemented. A backend can now call `VoocRoot.feed_pcm_samples(samples)` with normalized mono PCM; the pipeline analyzes and dispatches the spectrum to the preview. The app does **not yet capture decoded PCM from Android playback**, so no live playback data currently reaches this entry point and the preview still uses its clearly marked animated placeholder. Audio sliders still update project values; they do not yet process the playing audio. Background media controls, full OpenGL effects and actual video encoding are also not implemented.
+The FFT and analysis module and its thread-safe UI-dispatch pipeline are implemented. A backend can now call `VoocRoot.feed_pcm_samples(samples)` with normalized mono PCM; the pipeline analyzes and dispatches the spectrum to the preview. An opt-in Android backend now uses `MediaPlayer` plus `Visualizer` on that player's own audio session and forwards waveform samples into the PCM pipeline. This is an initial Android integration and has not been device-validated; permission behavior, capture callbacks, file URI handling and lifecycle behavior can vary. The existing Kivy SoundLoader path remains the default fallback. Android `Visualizer` is session-scoped, not system-wide capture. Audio sliders still update project values; they do not yet process the playing audio. Background media controls, full OpenGL effects and actual video encoding are also not implemented.
 
-No APK build or physical-device test is claimed for this update. See `docs/PORTING_PLAN.md` for the remaining integration sequence.
+No APK build or physical-device test is claimed for this update. The native backend requires the Android `RECORD_AUDIO` runtime permission for waveform capture; playback itself may still work if capture permission is denied. See `docs/PORTING_PLAN.md` for the remaining integration sequence.

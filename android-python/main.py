@@ -33,7 +33,8 @@ class VoocRoot(BoxLayout):
         self.s=ProjectState(); self.sound=None; self.playing=False; self.track=""; self._paused_at=0.0
         self.native_mode=False; self._native_requested=False
         self.native_audio=AndroidMediaPlayerSource(
-            self.feed_pcm_samples, self._native_error, self._native_completed
+            self.feed_pcm_samples, self._native_error, self._native_completed,
+            self._native_focus_changed
         )
         top=BoxLayout(size_hint_y=None,height=dp(40))
         top.add_widget(Label(text="[b]AUDIOVIS PRO[/b]",markup=True,halign="left"))
@@ -68,6 +69,16 @@ class VoocRoot(BoxLayout):
         Clock.schedule_once(lambda _dt: self.popup(message), 0)
     def _native_completed(self):
         Clock.schedule_once(lambda _dt: self._handle_native_completion(), 0)
+    def _native_focus_changed(self, state):
+        def apply(_dt):
+            if state in ("interrupted", "focus_lost", "paused", "stopped"):
+                self.playing=False
+            elif state in ("playing", "resumed"):
+                self.playing=True
+            elif state == "denied":
+                self.playing=False
+                self.popup("Android audio focus was not granted. Playback did not start.")
+        Clock.schedule_once(apply, 0)
     def _handle_native_completion(self):
         if not self.native_mode or self._end_handled:
             return

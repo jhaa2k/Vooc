@@ -130,9 +130,29 @@ class VoocRoot(BoxLayout):
             action("TOGGLE VISIBILITY",self.visibility)
             action("DELETE SELECTED",self.delete_layer)
             if self.s.layers:
+                self.s.selected=max(0,min(self.s.selected,len(self.s.layers)-1))
                 l=self.s.layers[self.s.selected]
-                ti=TextInput(text=l["name"],multiline=False,size_hint_y=None,height=dp(40))
-                ti.bind(text=lambda _,v:l.__setitem__("name",v)); col.add_widget(ti)
+                heading("LAYER INSPECTOR")
+                action("MOVE LAYER UP",lambda:self.move_layer(-1))
+                action("MOVE LAYER DOWN",lambda:self.move_layer(1))
+                action("LOCK / UNLOCK: "+("LOCKED" if l.get("locked",False) else "UNLOCKED"),self.toggle_lock)
+                ti=TextInput(text=l["name"],hint_text="Layer name / text",multiline=False,size_hint_y=None,height=dp(40))
+                ti.bind(text=lambda _,v:self.set_layer_value("name",v)); col.add_widget(ti)
+                def layer_slider(label,key,lo,hi,step=1):
+                    r=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
+                    r.add_widget(Label(text=label,size_hint_x=.3,font_size="10sp"))
+                    default={"x":50,"y":50,"scale":1.0,"opacity":1.0,"rotation":0}.get(key,0)
+                    value=Label(text=str(l.get(key,default)),size_hint_x=.16,font_size="10sp")
+                    sl=Slider(min=lo,max=hi,step=step,value=float(l.get(key,default)))
+                    def changed(_,v):
+                        if not l.get("locked",False):
+                            l[key]=round(v,2); value.text=str(l[key]); self.preview.refresh()
+                    sl.bind(value=changed); r.add_widget(sl); r.add_widget(value); col.add_widget(r)
+                layer_slider("Position X","x",0,100,1)
+                layer_slider("Position Y","y",0,100,1)
+                layer_slider("Scale","scale",0.25,4.0,0.05)
+                layer_slider("Opacity","opacity",0.0,1.0,0.05)
+                layer_slider("Rotation","rotation",-180,180,1)
         elif tab=="Presets":
             heading("VISUALIZER PRESETS")
             for n in self.s.presets: action("APPLY "+n,lambda name=n:self.apply_preset(name))
@@ -304,9 +324,25 @@ class VoocRoot(BoxLayout):
             except Exception:pass
         self.preview.refresh()
     def add_layer(self,k):
-        self.s.layers.append({"type":k.lower(),"name":k+" "+str(len(self.s.layers)+1),"visible":True,"locked":False,"x":50,"y":50})
+        self.s.layers.append({"type":k.lower(),"name":k+" "+str(len(self.s.layers)+1),"visible":True,"locked":False,"x":50,"y":50,"scale":1.0,"opacity":1.0,"rotation":0})
         self.s.selected=len(self.s.layers)-1;self.show("Layers")
     def select_layer(self,i):self.s.selected=i;self.show("Layers")
+    def set_layer_value(self,key,value):
+        if not self.s.layers:return
+        layer=self.s.layers[self.s.selected]
+        if not layer.get("locked",False):
+            layer[key]=value
+            self.preview.refresh()
+    def toggle_lock(self):
+        if self.s.layers:
+            layer=self.s.layers[self.s.selected]
+            layer["locked"]=not layer.get("locked",False)
+            self.show("Layers")
+    def move_layer(self,direction):
+        i=self.s.selected; j=i+direction
+        if 0<=i<len(self.s.layers) and 0<=j<len(self.s.layers):
+            self.s.layers[i],self.s.layers[j]=self.s.layers[j],self.s.layers[i]
+            self.s.selected=j; self.preview.refresh(); self.show("Layers")
     def duplicate(self):
         if self.s.layers:
             x=dict(self.s.layers[self.s.selected]);x["name"]+=" copy";self.s.layers.append(x);self.s.selected=len(self.s.layers)-1;self.show("Layers")

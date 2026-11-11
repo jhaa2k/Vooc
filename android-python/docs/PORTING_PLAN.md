@@ -14,7 +14,7 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 
 ## Remaining work, in dependency order
 
-1. **Android playback hardening:** validate runtime permission, callback delivery, URI/path handling, pause/seek/completion, audio focus and lifecycle on physical Android devices. Add focus-loss handling, then a foreground playback service and notification controls; migrate to Media3 if required.
+1. **Android playback hardening:** validate runtime permission, callback delivery, URI/path handling, pause/seek/completion, audio focus and lifecycle on physical Android devices. Legacy AudioManager focus request and focus-loss/duck handling are now wired into native playback. Validate on devices, then add a foreground playback service and notification controls; migrate to Media3 if required.
 2. **Storage Access Framework:** resolve selected document URIs into a supported playback source or use a URI-capable native data source; current native adapter only accepts local filesystem paths.
 3. **Connect analysis:** tune capture callback delivery and beat threshold/refractory logic against real music. Add waveform, BPM estimation, beat map and LFO analysis.
 4. **Actual audio DSP:** implement and validate 10-band EQ, gain, bass shelf, pan, speed, reverb, delay, distortion and normalization in the audio output path. UI state changes alone are not audio processing.
@@ -26,7 +26,7 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 
 - Android `MediaPlayer` completion/error callbacks and Visualizer waveform capture are integrated but have not been validated on a physical device.
 - Native playback currently accepts local filesystem paths, not SAF `content://` URIs.
-- Audio focus, foreground service, lock-screen/notification media controls and background-resilient playback are not implemented.
+- Audio focus request and transient/permanent loss handling are implemented at code level but not device-validated. Foreground service, lock-screen/notification media controls and background-resilient playback are not implemented.
 - The DSP module analyzes samples but does not modify audio output.
 - Kivy SoundLoader seek/pause/URI behavior varies by Android provider.
 - Video export and full visual effects are not implemented.

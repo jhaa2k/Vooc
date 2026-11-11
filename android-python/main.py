@@ -18,7 +18,7 @@ from vooc.state import ProjectState, THEMES
 from vooc.visualizer import Spectrum
 from vooc.pcm_pipeline import PCMAnalysisPipeline
 from vooc.android_audio import AndroidMediaPlayerSource
-from vooc.android_media import choose_audio, choose_image
+from vooc.android_media import choose_audio, choose_image\nfrom vooc.property_editor import AdvancedProperties
 
 class B(Button):
     def __init__(self, **kw):
@@ -27,7 +27,7 @@ class B(Button):
         super().__init__(**kw); self.background_normal=""; self.background_color=(.17,.17,.17,1)
 
 class VoocRoot(BoxLayout):
-    tabs=["Media","Layers","Presets","Audio","Visualizer","Scene","Export"]
+    tabs=["Media","Layers","Presets","Audio","Visualizer","Properties","Scene","Export"]
     def __init__(self, **kw):
         super().__init__(orientation="vertical",padding=dp(7),spacing=dp(5),**kw)
         self.s=ProjectState(); self.sound=None; self.playing=False; self.track=""; self._paused_at=0.0

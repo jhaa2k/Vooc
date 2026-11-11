@@ -28,7 +28,7 @@ class VoocRoot(BoxLayout):
     tabs=["Media","Layers","Presets","Audio","Scene","Export"]
     def __init__(self, **kw):
         super().__init__(orientation="vertical",padding=dp(7),spacing=dp(5),**kw)
-        self.s=ProjectState(); self.sound=None; self.playing=False; self.track=""
+        self.s=ProjectState(); self.sound=None; self.playing=False; self.track=""; self._paused_at=0.0
         top=BoxLayout(size_hint_y=None,height=dp(40))
         top.add_widget(Label(text="[b]AUDIOVIS PRO[/b]",markup=True,halign="left"))
         for name,fn in [("SAVE",self.save),("LOAD",self.load)]:
@@ -136,16 +136,24 @@ class VoocRoot(BoxLayout):
             self.track=path; self.s.current_track=path
             if path not in self.s.playlist:self.s.playlist.append(path)
             self.track_label.text=Path(path).name; self.seek.max=max(1,self.sound.length or 1)
-            self.playing=False; self._last_track_pos=0; self._end_handled=False; self.seek.value=0
+            self.playing=False; self._paused_at=0.0; self._last_track_pos=0; self._end_handled=False; self.seek.value=0
             self.preview.refresh(); self.show("Media")
         except Exception as e:self.popup(str(e))
     def toggle(self):
         if not self.sound:self.import_audio();return
-        if self.playing:self.sound.stop();self.playing=False
-        else:self.sound.play();self.playing=True
+        if self.playing:
+            try:self._paused_at=float(self.sound.get_pos() or self.seek.value)
+            except Exception:self._paused_at=float(self.seek.value)
+            self.sound.stop();self.playing=False
+        else:
+            self.sound.play()
+            if self._paused_at>0:
+                try:self.sound.seek(self._paused_at)
+                except Exception:pass
+            self.playing=True
     def stop(self):
         if self.sound:self.sound.stop()
-        self.playing=False;self.seek.value=0
+        self.playing=False;self._paused_at=0.0;self._end_handled=False;self.seek.value=0
     def seek_touch_down(self, slider, touch):
         if slider.collide_point(*touch.pos): self._seek_dragging=True
     def seek_audio(self, slider, touch):

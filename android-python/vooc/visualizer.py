@@ -2,6 +2,8 @@ from kivy.uix.widget import Widget
 from kivy.clock import Clock
 from kivy.graphics import Color, Rectangle, Ellipse, Line
 from kivy.metrics import dp
+from kivy.core.text import Label as CoreLabel
+from kivy.graphics import PushMatrix, PopMatrix, Rotate
 import math
 
 
@@ -112,3 +114,22 @@ class Spectrum(Widget):
                          width=dp(2), cap="round")
                 Color(*rgb, .22 + self.beat_pulse * .35)
                 Ellipse(pos=(cx-radius*.12, cy-radius*.12), size=(radius*.24, radius*.24))
+            # Text layers are rendered in normalized scene coordinates.
+            for layer in getattr(self.state, "layers", []):
+                if not layer.get("visible", True) or layer.get("type") != "text":
+                    continue
+                label = CoreLabel(text=str(layer.get("name", "Text")),
+                                  font_size=dp(18) * max(.25, min(4.0, float(layer.get("scale", 1.0)))),
+                                  color=(1, 1, 1, max(0.0, min(1.0, float(layer.get("opacity", 1.0))))))
+                label.refresh()
+                texture = label.texture
+                if not texture:
+                    continue
+                x = self.x + self.width * float(layer.get("x", 50)) / 100.0 - texture.width / 2
+                y = self.y + self.height * float(layer.get("y", 50)) / 100.0 - texture.height / 2
+                angle = float(layer.get("rotation", 0))
+                PushMatrix()
+                Rotate(angle=angle, origin=(x + texture.width / 2, y + texture.height / 2))
+                Color(1, 1, 1, 1)
+                Rectangle(texture=texture, pos=(x, y), size=texture.size)
+                PopMatrix()

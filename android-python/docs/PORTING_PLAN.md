@@ -9,11 +9,12 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 - Layer and preset state management.
 - Pure-Python radix-2 FFT with Hann window, logarithmic band mapping, RMS/peak metering and energy-onset beat detection.
 - Visualizer API that can render normalized externally supplied spectrum bands.
+- Thread-safe PCM analysis pipeline with scheduler-based UI delivery, lifecycle shutdown, and an app-level `feed_pcm_samples()` integration point.
 
 ## Remaining work, in dependency order
 
 1. **Android playback and PCM bridge:** replace or supplement Kivy SoundLoader with Android MediaPlayer/Media3 via PyJNIus/native code; expose a stable playback session and decoded PCM stream. Implement audio focus, lifecycle handling, foreground playback service and notification controls.
-2. **Connect analysis:** feed PCM frames into `AudioAnalyzer.process()`, use monotonic timestamps, tune beat threshold/refractory logic against real music, and call `Spectrum.set_spectrum()` on the UI thread at a bounded refresh rate. Add waveform, BPM estimation, beat map and LFO analysis.
+2. **Connect analysis:** implement the platform capture backend and call `VoocRoot.feed_pcm_samples()` with normalized mono PCM frames. The pipeline already runs `AudioAnalyzer`, throttles UI dispatch and routes results to `Spectrum.set_spectrum()` on the Kivy UI thread. Use monotonic timestamps and tune beat threshold/refractory logic against real music. Add waveform, BPM estimation, beat map and LFO analysis.
 3. **Actual audio DSP:** implement and validate 10-band EQ, gain, bass shelf, pan, speed, reverb, delay, distortion and normalization in the audio output path. UI state changes alone are not audio processing.
 4. **Scene graph and interaction:** OpenGL ES rendering for text/image, spectrum bars, particles, transforms, mirror, RGB split, blur, motion blur and custom shaders; add inspector controls, drag handles, keyframes, undo/redo and preset import.
 5. **Video export:** MediaCodec + MediaMuxer (H.264/AAC), deterministic frame timestamps, audio/video sync, progress, cancellation/resume, bitrate controls and scoped-storage destination URI.

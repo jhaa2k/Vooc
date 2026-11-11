@@ -18,7 +18,7 @@ python main.py
 ```
 
 ## Included in this foundation
-Six workspaces (Media, Layers, Presets, Audio, Scene, Export), audio file selection and basic playback, animated spectrum preview, live-bound audio sliders, ten EQ controls, basic layer add/select/delete/duplicate/visibility, presets, scene settings and JSON project save/load.
+Six workspaces (Media, Layers, Presets, Audio, Scene, Export), audio file selection, play/pause with position retention, stop, seek, previous/next track, playlist selection, repeat modes, animated placeholder spectrum, live-bound audio setting controls, ten EQ controls, basic layer add/select/delete/duplicate/visibility, presets, scene settings and JSON project save/load.
 
 ## Known gaps
 This is a first Android implementation foundation, not yet a complete feature-parity port or tested APK. Android-native PCM analysis/FFT, DSP processing, background media notification controls, full OpenGL scene effects and real MP4/WEBM/GIF rendering are not implemented yet. See `docs/PORTING_PLAN.md`.

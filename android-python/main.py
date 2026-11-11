@@ -27,7 +27,7 @@ class B(Button):
         super().__init__(**kw); self.background_normal=""; self.background_color=(.17,.17,.17,1)
 
 class VoocRoot(BoxLayout):
-    tabs=["Media","Layers","Presets","Audio","Scene","Export"]
+    tabs=["Media","Layers","Presets","Audio","Visualizer","Scene","Export"]
     def __init__(self, **kw):
         super().__init__(orientation="vertical",padding=dp(7),spacing=dp(5),**kw)
         self.s=ProjectState(); self.sound=None; self.playing=False; self.track=""; self._paused_at=0.0
@@ -55,7 +55,7 @@ class VoocRoot(BoxLayout):
         self._last_track_pos=0; self._end_handled=False
         self.body=BoxLayout()
         self.add_widget(self.body)
-        nav=GridLayout(cols=6,size_hint_y=None,height=dp(50),spacing=dp(2))
+        nav=GridLayout(cols=len(self.tabs),size_hint_y=None,height=dp(50),spacing=dp(2))
         for tab in self.tabs:
             b=B(text=tab,font_size="9sp"); b.bind(on_release=lambda _,t=tab:self.show(t)); nav.add_widget(b)
         self.add_widget(nav)

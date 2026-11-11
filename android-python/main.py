@@ -18,7 +18,7 @@ from vooc.state import ProjectState, THEMES
 from vooc.visualizer import Spectrum
 from vooc.pcm_pipeline import PCMAnalysisPipeline
 from vooc.android_audio import AndroidMediaPlayerSource
-from vooc.android_media import choose_audio
+from vooc.android_media import choose_audio, choose_image
 
 class B(Button):
     def __init__(self, **kw):
@@ -125,7 +125,7 @@ class VoocRoot(BoxLayout):
                 action(("● " if l["visible"] else "○ ")+l["name"],lambda ix=i:self.select_layer(ix))
             action("＋ ADD SPECTRUM",lambda:self.add_layer("Spectrum"))
             action("＋ ADD TEXT",lambda:self.add_layer("Text"))
-            action("＋ ADD IMAGE",lambda:self.add_layer("Image"))
+            action("＋ ADD IMAGE",self.add_image_layer)
             action("DUPLICATE SELECTED",self.duplicate)
             action("TOGGLE VISIBILITY",self.visibility)
             action("DELETE SELECTED",self.delete_layer)
@@ -136,6 +136,8 @@ class VoocRoot(BoxLayout):
                 action("MOVE LAYER UP",lambda:self.move_layer(-1))
                 action("MOVE LAYER DOWN",lambda:self.move_layer(1))
                 action("LOCK / UNLOCK: "+("LOCKED" if l.get("locked",False) else "UNLOCKED"),self.toggle_lock)
+                if l.get("type") == "image":
+                    action("IMPORT / REPLACE IMAGE", self.import_layer_image)
                 ti=TextInput(text=l["name"],hint_text="Layer name / text",multiline=False,size_hint_y=None,height=dp(40))
                 ti.bind(text=lambda _,v:self.set_layer_value("name",v)); col.add_widget(ti)
                 def layer_slider(label,key,lo,hi,step=1):
@@ -326,6 +328,25 @@ class VoocRoot(BoxLayout):
     def add_layer(self,k):
         self.s.layers.append({"type":k.lower(),"name":k+" "+str(len(self.s.layers)+1),"visible":True,"locked":False,"x":50,"y":50,"scale":1.0,"opacity":1.0,"rotation":0})
         self.s.selected=len(self.s.layers)-1;self.show("Layers")
+
+    def add_image_layer(self):
+        self.add_layer("Image")
+        self.import_layer_image()
+
+    def import_layer_image(self):
+        if not self.s.layers or self.s.layers[self.s.selected].get("type") != "image":
+            self.popup("Select an Image layer first.")
+            return
+        choose_image(self._on_image_selected)
+
+    def _on_image_selected(self, path):
+        if not path:
+            return
+        layer = self.s.layers[self.s.selected]
+        layer["image_path"] = path
+        layer["name"] = Path(path).name
+        self.preview.refresh()
+        self.show("Layers")
     def select_layer(self,i):self.s.selected=i;self.show("Layers")
     def set_layer_value(self,key,value):
         if not self.s.layers:return

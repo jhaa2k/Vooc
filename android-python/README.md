@@ -73,3 +73,11 @@ The **Properties** workspace adds a two-column category menu and accordion-based
 - The particle count control exposes a 5,000 maximum; use caution with high counts on mobile hardware. The UI does not silently spawn particles.
 
 Run the schema checks with `python -m unittest discover -s tests -v`.
+
+## Live engine modules (incremental)
+
+- `vooc/measure_engine.py` evaluates the Measure dropdown modes against elapsed preview time, beat pulse, track position/duration, RMS and dominant-frequency inputs. Modes return a modulation added to a property's base value; A is modulation amount and B is time speed.
+- `vooc/particle_system.py` provides bounded particle spawning, lifetime expiry, gravity, spawn-area selection, speed variation, and basic wind/gravity/vortex/attractor/repeller fields. The Kivy preview advances it on its scheduled tick and only draws cached particle state during paint.
+- The preview currently binds the Composition Measure Scale mode to Bars Height Scale and exposes particle simulation when the Particles General > Visible property is enabled.
+- Text supports `%title%`, `%artist%`, `%time%`, and `{ArtistOrTitle}` token replacement when metadata variables are enabled. Artist currently falls back to an empty string because the playback adapter does not yet expose reliable artist metadata. Typewriter and basic Fade animation are preview-supported.
+- These are first-pass CPU/Kivy implementations, not GPU particle or full Avee-compatible effect parity. High particle counts can reduce frame rate on older phones.

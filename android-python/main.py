@@ -98,6 +98,10 @@ class VoocRoot(BoxLayout):
         Popup(title="Vooc",content=Label(text=msg),size_hint=(.85,None),height=dp(140)).open()
     def show(self,tab):
         self.tab=tab; self.body.clear_widgets()
+        if tab=="Properties":
+            self.property_editor=AdvancedProperties(self.s, on_change=self.preview.refresh, on_save=self.autosave)
+            self.body.add_widget(self.property_editor)
+            return
         scroll=ScrollView(); col=BoxLayout(orientation="vertical",size_hint_y=None,spacing=dp(5),padding=dp(4))
         col.bind(minimum_height=col.setter("height")); scroll.add_widget(col); self.body.add_widget(scroll)
         def heading(t): col.add_widget(Label(text="[b]"+t+"[/b]",markup=True,size_hint_y=None,height=dp(28),halign="left"))
@@ -377,6 +381,12 @@ class VoocRoot(BoxLayout):
     def apply_preset(self,n):self.s.audio.update(self.s.presets[n]);self.show("Audio")
     def delete_preset(self):
         if self.s.presets:self.s.presets.pop(list(self.s.presets)[-1]);self.show("Presets")
+    def autosave(self):
+        try:
+            p=Path(App.get_running_app().user_data_dir)/"vooc_project.json"
+            p.write_text(json.dumps(self.s.data(),indent=2))
+        except Exception:
+            pass
     def save(self):
         p=Path(App.get_running_app().user_data_dir)/"vooc_project.json"
         p.write_text(json.dumps(self.s.data(),indent=2));self.popup("Project saved: "+str(p))

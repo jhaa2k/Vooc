@@ -228,14 +228,28 @@ class Spectrum(Widget):
                     continue
                 if not layer.get("visible", True) or layer.get("type") != "text":
                     continue
-                content = self._prop("TEXT", "Content", "Text", "Text Input", layer.get("name", "Text"))
+                content = str(self._prop("TEXT", "Content", "Text", "Text Input", layer.get("name", "Text")))
+                use_metadata = bool(self._prop("TEXT", "Content", "Text", "Use Metadata Variables", False))
+                if use_metadata:
+                    track_name = str(getattr(self.state, "current_track", "") or "")
+                    title = track_name.rsplit("/", 1)[-1].rsplit(".", 1)[0] if track_name else "Vooc"
+                    content = content.replace("%title%", title).replace("%artist%", "")
+                    content = content.replace("%time%", "{:02d}:{:02d}".format(int(self.measure_engine.time)//60, int(self.measure_engine.time)%60))
+                    content = content.replace("{ArtistOrTitle}", title)
+                animation = self._prop("TEXT", "Text Animation", "Animation", "Animation Type", "None")
+                if animation == "Typewriter":
+                    speed = max(0.0, float(self._prop("TEXT", "Content", "Text", "Typewriter Speed", 20.0)))
+                    content = content[:int(self.measure_engine.time * speed)]
                 font_size = max(1.0, min(300.0, float(self._prop("TEXT", "Typography", "Font", "Font Size", 18))))
                 text_color = self._rgba(self._prop("TEXT", "Appearance", "Colors", "Text Color", "#FFFFFFFF"))
                 visible = bool(self._prop("TEXT", "General", "Visibility", "Visible", True))
                 if not visible: continue
+                text_alpha = text_color[3]
+                if animation == "Fade":
+                    text_alpha *= max(0.0, min(1.0, (self.measure_engine.time % 2.0) / 2.0))
                 label = CoreLabel(text=str(content),
                                   font_size=dp(font_size) * max(.25, min(4.0, float(layer.get("scale", 1.0)))),
-                                  color=(text_color[0], text_color[1], text_color[2], text_color[3] * max(0.0, min(1.0, float(layer.get("opacity", 1.0))))))
+                                  color=(text_color[0], text_color[1], text_color[2], text_alpha * max(0.0, min(1.0, float(layer.get("opacity", 1.0))))))
                 label.refresh()
                 texture = label.texture
                 if not texture:

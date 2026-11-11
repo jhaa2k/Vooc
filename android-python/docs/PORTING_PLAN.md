@@ -31,7 +31,7 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 2. **Storage Access Framework:** resolve selected document URIs into a supported playback source or use a URI-capable native data source; current native adapter only accepts local filesystem paths.
 3. **Connect analysis:** tune capture callback delivery and beat threshold/refractory logic against real music. Add waveform, BPM estimation, beat map and LFO analysis.
 4. **Actual audio DSP:** implement and validate 10-band EQ, gain, bass shelf, pan, speed, reverb, delay, distortion and normalization in the audio output path. UI state changes alone are not audio processing.
-5. **Scene graph and interaction:** OpenGL ES rendering for image layers, particles, mirror, RGB split, blur, motion blur and custom shaders; add drag handles, keyframes, undo/redo, font selection and preset import.
+5. **Scene graph and interaction:** Basic image-layer preview is now wired for decodable filesystem paths, with X/Y, scale, opacity and rotation. Next add Android SAF URI decoding and persisted URI grants, then OpenGL ES compositing, particles, mirror, RGB split, blur, motion blur and custom shaders; add drag handles, keyframes, undo/redo, font selection and preset import.
 6. **Video export:** MediaCodec + MediaMuxer (H.264/AAC), deterministic frame timestamps, audio/video sync, progress, cancellation/resume, bitrate controls and scoped-storage destination URI.
 7. **Validation:** unit/instrumentation tests; Android 8–15, ARM64, scoped storage, backgrounding, orientation, long tracks, memory pressure and export cancellation. Verify every advertised control on device.
 
@@ -46,3 +46,10 @@ This is a staged port, not yet feature parity. Keep the original browser impleme
 - No successful APK build or physical-device validation is asserted by this plan.
 
 Retain the repository's existing MIT license notice in derivative distributions.
+
+ 
+## Image layer status
+
+- Image layers expose an import/replace action and render decoded local image paths in the preview with the existing transform controls.
+- Android SAF `content://` URI support and persisted read grants remain outstanding; provider compatibility must be validated on-device.
+- The current image preview is a Kivy 2D canvas layer, not the planned OpenGL ES compositor.

@@ -1,0 +1,3 @@
+# Keep Plyer's requests dependency on a universal pure-Python charset-normalizer wheel.
+# Newer cp314 Android-tagged wheels are selected by pip but cannot be installed by p4a's host-side pip.
+charset-normalizer==2.1.1

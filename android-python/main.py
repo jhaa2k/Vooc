@@ -274,7 +274,14 @@ class VoocRoot(BoxLayout):
                 self.native_audio.release(); self.native_mode=False
             if self.sound:self.sound.stop()
             self.sound=SoundLoader.load(path)
-            if not self.sound:self.popup("This audio format is not supported by the installed Android audio provider.");return
+            if not self.sound:
+                # Android's native MediaPlayer supports formats that the Kivy
+                # SDL audio provider may not decode on a given device.
+                if AndroidMediaPlayerSource.is_available():
+                    if self._activate_native_track(path, autoplay=False):
+                        return
+                self.popup("Could not decode this audio file. Try MP3, WAV, FLAC, OGG or M4A.")
+                return
             duration=float(self.sound.length or 1)
             self.track=path; self.s.current_track=path
             if path not in self.s.playlist:self.s.playlist.append(path)

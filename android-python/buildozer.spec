@@ -3,18 +3,31 @@ title = Vooc
 package.name = vooc
 package.domain = com.jhaa2k
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas
+source.include_exts = py,png,jpg,jpeg,webp,kv,atlas,json,ttf
+source.exclude_dirs = tests,docs,bin,.buildozer,__pycache__
 version = 1.0
-requirements = python3,kivy,numpy,sounddevice,miniaudio
+
+# Only libraries that have python-for-android recipes or are pure Python.
+# sounddevice (needs PortAudio) and miniaudio (CFFI, no p4a recipe) cannot be
+# built for Android; main.py already imports them optionally.
+requirements = python3,kivy,numpy,plyer,pyjnius
+
 orientation = portrait
 fullscreen = 0
-android.permissions = READ_EXTERNAL_STORAGE,READ_MEDIA_AUDIO
-android.api = 31
+android.permissions = RECORD_AUDIO,READ_MEDIA_AUDIO,READ_EXTERNAL_STORAGE
+android.api = 35
 android.minapi = 24
-android.archs = arm64-v8a,armeabi-v7a
-android.sdk_path = /usr/local/lib/android/sdk
-android.ndk_path = /usr/local/lib/android/sdk/ndk/27.3.13750724
-android.build_tools_version = 35.0.0
+android.ndk_api = 24
+android.enable_androidx = True
+android.archs = arm64-v8a, armeabi-v7a
+android.accept_sdk_license = True
+# Do NOT set android.sdk_path / android.ndk_path: the runner's preinstalled SDK
+# has no legacy tools/bin/sdkmanager, which makes Buildozer abort. Buildozer
+# downloads its own SDK + the NDK recommended by p4a instead.
+
+# Pin python-for-android to the upstream fix for the pip self-upgrade/venv corruption.
+p4a.branch = develop
+p4a.commit = d2ee8c54d9d42375a95f18159e950a119671cf63
 
 [buildozer]
 log_level = 2

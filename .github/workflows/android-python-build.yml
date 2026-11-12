@@ -37,17 +37,16 @@ jobs:
           sudo apt-get install -y \
             build-essential git zip unzip \
             autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake libffi-dev libssl-dev \
-            libltdl-dev
+            zlib1g-dev libncurses-dev \
+            cmake libffi-dev libssl-dev \
+            libltdl-dev automake ccache
 
-      - name: Accept Android SDK licenses and install pinned SDK packages
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platform-tools" \
-            "platforms;android-31" \
-            "build-tools;35.0.0"
+      - name: Cache Buildozer SDK/NDK downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('android-python/buildozer.spec') }}
+          restore-keys: buildozer-${{ runner.os }}-
 
       - name: Install Buildozer
         run: |
@@ -67,7 +66,7 @@ jobs:
         env:
           P4A_RELEASE_KEYSTORE: ""
           PIP_CONSTRAINT: ${{ github.workspace }}/android-python/constraints-android.txt
-        run: buildozer -v android debug
+        run: yes | buildozer -v android debug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

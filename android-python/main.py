@@ -21,11 +21,27 @@ from vooc.android_audio import AndroidMediaPlayerSource
 from vooc.android_media import choose_audio, choose_image
 from vooc.property_editor import AdvancedProperties
 
+# Material-inspired dark palette. Keep the original first-build layout and workflows.
+MATERIAL_BG = (0.055, 0.063, 0.078, 1)
+MATERIAL_SURFACE = (0.105, 0.118, 0.145, 1)
+MATERIAL_PRIMARY = (0.61, 0.36, 0.96, 1)
+MATERIAL_ON_PRIMARY = (1, 1, 1, 1)
+MATERIAL_TEXT = (0.91, 0.91, 0.94, 1)
+MATERIAL_MUTED = (0.63, 0.65, 0.70, 1)
+
 class B(Button):
     def __init__(self, **kw):
-        kw.setdefault("size_hint_y", None); kw.setdefault("height", dp(40))
+        kw.setdefault("size_hint_y", None)
+        kw.setdefault("height", dp(42))
         kw.setdefault("font_size", "12sp")
-        super().__init__(**kw); self.background_normal=""; self.background_color=(.17,.17,.17,1)
+        kw.setdefault("color", MATERIAL_TEXT)
+        kw.setdefault("background_normal", "")
+        kw.setdefault("background_down", "")
+        kw.setdefault("background_color", MATERIAL_SURFACE)
+        super().__init__(**kw)
+        self.background_normal = ""
+        self.background_down = ""
+        self.border = (0, 0, 0, 0)
 
 class VoocRoot(BoxLayout):
     tabs=["Media","Layers","Presets","Audio","Visualizer","Properties","Scene","Export"]
@@ -214,10 +230,14 @@ class VoocRoot(BoxLayout):
         r=BoxLayout(size_hint_y=None,height=dp(42)); r.add_widget(Label(text=label,size_hint_x=.35,font_size="11sp"))
         if key.startswith("visualizer_"):
             setting=key.replace("visualizer_","")
-            sp=Spinner(text=self.s.visualizer.get(setting,values[0]),values=values)
+            sp=Spinner(text=self.s.visualizer.get(setting,values[0]),values=values,
+                       background_normal="", background_color=MATERIAL_SURFACE,
+                       color=MATERIAL_TEXT)
             sp.bind(text=lambda _,v:(self.s.visualizer.__setitem__(setting,v),self.preview.refresh()))
         else:
-            sp=Spinner(text=self.s.scene.get(key,values[0]),values=values)
+            sp=Spinner(text=self.s.scene.get(key,values[0]),values=values,
+                       background_normal="", background_color=MATERIAL_SURFACE,
+                       color=MATERIAL_TEXT)
             sp.bind(text=lambda _,v:self.s.scene.__setitem__(key,v))
         r.add_widget(sp); col.add_widget(r)
     def import_audio(self):
@@ -397,5 +417,7 @@ class VoocRoot(BoxLayout):
 
 class VoocApp(App):
     def build(self):
-        self.title="Vooc";Window.clearcolor=(.08,.08,.08,1);return VoocRoot()
+        self.title="Vooc"
+        Window.clearcolor = MATERIAL_BG
+        return VoocRoot()
 if __name__=="__main__":VoocApp().run()

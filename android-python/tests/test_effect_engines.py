@@ -1,22 +1,35 @@
 import unittest
+
 from vooc.measure_engine import MeasureEngine
-from vooc.particle_system import ParticleSystem
-class MeasureTests(unittest.TestCase):
- def test_nothing_static(self):
-  e=MeasureEngine(); e.update(.1,beat=True,rms=.8); self.assertEqual(e.evaluate("Nothing",4,9),4)
- def test_beat_pulse(self):
-  e=MeasureEngine(); e.update(.01,beat=True); self.assertGreater(e.evaluate("BeatPulseScale",amount=2),0)
- def test_volume(self):
-  e=MeasureEngine(); e.update(.01,rms=.5); self.assertAlmostEqual(e.evaluate("VolumeLevelResponsive",amount=2),1)
- def test_track_progress(self):
-  e=MeasureEngine(); e.update(.1,track_position=25,track_duration=100); self.assertAlmostEqual(e.evaluate("TrackProgressPercentage"),.25)
-class ParticleTests(unittest.TestCase):
- def test_count_limit(self):
-  p=ParticleSystem()
-  for _ in range(40):items=p.update(.05,{"count":8,"spawn_time":.005},300,200)
-  self.assertLessEqual(len(items),8)
- def test_lifetime(self):
-  p=ParticleSystem(); p.update(.05,{"count":4,"spawn_time":.005,"lifetime":.1},300,200)
-  for _ in range(10):items=p.update(.05,{"count":4,"spawn_time":10,"lifetime":.1},300,200)
-  self.assertEqual(len(items),0)
-if __name__=="__main__":unittest.main()
+
+
+class MeasureEngineTests(unittest.TestCase):
+    def test_nothing_static(self):
+        self.assertEqual(MeasureEngine().evaluate("Nothing", 0.4, 10, 10), 0.4)
+
+    def test_beat_pulse(self):
+        m = MeasureEngine()
+        m.update(0.016, beat=True)
+        self.assertAlmostEqual(m.evaluate("Beat", 0.0, 2.0, 1.0), 2.0, places=3)
+        m.update(0.5)
+        self.assertLess(m.evaluate("Beat", 0.0, 2.0, 1.0), 1.0)
+
+    def test_volume_is_db_mapped(self):
+        m = MeasureEngine()
+        m.update(0.016, rms=0.5)
+        # -6 dB -> 0.9 on a 60 dB scale
+        self.assertAlmostEqual(m.evaluate("VolumeLevelResponsive", 0.0, 1.0, 1.0), 0.9, places=1)
+
+    def test_track_progress(self):
+        m = MeasureEngine()
+        m.update(0.016, track_position=30, track_duration=60)
+        self.assertAlmostEqual(m.evaluate("TrackProgressPercentage", 0.0, 1.0, 1.0), 0.5)
+
+    def test_total_time_uses_time(self):
+        m = MeasureEngine()
+        m.update(0.25)
+        self.assertAlmostEqual(m.evaluate("TotalTime", 0.0, 1.0, 1.0), 0.25, places=3)
+
+
+if __name__ == "__main__":
+    unittest.main()

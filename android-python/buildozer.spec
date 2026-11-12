@@ -8,13 +8,13 @@ source.exclude_dirs = tests,docs,bin,.buildozer,__pycache__
 version = 1.0
 
 # Only libraries that have python-for-android recipes or are pure Python.
-# sounddevice (needs PortAudio) and miniaudio (CFFI, no p4a recipe) cannot be
-# built for Android; main.py already imports them optionally.
+# On Android audio is played by MediaPlayer and analysed through the Visualizer
+# API (pyjnius); sounddevice/miniaudio are optional desktop-only backends.
 requirements = python3,kivy,numpy,plyer,pyjnius
 
 orientation = portrait
 fullscreen = 0
-android.permissions = RECORD_AUDIO,READ_MEDIA_AUDIO,READ_EXTERNAL_STORAGE
+android.permissions = RECORD_AUDIO,MODIFY_AUDIO_SETTINGS,READ_MEDIA_AUDIO,READ_MEDIA_IMAGES,READ_EXTERNAL_STORAGE
 android.api = 35
 android.minapi = 24
 android.ndk_api = 24

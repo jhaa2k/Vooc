@@ -1,31 +1,544 @@
-"""Declarative Avee-style property schema. UI and renderer consume the same keys."""
-MEASURE = ["Nothing","Beat","TotalTime","TotalTimeBackward","TotalTimeWhenPlaying","TotalTimeAndBeat","TrackPosition","BeatRandomShake","BeatCamShakeRotMore","BeatCamShakeRotLess","ConstantShakeRotMore","ConstantShakeRotLess","BeatTriggerAnim","BeatCamShakeOnly","BeatPulseScale","BeatFlashColor","BeatGlowIntensity","BeatHorizontalStretch","BeatVerticalBounce","ConstantSlowRotate","ConstantOrbitMove","ConstantLinearScroll","TrackProgressPercentage","TrackRemainingTime","TrackIntroOutroTrigger","VolumeLevelResponsive","PitchFrequencyResponsive"]
-BLEND = ["Alpha","PreMulAlpha","Screen","Add","AddAlpha","Multiply","Darken","Lighten","ColorDodge","ColorBurn","Overlay","SoftLight","HardLight","Difference","Exclusion","Hue","Saturation","Color","Luminosity"]
-ANCHOR = ["unset","start","center","end","top","bottom","topLeft","topCenter","topRight","bottomLeft","bottomCenter","bottomRight","centerLeft","centerRight","justify","fill","stretch"]
-SHAPES = ["None","Circle","SidedPolygon","Line","HorizontalLine","VerticalLine","Rectangle","Square","Triangle","Star","Heart","WaveformPath","CustomPath","Oval","Capsule","Pentagon","Hexagon"]
-def field(kind="slider", default=0.0, **kw):
-    return {"type":kind,"default":default,**kw}
-def general():
-    return {"General":{
-      "Tag":{"Tag":field("text","")},"Visibility":{"Visible":field("checkbox",True)},
-      "Compositing":{"Blend Mode":field("dropdown","Alpha",options=BLEND)},
-      "Transform":{"Position X":field(default=0.5),"Position Y":field(default=0.5),"Anchor X":field("dropdown","center",options=ANCHOR),"Anchor Y":field("dropdown","center",options=ANCHOR),"Alignment Position X":field(default=0.5),"Alignment Position Y":field(default=0.5),"Scale Is Uniform":field("checkbox",True),"Scale X":field(default=1.0),"Scale Y":field(default=1.0),"Rotation":field(default=0.0,min=-180,max=180),"Pivot X":field(default=0.5),"Pivot Y":field(default=0.5)},
-      "Measure Engine":{"Measure Pos":field("dropdown","Nothing",options=MEASURE),"Measure Scale":field("dropdown","Nothing",options=MEASURE),"Measure Rot":field("dropdown","Nothing",options=MEASURE),"A (Amount)":field(default=1.0),"B (Speed)":field(default=1.0)}
-    }}
-def standard_layer():
-    return general()
-def segment():
-    return {"Enable Segment":field("checkbox",True),"Shape Path":field("dropdown","None",options=SHAPES),"Color From":field("color","#FFFFFFFF"),"Color To":field("color","#FFFFFFFF"),"Fixed Height":field(default=0.0),"Bar Height Multiplier":field(default=1.0),"Mirror":field("checkbox",False),"Flip Every Other":field("checkbox",False)}
-SCHEMA = {
-"COMPOSITION":{"General":general()["General"],"Render Settings":{"Output":{"Resolution Width":field("number",1920,min=1,max=7680),"Resolution Height":field("number",1080,min=1,max=7680),"FPS Limit":field("dropdown","60",options=["30","60","120"]),"Background Color":field("color","#000000FF"),"Alpha / Transparency":field(default=1.0),"Clear Canvas on Frame":field("checkbox",True)}}},
-"IMAGE":{**standard_layer(),"Image Source":{"Source":{"Pick Image":field("image",""),"Keep Aspect Ratio":field("checkbox",True),"Crop to Fit":field("checkbox",False),"Shape":field("dropdown","None",options=SHAPES),"Image Index":field("number",0,min=0,max=999)}},"Color Adjustments":{"Adjustments":{"Tint":field("color","#FFFFFFFF"),"Brightness":field(default=0.0,min=-1,max=1),"Contrast":field(default=1.0,min=0,max=3),"Saturation":field(default=1.0,min=0,max=3),"Hue Shift":field(default=0.0,min=-180,max=180)}},"Color Key (Chroma Key)":{"Keying":{"Enable Color Key":field("checkbox",False),"Key Color":field("color","#00FF00FF"),"Threshold / Tolerance":field(default=0.1),"Softness":field(default=0.05)}},"Blur":{"Blur Settings":{"Blur Radius":field(default=0.0,min=0,max=100),"Blur Type":field("dropdown","Gaussian",options=["Gaussian","Box","Motion"])}},"Generated Album Art":{"Metadata Art":{"Enable Auto-Fetch":field("checkbox",False),"Fallback Image":field("image","")}},"Masking":{"Mask":{"Mask Image":field("image",""),"Mask Mode":field("dropdown","Alpha",options=["Alpha","Luminance","Inverted Alpha"])}}},
-"TEXT":{**standard_layer(),"Content":{"Text":{"Text Input":field("text",""),"Use Metadata Variables":field("checkbox",False),"Typewriter Speed":field(default=0.0,min=0,max=100)}},"Typography":{"Font":{"Font Family":field("font","Montserrat"),"Font Size":field(default=48,min=1,max=300),"Font Weight":field("dropdown","400",options=[str(x) for x in range(100,1000,100)]),"Style":field("dropdown","Normal",options=["Normal","Italic","Bold","Bold-Italic"]),"Letter Spacing":field(default=0.0,min=-10,max=50),"Line Height":field(default=1.0,min=0.5,max=3),"Alignment":field("dropdown","Center",options=["Left","Center","Right","Justify"])}},"Appearance":{"Colors":{"Text Color":field("color","#FFFFFFFF"),"Shadow Color":field("color","#000000FF"),"Shadow X":field(default=0.0),"Shadow Y":field(default=0.0),"Shadow Blur":field(default=0.0,min=0,max=100),"Outline/Stroke Color":field("color","#000000FF"),"Outline Width":field(default=0.0,min=0,max=20)}},"Text Animation":{"Animation":{"Animation Type":field("dropdown","None",options=["None","Fade","Slide Up","Slide Down","Zoom","Typewriter"]),"Animation Speed":field(default=1.0,min=0,max=10)}}},
-"BARS / SEGMENTS":{**standard_layer(),"Bars Setup":{"Geometry":{"Flip Input":field("checkbox",False),"Height Scale":field(default=1.0,min=0,max=10),"Min Height Scale":field(default=0.0),"Max Height Scale":field(default=1.0,min=0,max=10),"Shape Path":field("dropdown","None",options=SHAPES),"Color Blend Offset":field(default=0.0),"Bar Count":field("slider",64,min=1,max=256),"Bar Spacing":field(default=0.1),"Bar Width":field(default=0.8)}},"Segment 1":{"Segment 1":segment()},"Segment 2":{"Segment 2":segment()},"Segment 3":{"Segment 3":segment()},"Behavior":{"Dynamics":{"Softness":field(default=0.35),"Reaction Delay":field(default=0.0),"Reaction Accumulated Delay":field(default=0.0),"Audio Provider Index":field("number",0,min=0,max=64),"Audio Channel":field("dropdown","Stereo",options=["Mono","Left","Right","Stereo"])}}},
-"PARTICLES":{**standard_layer(),"Overall Settings":{"Emitter":{"Color":field("color","#FFFFFFFF"),"Count Limit":field("slider",500,min=0,max=5000),"Mirror X":field("checkbox",False),"Mirror Y":field("checkbox",False),"Perspective Depth":field(default=0.0),"Perspective Fov":field(default=60,min=1,max=179),"Spawn Area":field("dropdown","Rectangle",options=["Rectangle","Circle","Line","Point"]),"Vector Relative To Center":field("checkbox",False),"Use Random Vector Instead":field("checkbox",False),"Vector Angle":field(default=0.0,min=-360,max=360),"Vector Angle Z":field(default=0.0,min=-360,max=360),"Force Field":field("dropdown","None",options=["None","Gravity","Wind","Vortex","Attractor","Repeller"])}},"Appearance":{"Particle Appearance":{"Custom Image":field("image",""),"Particle Scale":field(default=1.0),"Trail Length":field(default=0.0),"Color From":field("color","#FFFFFFFF"),"Color To":field("color","#FFFFFFFF"),"Fade In And Out Time":field(default=0.2),"Velocity Angle":field("checkbox",False),"Size Aspect Ratio":field(default=1.0),"Start Size":field(default=1.0),"Fade In Size":field(default=0.0),"End Size":field(default=0.0),"End Size Random":field(default=0.0),"End Size ZFactor":field(default=1.0),"Near Camera Fade Out Distance":field(default=0.0)}},"Behaviour":{"Motion":{"Spawn Time":field(default=0.1),"Measure Overall Speed":field("dropdown","Nothing",options=MEASURE),"A X Amount":field(default=0.0),"B Y Amount":field(default=0.0),"Speed":field(default=1.0),"Speed Random":field(default=0.0),"Lifetime":field(default=2.0,min=0,max=120),"Gravity X":field(default=0.0),"Gravity Y":field(default=-9.8)}},"Wave Behaviour":{"Wave":{"Side Sine Wave Freq":field(default=1.0),"Side Sine Wave Freq Random":field(default=0.0),"Side Sine Wave Mag":field(default=0.0),"Side Sine Wave Mag Random":field(default=0.0)}}},
-"AUDIOPROVIDER":{"General":{"Routing":{"Visible":field("checkbox",True),"Audio Source":field("dropdown","File",options=["File","Microphone","System Audio"]),"Volume":field(default=1.0),"Balance":field(default=0.0,min=-1,max=1),"Preamp":field(default=1.0),"Measure Source":field("dropdown","Bass",options=["Bass","Mid","Treble","Volume","Peak"])}},"Sync & Offset":{"Timing":{"Audio Offset":field(default=0.0,min=-1000,max=1000),"BPM Sync":field("number",120,min=1,max=400),"Beat Offset":field(default=0.0,min=-10,max=10)}}},
-"BLUR EFFECT":{**standard_layer(),"Appearance":{"Compositing":{"Blend Mode Content":field("dropdown","Alpha",options=BLEND),"Color":field("color","#FFFFFFFF"),"Source Composition Index":field("number",0,min=0,max=999),"Mask Image":field("image",""),"Show Unblurred Content":field("checkbox",True),"Show Unblurred Content Under":field("checkbox",False)}},"Blur Settings":{"Multi-pass Blur":{"Blur Radius":field(default=8.0,min=0,max=100),"Blur Multiplier":field(default=1.0),"1Layer Scale X":field(default=1.0),"1Layer Scale Y":field(default=1.0),"2Layer Scale X":field(default=0.5),"2Layer Scale Y":field(default=0.5),"3Layer Scale X":field(default=0.25),"3Layer Scale Y":field(default=0.25),"1Layer Color":field("color","#FFFFFFFF"),"2Layer Color":field("color","#FFFFFFFF"),"3Layer Color":field("color","#FFFFFFFF")}}},
-"RGBSPLITEFFECT":{**standard_layer(),"Effect Settings":{"Glitch":{"Split Amount":field(default=0.02),"Angle / Direction":field(default=0.0,min=-360,max=360),"Enable Glitch on Beat":field("checkbox",False),"Glitch Duration":field(default=0.1,min=0,max=5),"Red Channel Offset":field(default=0.01),"Green Channel Offset":field(default=0.0),"Blue Channel Offset":field(default=-0.01)}}},
-"MOTIONBLUREFFECT":{**standard_layer(),"Appearance":{"Compositing":{"Blend Mode Content":field("dropdown","Alpha",options=BLEND),"Color":field("color","#FFFFFFFF"),"Target Image":field("image",""),"Show Unblurred Content":field("checkbox",True),"Show Unblurred Content Under":field("checkbox",False)}},"Motion Blur":{"Velocity Blur":{"Blur Amount Multiplier":field(default=1.0),"Motion Source":field("dropdown","EffectTransform",options=["EffectTransform","TargetImage","AudioVolume"]),"Relative Motion Mode":field("checkbox",True)}}},
-"MIRROR EFFECT":{**standard_layer(),"Appearance":{"Mirror":{"Target Image":field("image",""),"Mirror Mode":field("dropdown","Horizontal",options=["Horizontal","Vertical","Both","Kaleidoscope"]),"Flip Mirror":field("checkbox",False),"Color":field("color","#FFFFFFFF"),"Offset":field(default=0.0)}}},
-"CUSTOM SHADER":{**standard_layer(),"Appearance":{"Target":{"Target Image":field("image","")}},"Shader Code":{"GLSL":{"Shader Vertex":field("code",""),"Fragment Shader":field("code",""),"Compile / Apply":field("action","Apply shader")}},"Variables":{"Uniforms":{"New Variable":field("dropdown","None",options=["None","Float","Vector2","Vector3","Color"]),"Add Variable":field("action","Add variable")}}}
+"""Declarative Avee-style property schema.
+
+This module is the single source of truth for every editable property.
+The UI (accordion inspector), the data model (defaults / JSON migration) and
+the render engine all read the same keys, so adding a property here makes it
+appear in the editor, persist to disk and become readable by the renderer.
+
+Hierarchy:  MODULE -> Category (accordion) -> Sub-category (header) -> Property
+
+Property path used everywhere:  "Category/Sub-category/Property"
+"""
+from collections import OrderedDict as OD
+
+# ---------------------------------------------------------------- option lists
+BLEND = ["Alpha", "PreMulAlpha", "Screen", "Add", "AddAlpha", "Multiply",
+         "Darken", "Lighten", "ColorDodge", "ColorBurn", "Overlay", "SoftLight",
+         "HardLight", "Difference", "Exclusion", "Hue", "Saturation", "Color",
+         "Luminosity"]
+
+ANCHOR = ["unset", "start", "center", "end", "top", "bottom", "topLeft",
+          "topCenter", "topRight", "bottomLeft", "bottomCenter", "bottomRight",
+          "centerLeft", "centerRight", "justify", "fill", "stretch"]
+
+MEASURE = ["Nothing", "Beat", "TotalTime", "TotalTimeBackward",
+           "TotalTimeWhenPlaying", "TotalTimeAndBeat", "TrackPosition",
+           "BeatRandomShake", "BeatCamShakeRotMore", "BeatCamShakeRotLess",
+           "ConstantShakeRotMore", "ConstantShakeRotLess", "BeatTriggerAnim",
+           "BeatCamShakeOnly", "BeatPulseScale", "BeatFlashColor",
+           "BeatGlowIntensity", "BeatHorizontalStretch", "BeatVerticalBounce",
+           "ConstantSlowRotate", "ConstantOrbitMove", "ConstantLinearScroll",
+           "TrackProgressPercentage", "TrackRemainingTime",
+           "TrackIntroOutroTrigger", "VolumeLevelResponsive",
+           "PitchFrequencyResponsive"]
+
+SHAPES = ["None", "Circle", "SidedPolygon", "Line", "HorizontalLine",
+          "VerticalLine", "Rectangle", "Square", "Triangle", "Star", "Heart",
+          "WaveformPath", "CustomPath", "Oval", "Capsule", "Pentagon", "Hexagon"]
+
+FONT_WEIGHTS = [str(w) for w in range(100, 1000, 100)]
+VARIABLE_TYPES = ["None", "Float", "Vector2", "Vector3", "Color"]
+
+# Order of the main-menu grid (exact names requested).
+MODULES = ["COMPOSITION", "TEXT", "BARS", "PARTICLES", "IMAGE", "AUDIOPROVIDER",
+           "BLUREFFECT", "RGBSPLITEFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT",
+           "CUSTOMSHADER"]
+
+EFFECT_MODULES = ["BLUREFFECT", "RGBSPLITEFFECT", "MOTIONBLUREFFECT",
+                  "MIRROREREFFECT", "CUSTOMSHADER"]
+
+
+# ---------------------------------------------------------------- field helpers
+def slider(default=0.0, lo=0.0, hi=1.0, step=0.001, **kw):
+    """Sliders are normalized 0.000-1.000 unless a wider range is given."""
+    return dict(type="slider", default=float(default), min=float(lo),
+                max=float(hi), step=step, **kw)
+
+
+def check(default=False, **kw):
+    return dict(type="checkbox", default=bool(default), **kw)
+
+
+def color(default="#FFFFFFFF", **kw):
+    """Colors are RGBA hex strings: #RRGGBBAA (last two digits = alpha)."""
+    return dict(type="color", default=default, **kw)
+
+
+def dropdown(options, default=None, **kw):
+    return dict(type="dropdown", options=list(options),
+                default=options[0] if default is None else default, **kw)
+
+
+def text(default="", multiline=False, **kw):
+    return dict(type="text", default=default, multiline=multiline, **kw)
+
+
+def number(default=0, lo=0, hi=99999, **kw):
+    return dict(type="number", default=default, min=lo, max=hi, **kw)
+
+
+def image(**kw):
+    return dict(type="image", default="", **kw)
+
+
+def font(default="Roboto", **kw):
+    return dict(type="font", default=default, **kw)
+
+
+def code(default="", **kw):
+    return dict(type="code", default=default, **kw)
+
+
+def action(label, **kw):
+    return dict(type="action", default=label, label=label, **kw)
+
+
+# ---------------------------------------------------------------- shared blocks
+def general_category(tag=""):
+    """Standard Layer Settings used by every visual layer."""
+    return OD([
+        ("Layer", OD([
+            ("Tag", text(tag)),
+            ("Visible", check(True)),
+            ("Blend Mode", dropdown(BLEND, "Alpha")),
+        ])),
+        ("Position", OD([
+            ("Position X", slider(0.5)),
+            ("Position Y", slider(0.5)),
+            ("Anchor X", dropdown(ANCHOR, "center")),
+            ("Anchor Y", dropdown(ANCHOR, "center")),
+            ("Alignment Position X", slider(0.5)),
+            ("Alignment Position Y", slider(0.5)),
+        ])),
+        ("Scale & Rotation", OD([
+            ("Scale Is Uniform", check(True)),
+            ("Scale X", slider(1.0, 0, 10)),
+            ("Scale Y", slider(1.0, 0, 10)),
+            ("Rotation", slider(0.0, help="0..1 = 0..360 degrees")),
+            ("Pivot X", slider(0.5)),
+            ("Pivot Y", slider(0.5)),
+        ])),
+        ("Measure Engine", OD([
+            ("Measure Pos", dropdown(MEASURE, "Nothing")),
+            ("Pos Amount (A)", slider(0.1, 0, 10)),
+            ("Pos Speed (B)", slider(1.0, 0, 10)),
+            ("Measure Scale", dropdown(MEASURE, "Nothing")),
+            ("Scale Amount (A)", slider(0.2, 0, 10)),
+            ("Scale Speed (B)", slider(1.0, 0, 10)),
+            ("Measure Rot", dropdown(MEASURE, "Nothing")),
+            ("Rot Amount (A)", slider(0.1, 0, 10)),
+            ("Rot Speed (B)", slider(1.0, 0, 10)),
+        ])),
+    ])
+
+
+def segment(index, enabled, c_from, c_to, mult):
+    return OD([
+        ("Enable Segment", check(enabled)),
+        ("Shape Path", dropdown(SHAPES, "None")),
+        ("Color From", color(c_from)),
+        ("Color To", color(c_to)),
+        ("Fixed Height", slider(0.0)),
+        ("Bar Height Multiplier", slider(mult, 0, 10)),
+        ("Mirror", check(False)),
+        ("Flip Every Other", check(False)),
+    ])
+
+
+# ---------------------------------------------------------------- the schema
+SCHEMA = OD()
+
+SCHEMA["COMPOSITION"] = OD([
+    ("General", general_category("Main")),
+    ("Render Settings", OD([
+        ("Output", OD([
+            ("Resolution Width", number(1080, 16, 7680)),
+            ("Resolution Height", number(1920, 16, 7680)),
+            ("FPS Limit", dropdown(["30", "60", "120"], "60")),
+        ])),
+        ("Canvas", OD([
+            ("Background Color", color("#070906FF")),
+            ("Alpha / Transparency", slider(1.0)),
+            ("Clear Canvas on Frame", check(True)),
+        ])),
+    ])),
+])
+
+SCHEMA["IMAGE"] = OD([
+    ("General", general_category("Album Art")),
+    ("Image Source", OD([
+        ("Source", OD([
+            ("Pick Image", image()),
+            ("Keep Aspect Ratio", check(True)),
+            ("Crop to Fit", check(False)),
+            ("Shape", dropdown(SHAPES, "Circle")),
+            ("Image Index", number(0, 0, 99)),
+            ("Size", slider(0.42, help="Base size relative to the canvas")),
+        ])),
+    ])),
+    ("Color Adjustments", OD([
+        ("Adjustments", OD([
+            ("Tint", color("#FFFFFFFF")),
+            ("Brightness", slider(0.5, help="0.5 = unchanged")),
+            ("Contrast", slider(0.5, help="0.5 = unchanged")),
+            ("Saturation", slider(0.5, help="0.5 = unchanged")),
+            ("Hue Shift", slider(0.0, help="0..1 = 0..360 degrees")),
+        ])),
+    ])),
+    ("Color Key (Chroma Key)", OD([
+        ("Color Key", OD([
+            ("Enable Color Key", check(False)),
+            ("Key Color", color("#00FF00FF")),
+            ("Threshold / Tolerance", slider(0.25)),
+            ("Softness", slider(0.1)),
+        ])),
+    ])),
+    ("Blur", OD([
+        ("Blur", OD([
+            ("Blur Radius", slider(0.0)),
+            ("Blur Type", dropdown(["Gaussian", "Box", "Motion"], "Gaussian")),
+        ])),
+    ])),
+    ("Generated Album Art", OD([
+        ("Album Art", OD([
+            ("Enable Auto-Fetch", check(True)),
+            ("Fallback Image", image()),
+        ])),
+    ])),
+    ("Masking", OD([
+        ("Mask", OD([
+            ("Mask Image", image()),
+            ("Mask Mode", dropdown(["Alpha", "Luminance", "Inverted Alpha"], "Alpha")),
+        ])),
+    ])),
+])
+SCHEMA["IMAGE"]["General"]["Position"]["Position Y"] = slider(0.62)
+
+SCHEMA["TEXT"] = OD([
+    ("General", general_category("Title")),
+    ("Content", OD([
+        ("Text", OD([
+            ("Text Input", text("%title%\n%artist%", multiline=True)),
+            ("Use Metadata Variables", check(True, help="%title% %artist% %album% %time% %duration% %remaining% {ArtistOrTitle}")),
+            ("Typewriter Speed", slider(0.5, help="Characters per second x 60")),
+        ])),
+    ])),
+    ("Typography", OD([
+        ("Font", OD([
+            ("Font Family", font("Roboto")),
+            ("Font Size", slider(0.035, help="Relative to canvas height")),
+            ("Font Weight", dropdown(FONT_WEIGHTS, "700")),
+            ("Style", dropdown(["Normal", "Italic", "Bold", "Bold-Italic"], "Normal")),
+            ("Letter Spacing", slider(0.0)),
+            ("Line Height", slider(0.5, help="0.5 = 1.0x, 1 = 2.0x")),
+            ("Alignment", dropdown(["Left", "Center", "Right", "Justify"], "Center")),
+        ])),
+    ])),
+    ("Appearance", OD([
+        ("Fill", OD([
+            ("Text Color", color("#FFFFFFFF")),
+        ])),
+        ("Shadow", OD([
+            ("Shadow Color", color("#00000099")),
+            ("Shadow X", slider(0.52)),
+            ("Shadow Y", slider(0.48)),
+            ("Shadow Blur", slider(0.2)),
+        ])),
+        ("Outline", OD([
+            ("Outline/Stroke Color", color("#000000FF")),
+            ("Outline Width", slider(0.0)),
+        ])),
+    ])),
+    ("Text Animation", OD([
+        ("Animation", OD([
+            ("Animation Type", dropdown(["None", "Fade", "Slide Up", "Slide Down", "Zoom", "Typewriter"], "Fade")),
+            ("Animation Speed", slider(0.5)),
+        ])),
+    ])),
+])
+SCHEMA["TEXT"]["General"]["Position"]["Position Y"] = slider(0.2)
+
+SCHEMA["BARS"] = OD([
+    ("General", general_category("Spectrum")),
+    ("Bars Setup", OD([
+        ("Bars", OD([
+            ("Flip Input", check(False)),
+            ("Height Scale", slider(1.0, 0, 10)),
+            ("Min Height Scale", slider(0.01)),
+            ("Max Height Scale", slider(0.22, 0, 10)),
+            ("Shape Path", dropdown(SHAPES, "Circle")),
+            ("Path Size", slider(0.24, help="Size of the shape path")),
+            ("Color Blend Offset", slider(0.0)),
+            ("Bar Count", slider(64, 4, 256, step=1)),
+            ("Bar Spacing", slider(0.3)),
+            ("Bar Width", slider(0.7)),
+        ])),
+    ])),
+    ("Segment 1", OD([("Segment 1", segment(1, True, "#C6FF00FF", "#5BFFB0FF", 1.0))])),
+    ("Segment 2", OD([("Segment 2", segment(2, False, "#FFFFFF99", "#C6FF0066", 0.6))])),
+    ("Segment 3", OD([("Segment 3", segment(3, False, "#5BFFB0FF", "#00E5FFFF", 0.3))])),
+    ("Behavior", OD([
+        ("Physics", OD([
+            ("Softness", slider(0.55, help="How slowly bars fall back")),
+            ("Reaction Delay", slider(0.15, help="How slowly bars rise")),
+            ("Reaction Accumulated Delay", slider(0.0, help="Extra delay per bar index")),
+        ])),
+        ("Audio", OD([
+            ("Audio Provider Index", number(0, 0, 8)),
+            ("Audio Channel", dropdown(["Mono", "Left", "Right", "Stereo"], "Mono")),
+        ])),
+    ])),
+])
+
+SCHEMA["BARS"]["General"]["Position"]["Position Y"] = slider(0.62)
+
+SCHEMA["PARTICLES"] = OD([
+    ("General", general_category("Particles")),
+    ("Overall Settings", OD([
+        ("Emitter", OD([
+            ("Color", color("#FFFFFFFF")),
+            ("Count Limit", slider(300, 0, 5000, step=1, warn_above=2000,
+                                   warning="Above 2000 particles may lag on phones")),
+            ("Mirror X", check(False)),
+            ("Mirror Y", check(False)),
+            ("Spawn Area", dropdown(["Rectangle", "Circle", "Line", "Point"], "Circle")),
+            ("Force Field", dropdown(["None", "Gravity", "Wind", "Vortex", "Attractor", "Repeller"], "None")),
+        ])),
+        ("Perspective", OD([
+            ("Perspective Depth", slider(0.0)),
+            ("Perspective Fov", slider(0.5, help="0..1 = 10..170 degrees")),
+        ])),
+        ("Direction", OD([
+            ("Vector Relative To Center", check(True)),
+            ("Use Random Vector Instead", check(False)),
+            ("Vector Angle", slider(0.25, help="0..1 = 0..360 degrees")),
+            ("Vector Angle Z", slider(0.0, help="0..1 = 0..360 degrees")),
+        ])),
+    ])),
+    ("Appearance", OD([
+        ("Look", OD([
+            ("Custom Image", image()),
+            ("Particle Scale", slider(0.3)),
+            ("Trail Length", slider(0.0)),
+            ("Color From", color("#C6FF00FF")),
+            ("Color To", color("#5BFFB000")),
+            ("Fade In And Out Time", slider(0.2)),
+            ("Velocity Angle", check(False)),
+            ("Size Aspect Ratio", slider(0.5, help="0.5 = square")),
+        ])),
+        ("Size", OD([
+            ("Start Size", slider(0.5)),
+            ("Fade In Size", slider(0.1)),
+            ("End Size", slider(0.1)),
+            ("End Size Random", slider(0.2)),
+            ("End Size ZFactor", slider(0.5)),
+            ("Near Camera Fade Out Distance", slider(0.0)),
+        ])),
+    ])),
+    ("Behaviour", OD([
+        ("Motion", OD([
+            ("Spawn Time", slider(0.02, help="Seconds between spawns")),
+            ("Measure Overall Speed", dropdown(MEASURE, "Beat")),
+            ("A X Amount", slider(0.5, 0, 10)),
+            ("B Y Amount", slider(1.0, 0, 10)),
+            ("Speed", slider(0.2)),
+            ("Speed Random", slider(0.4)),
+            ("Lifetime", slider(0.3, help="0..1 = 0..10 seconds")),
+            ("Gravity X", slider(0.5, help="0.5 = none")),
+            ("Gravity Y", slider(0.5, help="0.5 = none")),
+        ])),
+    ])),
+    ("Wave Behaviour", OD([
+        ("Side Wave", OD([
+            ("Side Sine Wave Freq", slider(0.2)),
+            ("Side Sine Wave Freq Random", slider(0.0)),
+            ("Side Sine Wave Mag", slider(0.0)),
+            ("Side Sine Wave Mag Random", slider(0.0)),
+        ])),
+    ])),
+])
+
+SCHEMA["PARTICLES"]["General"]["Position"]["Position Y"] = slider(0.62)
+
+SCHEMA["AUDIOPROVIDER"] = OD([
+    ("General", OD([
+        ("Routing", OD([
+            ("Visible", check(True)),
+            ("Audio Source", dropdown(["File", "Microphone", "System Audio"], "File")),
+            ("Volume", slider(0.8)),
+            ("Balance", slider(0.5, help="0 = left, 0.5 = center, 1 = right")),
+            ("Preamp", slider(1.0, 0, 10, help="Gain applied to the analysis signal")),
+            ("Measure Source", dropdown(["Bass", "Mid", "Treble", "Volume", "Peak"], "Bass")),
+        ])),
+    ])),
+    ("Sync & Offset", OD([
+        ("Timing", OD([
+            ("Audio Offset", slider(0.0, -1000, 1000, step=1, help="Milliseconds")),
+            ("BPM Sync", number(0, 0, 400, help="0 = off; otherwise adds a beat grid")),
+            ("Beat Offset", slider(0.0)),
+        ])),
+    ])),
+])
+
+SCHEMA["BLUREFFECT"] = OD([
+    ("General", general_category("Glow")),
+    ("Appearance", OD([
+        ("Content", OD([
+            ("Blend Mode Content", dropdown(BLEND, "Screen")),
+            ("Color", color("#FFFFFFFF")),
+            ("Source Composition Index", number(0, 0, 16)),
+            ("Mask Image", image()),
+            ("Show Unblurred Content", check(True)),
+            ("Show Unblurred Content Under", check(False)),
+        ])),
+    ])),
+    ("Blur Settings", OD([
+        ("Radius", OD([
+            ("Blur Radius", slider(0.3)),
+            ("Blur Multiplier", slider(1.0, 0, 10)),
+        ])),
+        ("Layer 1", OD([
+            ("1Layer Scale X", slider(1.0, 0, 10)),
+            ("1Layer Scale Y", slider(1.0, 0, 10)),
+            ("1Layer Color", color("#FFFFFF99")),
+        ])),
+        ("Layer 2", OD([
+            ("2Layer Scale X", slider(2.0, 0, 10)),
+            ("2Layer Scale Y", slider(2.0, 0, 10)),
+            ("2Layer Color", color("#C6FF0066")),
+        ])),
+        ("Layer 3", OD([
+            ("3Layer Scale X", slider(4.0, 0, 10)),
+            ("3Layer Scale Y", slider(4.0, 0, 10)),
+            ("3Layer Color", color("#5BFFB044")),
+        ])),
+    ])),
+])
+SCHEMA["BLUREFFECT"]["General"]["Layer"]["Visible"] = check(False)
+
+SCHEMA["RGBSPLITEFFECT"] = OD([
+    ("General", general_category("Glitch")),
+    ("Effect Settings", OD([
+        ("Split", OD([
+            ("Split Amount", slider(0.2)),
+            ("Angle / Direction", slider(0.0, help="0..1 = 0..360 degrees")),
+            ("Red Channel Offset", slider(1.0)),
+            ("Green Channel Offset", slider(0.5)),
+            ("Blue Channel Offset", slider(0.0)),
+        ])),
+        ("Glitch", OD([
+            ("Enable Glitch on Beat", check(True)),
+            ("Glitch Duration", slider(0.2, help="0..1 = 0..1 second")),
+        ])),
+    ])),
+])
+SCHEMA["RGBSPLITEFFECT"]["General"]["Layer"]["Visible"] = check(False)
+
+SCHEMA["MOTIONBLUREFFECT"] = OD([
+    ("General", general_category("Motion Blur")),
+    ("Appearance", OD([
+        ("Content", OD([
+            ("Blend Mode Content", dropdown(BLEND, "Alpha")),
+            ("Color", color("#FFFFFFFF")),
+            ("Target Image", image()),
+            ("Show Unblurred Content", check(True)),
+            ("Show Unblurred Content Under", check(False)),
+        ])),
+    ])),
+    ("Motion Blur", OD([
+        ("Motion", OD([
+            ("Blur Amount Multiplier", slider(1.0, 0, 10)),
+            ("Motion Source", dropdown(["EffectTransform", "TargetImage", "AudioVolume"], "AudioVolume")),
+            ("Relative Motion Mode", check(True)),
+        ])),
+    ])),
+])
+SCHEMA["MOTIONBLUREFFECT"]["General"]["Layer"]["Visible"] = check(False)
+
+SCHEMA["MIRROREREFFECT"] = OD([
+    ("General", general_category("Mirror")),
+    ("Appearance", OD([
+        ("Mirror", OD([
+            ("Target Image", image()),
+            ("Mirror Mode", dropdown(["Horizontal", "Vertical", "Both", "Kaleidoscope"], "Horizontal")),
+            ("Flip Mirror", check(False)),
+            ("Color", color("#FFFFFFFF")),
+            ("Offset", slider(0.5, help="Mirror axis position")),
+        ])),
+    ])),
+])
+SCHEMA["MIRROREREFFECT"]["General"]["Layer"]["Visible"] = check(False)
+
+DEFAULT_FRAGMENT = """// Kivy effect function. Inputs: color, texture, tex_coords, coords.
+// Built-ins: time, resolution, beat, rms, bass + your variables below.
+vec4 effect(vec4 color, sampler2D texture, vec2 tex_coords, vec2 coords)
+{
+    vec2 uv = tex_coords;
+    float wave = sin(uv.y * 30.0 + time * 4.0) * 0.004 * (1.0 + beat * 4.0);
+    vec4 c = texture2D(texture, vec2(uv.x + wave, uv.y));
+    return vec4(c.rgb * (0.9 + mySpeed * 0.2), c.a);
 }
+"""
+
+SCHEMA["CUSTOMSHADER"] = OD([
+    ("General", general_category("Shader")),
+    ("Appearance", OD([
+        ("Target", OD([
+            ("Target Image", image()),
+        ])),
+    ])),
+    ("Shader Code", OD([
+        ("GLSL", OD([
+            ("Shader Vertex", code("", help="Optional. Leave empty to use the default vertex shader.")),
+            ("Fragment Shader", code(DEFAULT_FRAGMENT)),
+            ("Compile / Apply", action("Compile / Apply")),
+        ])),
+    ])),
+    ("Variables", OD([
+        ("Declare", OD([
+            ("New Variable Name", text("myVar")),
+            ("New Variable", dropdown(VARIABLE_TYPES, "Float")),
+            ("Add Variable", action("Add Variable")),
+        ])),
+        ("Variable Mappings", OD([
+            ("Mappings", dict(type="variables", default=[
+                {"name": "mySpeed", "type": "Float", "value": 0.5}])),
+        ])),
+    ])),
+])
+SCHEMA["CUSTOMSHADER"]["General"]["Layer"]["Visible"] = check(False)
+
+
+# ---------------------------------------------------------------- module info
+MODULE_INFO = {
+    "COMPOSITION": "Master canvas. Its General transform moves every layer together. Render Settings set the internal render resolution (and aspect ratio), FPS limit, background color and whether the canvas is cleared every frame (turn off for trails).",
+    "IMAGE": "Draws a picture. Keep Aspect Ratio prevents stretching, Crop to Fit fills the box. Shape builds a mathematical mask: pixels outside the shape become transparent. Color Key removes one color. Generated Album Art loads the embedded cover of the current track.",
+    "TEXT": "Draws text. With metadata variables on, %title% %artist% %album% %time% %duration% %remaining% and {ArtistOrTitle} are replaced with live data. Typewriter reveals characters one by one.",
+    "BARS": "Splits the spectrum into Bar Count chunks. Height Scale amplifies, Softness and Reaction Delay act like a spring (fast rise, slow fall). Shape Path lays bars along a circle, polygon, line or waveform. Segments stack up to three styles.",
+    "PARTICLES": "Particle system. Count Limit caps particles (over 2000 can lag). Spawn Area is the birth location, Gravity pulls, Lifetime sets seconds before respawn. Measure Overall Speed accelerates particles on the beat.",
+    "AUDIOPROVIDER": "Routes audio: a music file, the microphone or system audio (other apps). Volume/Balance control playback, Preamp boosts analysis, Audio Offset delays visuals so they sync with the beat, BPM Sync adds a beat grid.",
+    "BLUREFFECT": "Gaussian glow. Three passes blur at different scales and tint them to build an atmospheric glow. Show Unblurred Content keeps the sharp image on top.",
+    "RGBSPLITEFFECT": "Separates the red, green and blue channels for a glitch look. Can spike on every beat.",
+    "MOTIONBLUREFFECT": "Stretches the image in the direction of movement. Faster movement means more blur. Relative mode uses per-frame movement.",
+    "MIRROREREFFECT": "Horizontal/Vertical takes half of the image and flips it onto the other half. Flip Mirror swaps the copied side. Kaleidoscope creates radial symmetry.",
+    "CUSTOMSHADER": "Your own GLSL fragment shader, compiled on the GPU and applied to the scene. Declared variables get sliders/color pickers and are sent to the shader as uniforms every frame.",
+}
+
+
+# ---------------------------------------------------------------- helpers
+def iter_fields(module):
+    """Yield (path, spec) for every property of a module, in display order."""
+    for category, subs in SCHEMA[module].items():
+        for sub, props in subs.items():
+            for name, spec in props.items():
+                yield "/".join((category, sub, name)), spec
+
+
+def defaults(module):
+    from copy import deepcopy
+    return {path: deepcopy(spec["default"]) for path, spec in iter_fields(module)}
+
+
+def field_spec(module, path):
+    category, sub, name = path.split("/", 2)
+    return SCHEMA[module][category][sub][name]

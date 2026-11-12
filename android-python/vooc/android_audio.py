@@ -7,6 +7,19 @@ import threading
 import time
 
 
+def waveform_to_float(waveform):
+    """Android Visualizer waveform: unsigned 8-bit PCM -> float32 [-1, 1]."""
+    try:
+        import numpy as np
+        if isinstance(waveform, (bytes, bytearray)):
+            data = np.frombuffer(bytes(waveform), dtype=np.uint8).astype(np.float32)
+        else:
+            data = (np.asarray(list(waveform), dtype=np.int16) & 0xFF).astype(np.float32)
+        return (data - 128.0) / 128.0
+    except ImportError:
+        return [(((int(v) + 256) % 256) - 128) / 128.0 for v in waveform]
+
+
 class AndroidMediaPlayerSource:
     def __init__(self, on_pcm, on_error=None, on_completion=None, on_focus_change=None):
         self.on_pcm = on_pcm
@@ -67,7 +80,21 @@ class AndroidMediaPlayerSource:
             listener = PlayerListener()
             player.setOnCompletionListener(listener)
             player.setOnErrorListener(listener)
-            player.setDataSource(str(path))
+            path = str(path)
+            if "://" in path:
+                Uri = autoclass("android.net.Uri")
+                activity = autoclass("org.kivy.android.PythonActivity").mActivity
+                player.setDataSource(activity, Uri.parse(path))
+            else:
+                player.setDataSource(path)
+            try:
+                AudioAttributesBuilder = autoclass("android.media.AudioAttributes$Builder")
+                AudioAttributes = autoclass("android.media.AudioAttributes")
+                attrs = AudioAttributesBuilder().setUsage(AudioAttributes.USAGE_MEDIA) \
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
+                player.setAudioAttributes(attrs)
+            except Exception:
+                pass
             player.prepare()
 
             with self._lock:
@@ -124,13 +151,7 @@ class AndroidMediaPlayerSource:
                     @java_method("([BII)V")
                     def onWaveFormDataCapture(self, waveform, sampling_rate, capture_size):
                         try:
-                            values = []
-                            for item in waveform:
-                                value = int(item)
-                                if value < 0:
-                                    value += 256
-                                values.append((value - 128) / 128.0)
-                            source.on_pcm(values, time.monotonic())
+                            source.on_pcm(waveform_to_float(waveform), time.monotonic())
                         except Exception as exc:
                             source.on_error("PCM callback failed: " + str(exc))
 
@@ -318,6 +339,15 @@ class AndroidMediaPlayerSource:
                 return int(self.player.getDuration()) if self.player is not None else 0
         except Exception:
             return 0
+
+    def set_volume(self, left, right):
+        try:
+            with self._lock:
+                if self.player is not None and not self._ducked:
+                    self.player.setVolume(float(left), float(right))
+            return True
+        except Exception:
+            return False
 
     def is_playing(self):
         try:

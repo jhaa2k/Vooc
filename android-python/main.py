@@ -1,5 +1,5 @@
-import os
 import math
+import os
 import random
 import threading
 import time
@@ -14,7 +14,6 @@ from kivy.uix.filechooser import FileChooserListView
 from kivy.uix.popup import Popup
 from kivy.uix.widget import Widget
 from kivy.graphics import Color, Rectangle, Line, Ellipse
-from kivy.core.window import Window
 from kivy.clock import Clock
 
 try:
@@ -369,6 +368,21 @@ class VoocApp(App):
         self.engine = AudioEngine()
         self.visualizer = Visualizer(self.engine)
 
+        self.status = Label(
+            text="Vooc Android\nTap Open to select music",
+            size_hint=(1, None),
+            height=60,
+            color=(1, 1, 1, 1),
+        )
+
+        self.seek = Slider(min=0, max=100, value=0)
+        self.seek.bind(value=self.on_seek)
+
+        self.volume = Slider(min=0, max=1, value=0.8)
+        self.volume.bind(
+            value=lambda instance, value: setattr(self.engine, "volume", value)
+        )
+
         controls = BoxLayout(
             orientation="horizontal",
             size_hint=(1, None),
@@ -398,18 +412,36 @@ class VoocApp(App):
         controls.add_widget(open_button)
         controls.add_widget(theme_button)
 
-        volume = Slider(min=0, max=1, value=0.8)
-        volume.bind(value=lambda instance, value: setattr(self.engine, "volume", value))
-
         layout = BoxLayout(orientation="vertical")
         layout.add_widget(self.visualizer)
-        layout.add_widget(volume)
+        layout.add_widget(self.status)
+        layout.add_widget(self.seek)
+        layout.add_widget(self.volume)
         layout.add_widget(controls)
 
+        Clock.schedule_interval(self.update_status, 0.25)
         return layout
 
     def change_theme(self, instance):
         self.visualizer.theme_index = (self.visualizer.theme_index + 1) % len(THEMES)
+
+    def on_seek(self, instance, value):
+        if self.engine.duration:
+            self.engine.seek(value / 100 * self.engine.duration)
+
+    def update_status(self, dt):
+        if self.engine.path:
+            name = os.path.basename(self.engine.path)
+            current = self.engine.current_time()
+            total = self.engine.duration
+            self.status.text = (
+                f"{name}\n"
+                f"{int(current // 60):02d}:{int(current % 60):02d} / "
+                f"{int(total // 60):02d}:{int(total % 60):02d}"
+            )
+
+            if total and not self.seek.active:
+                self.seek.value = current / total * 100
 
     def open_file(self, instance):
         content = FileChooserListView(
@@ -422,7 +454,7 @@ class VoocApp(App):
                     self.engine.load(selection[0])
                     self.engine.play()
                 except Exception as error:
-                    print("Audio load failed:", error)
+                    self.status.text = f"Load failed: {error}"
             popup.dismiss()
 
         content.bind(selection=select)

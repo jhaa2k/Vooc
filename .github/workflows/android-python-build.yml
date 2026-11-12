@@ -41,6 +41,14 @@ jobs:
             libtinfo5 cmake libffi-dev libssl-dev \
             libltdl-dev
 
+      - name: Accept Android SDK licenses and install pinned SDK packages
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "platforms;android-31" \
+            "build-tools;35.0.0"
+
       - name: Install Buildozer
         run: |
           python -m pip install --upgrade pip

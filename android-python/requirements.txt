@@ -1,2 +1,4 @@
 kivy>=2.3.0
-plyer>=2.1.0
+numpy>=1.24.0
+sounddevice>=0.4.6
+miniaudio>=1.59.0

@@ -3,22 +3,15 @@ title = Vooc
 package.name = vooc
 package.domain = com.jhaa2k
 source.dir = .
-source.include_exts = py,kv,png,jpg,jpeg,webp,json,md,ttf
-version = 0.1.0
-requirements = python3,kivy,plyer,pyjnius
+source.include_exts = py,png,jpg,kv,atlas
+version = 1.0
+requirements = python3,kivy,numpy,sounddevice,miniaudio
 orientation = portrait
 fullscreen = 0
-android.permissions = RECORD_AUDIO,READ_MEDIA_AUDIO,READ_EXTERNAL_STORAGE
-android.api = 35
+android.permissions = READ_EXTERNAL_STORAGE,READ_MEDIA_AUDIO
+android.api = 31
 android.minapi = 24
-android.ndk_api = 24
-android.enable_androidx = True
-android.archs = arm64-v8a, armeabi-v7a
-android.accept_sdk_license = True
-
-# Pin python-for-android to the upstream fix for the pip self-upgrade/venv corruption.
-p4a.branch = develop
-p4a.commit = d2ee8c54d9d42375a95f18159e950a119671cf63
+android.archs = arm64-v8a,armeabi-v7a
 
 [buildozer]
 log_level = 2

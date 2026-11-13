@@ -4,7 +4,7 @@ package.name = vooc
 package.domain = com.jhaa2k
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,webp,kv,atlas,json,ttf
-source.exclude_dirs = tests,docs,bin,.buildozer,__pycache__
+source.exclude_dirs = tests,docs,bin,ci,.buildozer,__pycache__
 version = 1.0
 
 # Only libraries that have python-for-android recipes or are pure Python.

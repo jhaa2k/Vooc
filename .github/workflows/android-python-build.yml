@@ -61,6 +61,14 @@ jobs:
         working-directory: android-python
         run: python -m unittest discover -s tests -v
 
+      - name: Use the repository's fixed debug signing key
+        # Every CI run would otherwise create a new random debug key, and Android
+        # refuses to install an update signed with a different key
+        # ("App not installed"). A fixed key lets new APKs install over old ones.
+        run: |
+          mkdir -p ~/.android
+          cp android-python/ci/debug.keystore ~/.android/debug.keystore
+
       - name: Build debug APK
         working-directory: android-python
         env:

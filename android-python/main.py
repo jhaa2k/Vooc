@@ -130,6 +130,7 @@ class VoocRoot(FloatLayout):
         if system_insets() is None:
             Clock.schedule_once(self._retry_insets, 0.5)
         Clock.schedule_interval(self.tick, 1 / 15.0)
+        Clock.schedule_interval(self._smoke_autoload, 1.0)
         if Window is not None:
             Window.bind(on_keyboard=self._on_key)
 
@@ -303,6 +304,24 @@ class VoocRoot(FloatLayout):
         scroll.add_widget(col)
         self.body.add_widget(scroll)
 
+    def _smoke_autoload(self, *_):
+        """Emulator smoke test hook: play files/smoke_track.* directly (the
+        emulator's document picker often shows no files). No-op for users."""
+        try:
+            base = Path(App.get_running_app().user_data_dir)
+            if not (base / "smoke_targets").exists():
+                return
+            trigger = base / "smoke_load"
+            if not trigger.exists():
+                return
+            trigger.unlink()
+            tracks = sorted(base.glob("smoke_track.*"))
+            if tracks:
+                print("Vooc smoke: loading %s" % tracks[0])
+                self.load_track(str(tracks[0]), autoplay=True)
+        except Exception as exc:
+            print("Vooc smoke autoload: %s" % exc)
+
     def _dump_targets(self, *_):
         """Emulator smoke test hook: publish key button positions (fractions,
         y from top) when files/smoke_targets exists. No-op for users."""
@@ -312,13 +331,23 @@ class VoocRoot(FloatLayout):
             if not (base / "smoke_targets").exists() or Window is None:
                 return
             W, H = float(Window.width), float(Window.height)
+            off_top = 0
+            try:
+                from jnius import autoclass
+                if autoclass("android.os.Build$VERSION").SDK_INT < 35:
+                    # window starts below the status bar: shift to screen coordinates
+                    act = autoclass("org.kivy.android.PythonActivity").mActivity
+                    ins = act.getWindow().getDecorView().getRootWindowInsets()
+                    off_top = int(ins.getSystemWindowInsetTop()) if ins is not None else 0
+            except Exception:
+                off_top = 0
             out = []
 
             def add(name, w):
                 if w is None or w.get_root_window() is None:
                     return
                 x, y = w.to_window(w.x + w.width / 2.0, w.y + w.height / 2.0)
-                out.append("%s %.4f %.4f" % (name, x / W, 1 - y / H))
+                out.append("%s %d %d px" % (name, int(x), int(off_top + H - y)))
             add("play", self.play_btn)
             add("style", self.style_chip)
             for k, it in self.nav.items.items():

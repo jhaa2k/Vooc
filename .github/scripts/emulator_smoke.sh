@@ -33,7 +33,8 @@ W=$($T adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1); WX=${W%x*}; WY=${
 tgt() {
   line=$($T adb shell run-as $PKG cat files/ui_targets.txt 2>/dev/null | tr -d '\r' | grep "^$1 " | head -1)
   if [ -z "$line" ]; then echo "target $1 missing (fallback $2 $3)"; tap $2 $3; return; fi
-  set -- $line; tap $2 $3
+  set -- $line
+  if [ "$4" = px ]; then adb shell input tap $2 $3; else tap $2 $3; fi
 }
 tap() { adb shell input tap $(python3 -c "print(int($WX*$1), int($WY*$2))"); }
 n=0
@@ -90,6 +91,22 @@ for attempt in 1 2 3 4; do
   else LONG=1 tap_text 'test_song'; sleep 2; tap_text '^(Select|SELECT|Open|OPEN|Done)$|action_menu_select|menu_select'; sleep 5; fi
 done
 shot imported
+# The emulator's picker often lists no files; fall back to the app's test hook
+if ! $T adb shell run-as $PKG ls files/vooc_project.json >/dev/null 2>&1 || \
+   ! $T adb shell run-as $PKG cat files/vooc_project.json 2>/dev/null | grep -q test_song; then
+  echo "picker import failed, using smoke_track hook"
+  adb shell input keyevent KEYCODE_BACK; sleep 1
+  top=$($T adb shell dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity|ResumedActivity:' | head -1)
+  case "$top" in *$PKG*) ;; *) $T adb shell am start -n $PKG/org.kivy.android.PythonActivity; sleep 4 ;; esac
+  ext=wav; src=test_song.wav
+  if command -v ffmpeg >/dev/null 2>&1 && ffmpeg -v error -y -i test_song.wav -b:a 128k smoke.mp3; then ext=mp3; src=smoke.mp3; fi
+  echo "smoke track format: $ext"
+  adb push $src /data/local/tmp/smoke_track.$ext >/dev/null
+  adb shell chmod 644 /data/local/tmp/smoke_track.$ext
+  $T adb shell run-as $PKG cp /data/local/tmp/smoke_track.$ext files/smoke_track.$ext
+  $T adb shell run-as $PKG touch files/smoke_load
+  sleep 4; shot imported_hook
+fi
 # Import autoplays; give the spectrum decoder time, then capture the live visualizer
 sleep 8; shot playing
 for tab in visual sound layers studio library; do

@@ -125,10 +125,10 @@ QUICK_EFFECTS = [
     ("Vignette", "CUSTOMSHADER", "Vignette", "Shader Code/GLSL/Intensity", 0.0, 1.0),
     ("Film Grain", "CUSTOMSHADER", "Film Grain", "Shader Code/GLSL/Intensity", 0.0, 1.0),
 ]
-ADDABLE = [("Text", "TEXT", "text"), ("Image", "IMAGE", "image"), ("Spectrum bars", "BARS", "bars"),
-           ("Particles", "PARTICLES", "sparkle"), ("Glow / Blur", "BLUREFFECT", "eye"),
-           ("Motion Blur", "MOTIONBLUREFFECT", "next"), ("RGB Split", "RGBSPLITEFFECT", "layers"),
-           ("Mirrorer", "MIRROREREFFECT", "copy"), ("Custom Shader", "CUSTOMSHADER", "more")]
+ADDABLE = [("Text", "TEXT", "text"), ("Image", "IMAGE", "image"), ("Bars", "BARS", "bars"),
+           ("Particles", "PARTICLES", "sparkle"), ("Glow", "BLUREFFECT", "eye"),
+           ("Motion", "MOTIONBLUREFFECT", "next"), ("RGB Split", "RGBSPLITEFFECT", "layers"),
+           ("Mirror", "MIRROREREFFECT", "copy"), ("Shader", "CUSTOMSHADER", "more")]
 FIXED_MODULES = ("COMPOSITION", "AUDIOPROVIDER")
 B = "Bars Setup/Bars/"
 CANVAS = "Render Settings/Canvas/"

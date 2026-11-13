@@ -36,7 +36,15 @@ class TemplateTests(unittest.TestCase):
             templates.validate({"nope": 1})
 
 
+try:
+    import PIL  # noqa: F401
+    HAVE_PIL = True
+except ImportError:
+    HAVE_PIL = False
+
+
 class PaletteTests(unittest.TestCase):
+    @unittest.skipUnless(HAVE_PIL, "Pillow not installed")
     def test_extract_from_image(self):
         from PIL import Image
         with tempfile.TemporaryDirectory() as d:

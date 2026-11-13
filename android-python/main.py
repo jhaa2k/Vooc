@@ -5,11 +5,12 @@ from kivy.core.window import Window
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
-from vooc.material import (
-    MaterialButton as Button, MaterialLabel as Label, MaterialSlider as Slider,
-    MaterialSpinner as Spinner, MaterialTextInput as TextInput,
-    MaterialPopup as Popup, MaterialCard
-)
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.slider import Slider
+from kivy.uix.spinner import Spinner
+from kivy.uix.textinput import TextInput
+from kivy.uix.popup import Popup
 from kivy.core.audio import SoundLoader
 from pathlib import Path
 import json, random
@@ -20,21 +21,16 @@ from vooc.android_audio import AndroidMediaPlayerSource
 from vooc.android_media import choose_audio, choose_image
 from vooc.property_editor import AdvancedProperties
 
-# Material-inspired dark palette; preserve the original first-build workspace layout.
-MATERIAL_BG = (0.055, 0.063, 0.078, 1)
-MATERIAL_SURFACE = (0.105, 0.118, 0.145, 1)
-MATERIAL_PRIMARY = (0.61, 0.36, 0.96, 1)
-MATERIAL_TEXT = (0.91, 0.91, 0.94, 1)
-
 class B(Button):
+    """Stable Kivy-native Material-toned button; avoids custom GPU canvas widgets."""
     def __init__(self, **kw):
         kw.setdefault("size_hint_y", None)
-        kw.setdefault("height", dp(42))
+        kw.setdefault("height", dp(44))
         kw.setdefault("font_size", "12sp")
-        kw.setdefault("color", MATERIAL_TEXT)
+        kw.setdefault("color", (.93, .93, .96, 1))
         kw.setdefault("background_normal", "")
         kw.setdefault("background_down", "")
-        kw.setdefault("background_color", MATERIAL_SURFACE)
+        kw.setdefault("background_color", (.15, .16, .20, 1))
         super().__init__(**kw)
         self.background_normal = ""
         self.background_down = ""
@@ -50,40 +46,29 @@ class VoocRoot(BoxLayout):
             self.feed_pcm_samples, self._native_error, self._native_completed,
             self._native_focus_changed
         )
-        top=MaterialCard(orientation="horizontal",size_hint_y=None,height=dp(52),padding=[dp(12),dp(6)])
-        top.add_widget(Label(text="[b]VOOC[/b]",markup=True,halign="left",font_size="18sp"))
-        top.add_widget(Label(text="AUDIO VISUALIZER",halign="left",font_size="10sp",color=(.66,.68,.73,1)))
+        top=BoxLayout(size_hint_y=None,height=dp(40))
+        top.add_widget(Label(text="[b]AUDIOVIS PRO[/b]",markup=True,halign="left"))
         for name,fn in [("SAVE",self.save),("LOAD",self.load)]:
-            b=B(text=name,size_hint_x=None,width=dp(64),variant="outlined"); b.bind(on_release=lambda _,f=fn:f()); top.add_widget(b)
+            b=B(text=name,size_hint_x=None,width=dp(58)); b.bind(on_release=lambda _,f=fn:f()); top.add_widget(b)
         self.add_widget(top)
-        preview_card=MaterialCard(size_hint_y=.38,padding=dp(5))
-        self.preview=Spectrum(self.s,size_hint=(1,1)); preview_card.add_widget(self.preview)
-        self.add_widget(preview_card)
+        self.preview=Spectrum(self.s,size_hint_y=.38); self.add_widget(self.preview)
         self.pcm_pipeline=PCMAnalysisPipeline(self._on_audio_analysis, scheduler=lambda callback: Clock.schedule_once(lambda _dt: callback(), 0), sample_rate=44100, fft_size=1024, band_count=64, min_interval=1/30)
         self.track_label=Label(text="No track loaded",size_hint_y=None,height=dp(25),font_size="11sp")
         self.add_widget(self.track_label)
-        transport_card=MaterialCard(size_hint_y=None,height=dp(54),padding=[dp(6),dp(5)])
-        transport=BoxLayout(size_hint_y=1,spacing=dp(5))
+        transport=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
         for text,fn in [("PREV",self.previous),("IMPORT",self.import_audio),("PLAY / PAUSE",self.toggle),("STOP",self.stop),("NEXT",self.next)]:
-            variant="filled" if text in ("IMPORT","PLAY / PAUSE") else "tonal"
-            b=B(text=text,font_size="10sp",variant=variant); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
-        transport_card.add_widget(transport)
-        self.add_widget(transport_card)
+            b=B(text=text,font_size="10sp"); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
+        self.add_widget(transport)
         self.seek=Slider(min=0,max=100,value=0,size_hint_y=None,height=dp(22))
         self._seek_dragging=False
         self.seek.bind(on_touch_down=self.seek_touch_down,on_touch_up=self.seek_audio); self.add_widget(self.seek)
         self._last_track_pos=0; self._end_handled=False
         self.body=BoxLayout()
         self.add_widget(self.body)
-        nav_scroll=ScrollView(size_hint_y=None,height=dp(58),do_scroll_x=True,do_scroll_y=False,bar_width=0)
-        nav=GridLayout(rows=1,cols=len(self.tabs),size_hint=(None,1),spacing=dp(5),padding=[dp(4),dp(3)])
-        nav.bind(minimum_width=nav.setter("width"))
-        self.nav_buttons={}
+        nav=GridLayout(cols=len(self.tabs),size_hint_y=None,height=dp(50),spacing=dp(2))
         for tab in self.tabs:
-            b=B(text=tab,font_size="11sp",size_hint_x=None,width=dp(108),variant="tonal")
-            b.bind(on_release=lambda _,t=tab:self.show(t)); nav.add_widget(b); self.nav_buttons[tab]=b
-        nav_scroll.add_widget(nav)
-        self.add_widget(nav_scroll)
+            b=B(text=tab,font_size="9sp"); b.bind(on_release=lambda _,t=tab:self.show(t)); nav.add_widget(b)
+        self.add_widget(nav)
         self.show("Media"); Clock.schedule_interval(self.tick,1/20)
 
     def feed_pcm_samples(self, samples, timestamp=None):
@@ -121,10 +106,7 @@ class VoocRoot(BoxLayout):
     def popup(self,msg):
         Popup(title="Vooc",content=Label(text=msg),size_hint=(.85,None),height=dp(140)).open()
     def show(self,tab):
-        self.tab=tab
-        for name, button in getattr(self,"nav_buttons",{}).items():
-            button.set_variant("filled" if name == tab else "tonal")
-        self.body.clear_widgets()
+        self.tab=tab; self.body.clear_widgets()
         if tab=="Properties":
             self.property_editor=AdvancedProperties(self.s, on_change=self.preview.refresh, on_save=self.autosave)
             self.body.add_widget(self.property_editor)
@@ -241,12 +223,10 @@ class VoocRoot(BoxLayout):
         r=BoxLayout(size_hint_y=None,height=dp(42)); r.add_widget(Label(text=label,size_hint_x=.35,font_size="11sp"))
         if key.startswith("visualizer_"):
             setting=key.replace("visualizer_","")
-            sp=Spinner(text=self.s.visualizer.get(setting,values[0]),values=values,
-                       background_normal="", background_color=MATERIAL_SURFACE, color=MATERIAL_TEXT)
+            sp=Spinner(text=self.s.visualizer.get(setting,values[0]),values=values)
             sp.bind(text=lambda _,v:(self.s.visualizer.__setitem__(setting,v),self.preview.refresh()))
         else:
-            sp=Spinner(text=self.s.scene.get(key,values[0]),values=values,
-                       background_normal="", background_color=MATERIAL_SURFACE, color=MATERIAL_TEXT)
+            sp=Spinner(text=self.s.scene.get(key,values[0]),values=values)
             sp.bind(text=lambda _,v:self.s.scene.__setitem__(key,v))
         r.add_widget(sp); col.add_widget(r)
     def import_audio(self):
@@ -283,12 +263,7 @@ class VoocRoot(BoxLayout):
                 self.native_audio.release(); self.native_mode=False
             if self.sound:self.sound.stop()
             self.sound=SoundLoader.load(path)
-            if not self.sound:
-                # Fall back to Android's native decoder for device-supported formats.
-                if AndroidMediaPlayerSource.is_available() and self._activate_native_track(path, autoplay=False):
-                    return
-                self.popup("Could not decode this audio file. Try MP3, WAV, FLAC, OGG or M4A.")
-                return
+            if not self.sound:self.popup("This audio format is not supported by the installed Android audio provider.");return
             duration=float(self.sound.length or 1)
             self.track=path; self.s.current_track=path
             if path not in self.s.playlist:self.s.playlist.append(path)
@@ -431,7 +406,31 @@ class VoocRoot(BoxLayout):
 
 class VoocApp(App):
     def build(self):
-        self.title="Vooc"
-        Window.clearcolor = MATERIAL_BG
-        return VoocRoot()
-if __name__=="__main__":VoocApp().run()
+        self.title = "Vooc"
+        Window.clearcolor = (.055, .063, .078, 1)
+        try:
+            return VoocRoot()
+        except Exception:
+            import traceback
+            from kivy.uix.label import Label
+            from kivy.uix.button import Button
+            from kivy.uix.boxlayout import BoxLayout
+            details = traceback.format_exc()
+            try:
+                log_path = Path(self.user_data_dir) / "vooc_startup_error.txt"
+                log_path.write_text(details, encoding="utf-8")
+            except Exception:
+                log_path = "app-private/vooc_startup_error.txt"
+            fallback = BoxLayout(orientation="vertical", padding=dp(18), spacing=dp(12))
+            fallback.add_widget(Label(text="VOOC COULD NOT START", bold=True, font_size="18sp",
+                                      color=(1, .45, .4, 1), size_hint_y=None, height=dp(42)))
+            fallback.add_widget(Label(text="Startup error was saved to: " + str(log_path) +
+                                      "\\nPlease share this file to diagnose the exact crash.",
+                                      halign="left", valign="middle", color=(.9,.9,.92,1)))
+            retry = Button(text="RESTART APP", size_hint_y=None, height=dp(48))
+            retry.bind(on_release=lambda *_: App.get_running_app().stop())
+            fallback.add_widget(retry)
+            return fallback
+
+if __name__ == "__main__":
+    VoocApp().run()

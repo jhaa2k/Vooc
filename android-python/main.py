@@ -427,7 +427,7 @@ class VoocApp(App):
             fallback.add_widget(Label(text="Startup error was saved to: " + str(log_path) +
                                       "\\nPlease share this file to diagnose the exact crash.",
                                       halign="left", valign="middle", color=(.9,.9,.92,1)))
-            retry = Button(text="RESTART APP", size_hint_y=None, height=dp(48))
+            retry = Button(text="CLOSE APP", size_hint_y=None, height=dp(48))
             retry.bind(on_release=lambda *_: App.get_running_app().stop())
             fallback.add_widget(retry)
             return fallback

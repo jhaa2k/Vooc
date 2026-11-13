@@ -389,10 +389,8 @@ class Button3(Tap):
             self.label.bind(text=self._fit)
 
     def _fit(self, *_):
-        try:
-            need = self.label._label.get_extents(self.label.text)[0]
-        except Exception:
-            return
+        # cheap estimate (bold Roboto ~0.6 em per glyph) - no extra native text measuring
+        need = len(self.label.text) * self.label.font_size * 0.6
         room = self.width - self.padding[0] * 2 - self.spacing - dp(6)
         show = need + dp(18) + dp(8) <= room
         self.icon.opacity = 1 if show else 0

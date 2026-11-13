@@ -60,9 +60,16 @@ class LayersPass:
 
 
 class SceneView(Widget):
-    def __init__(self, project, hub=None, **kw):
+    HEAVY = ("BLUREFFECT", "MOTIONBLUREFFECT")
+
+    def __init__(self, project, hub=None, offline=False, size_override=None, **kw):
         super().__init__(**kw)
         self.project = project
+        self.offline = offline                 # export renderer: no clock, fixed dt, full quality
+        self.size_override = size_override     # exact output size for export
+        # performance controls (preview only; export always renders everything)
+        self.perf = {"preview_fps": 60, "render_scale": 1.0, "heavy_blur": True,
+                     "max_bars": 256, "max_particles": 2000}
         self.hub = hub
         self.measure = MeasureEngine()
         self.renderers = {}        # layer.id -> renderer
@@ -81,7 +88,8 @@ class SceneView(Widget):
             self.display = Rectangle()
         self.bind(pos=self._layout, size=self._layout)
         self._fps_limit = None
-        self.start()
+        if not offline:
+            self.start()
 
     # ------------------------------------------------------------ timing
     def start(self):
@@ -100,16 +108,28 @@ class SceneView(Widget):
 
     def _comp_fps(self):
         try:
-            return int(self.project.layer("COMPOSITION").get(C + "Output/FPS Limit"))
+            fps = int(self.project.layer("COMPOSITION").get(C + "Output/FPS Limit"))
         except (ValueError, TypeError):
-            return 60
+            fps = 60
+        if not self.offline:
+            fps = min(fps, int(self.perf.get("preview_fps", 60) or 60))
+        return max(10, fps)
+
+    def set_perf(self, **values):
+        self.perf.update(values)
+        self._signature = None           # force rebuild (size / heavy effects may change)
+        if not self.offline:
+            self.start()
 
     # ------------------------------------------------------------ geometry
     def render_size(self):
         comp = self.project.layer("COMPOSITION")
+        if self.size_override:
+            return tuple(int(v) for v in self.size_override)
         w = comp.get(C + "Output/Resolution Width")
         h = comp.get(C + "Output/Resolution Height")
-        k = min(1.0, MAX_RENDER_SIDE / float(max(w, h)))
+        scale = max(0.25, min(1.0, float(self.perf.get("render_scale", 1.0))))
+        k = min(1.0, MAX_RENDER_SIDE * scale / float(max(w, h)))
         return max(16, int(w * k)), max(16, int(h * k))
 
     def _layout(self, *_):
@@ -127,16 +147,26 @@ class SceneView(Widget):
             return False
         if layer.module == "COMPOSITION":
             return False
+        if layer.module in self.HEAVY and not self.offline and not self.perf.get("heavy_blur", True):
+            return False
         return bool(layer.values.get("General/Layer/Visible", True))
 
     def _compute_signature(self):
         comp = self.project.layer("COMPOSITION")
         layers = tuple((l.id, l.module) for l in self.project.layers if self._visible(l))
-        return (layers, self.render_size(), comp.get(C + "Canvas/Clear Canvas on Frame"),
+        return (layers, self.render_size(), self.perf.get("heavy_blur", True), comp.get(C + "Canvas/Clear Canvas on Frame"),
                 comp.get("General/Layer/Visible"))
+
+    def set_project(self, project):
+        self.project = project
+        self._signature = None
 
     def rebuild(self):
         self._signature = self._compute_signature()
+        alive = {l.id for l in self.project.layers}
+        for lid in [k for k in self.renderers if k not in alive]:
+            self.renderers.pop(lid, None)
+            self.shader_errors.pop(lid, None)
         size = self.render_size()
         comp = self.project.layer("COMPOSITION")
         clear_each = comp.get(C + "Canvas/Clear Canvas on Frame")
@@ -192,10 +222,25 @@ class SceneView(Widget):
         return err
 
     # ------------------------------------------------------------ frame
-    def tick(self, *_):
+    def render_frame(self, t, dt):
+        """Offline (export) frame at song time ``t``: updates and draws every pass."""
+        self._offline_time = t
+        self.tick(dt=dt)
+        for p in self.passes:
+            p.fbo.draw()
+        return self.passes[-1].fbo
+
+    def pixels(self):
+        """RGBA bytes of the final frame (bottom-up rows, as OpenGL returns them)."""
+        return self.passes[-1].fbo.pixels
+
+    def tick(self, *_, dt=None):
         now = time.monotonic()
-        dt = now - self._last
-        self._last = now
+        if dt is None:
+            dt = now - self._last
+            self._last = now
+        else:
+            now = self._start + getattr(self, "_offline_time", 0.0)
         if dt > 0:
             self.fps = self.fps * 0.9 + (1.0 / dt) * 0.1
         if self._comp_fps() != self._fps_limit:

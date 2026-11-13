@@ -301,8 +301,39 @@ class Icon(Widget):
             Ellipse(pos=(cx - s * .1, cy + dy * s - s * .1), size=(s * .2, s * .2))
 
 
+# ---------------------------------------------------------------- touch guard
+class TouchGuard:
+    """Mixin for ButtonBehavior widgets: a press that slides more than a few dp
+    (scrolling, swiping) is cancelled instead of firing, so brushing past a
+    button never triggers it."""
+    GUARD_DIST = dp(10)
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            touch.ud.setdefault("guard_start", touch.pos)
+        return super().on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        if touch.grab_current is self:
+            sx, sy = touch.ud.get("guard_start", touch.pos)
+            if abs(touch.x - sx) > self.GUARD_DIST or abs(touch.y - sy) > self.GUARD_DIST:
+                touch.ud["guard_cancel"] = True
+        return super().on_touch_move(touch)
+
+    def on_touch_up(self, touch):
+        if touch.grab_current is self and touch.ud.get("guard_cancel"):
+            touch.ungrab(self)
+            self.state = "normal"
+            try:
+                Animation(a=0, d=0.2).start(self._sc)
+            except Exception:
+                pass
+            return True
+        return super().on_touch_up(touch)
+
+
 # ---------------------------------------------------------------- buttons
-class Tap(ButtonBehavior, Box):
+class Tap(TouchGuard, ButtonBehavior, Box):
     """Pressable rounded surface with state-layer feedback."""
 
     def __init__(self, on_tap=None, **kw):
@@ -361,7 +392,7 @@ class Button3(Tap):
         self.label.text = v
 
 
-class IconBtn(ButtonBehavior, Widget):
+class IconBtn(TouchGuard, ButtonBehavior, Widget):
     """Circular icon button. kind: standard | tonal | filled."""
     active = BooleanProperty(False)
 
@@ -489,25 +520,38 @@ class ChipGroup(ScrollView):
 
 # ---------------------------------------------------------------- slider
 class Slider3(Widget):
-    """M3 slider with live value bubble. Horizontal or vertical, optional
-    bipolar fill (from centre) for EQ / balance. ``on_change(value)`` fires on
-    every movement; ``on_commit(value)`` on release."""
+    """Thin M3 slider with a live value bubble. Horizontal or vertical,
+    optional bipolar fill (from centre) for EQ / balance.
+
+    Touch rules (no accidental changes):
+      * a plain tap never moves the value;
+      * the value only follows the finger after it slides ``DRAG_START`` along
+        the slider axis (a vertical swipe on a horizontal slider scrolls the
+        page instead);
+      * a double tap resets to ``default`` (when given).
+    ``on_change(value)`` fires on every movement, ``on_commit(value)`` on release.
+    """
     value = NumericProperty(0.0)
+    DRAG_START = dp(6)
+    DOUBLE_TAP = 0.32
 
     def __init__(self, lo=0.0, hi=1.0, value=0.0, step=0.0, on_change=None, on_commit=None,
-                 fmt=None, vertical=False, bipolar=False, **kw):
+                 fmt=None, vertical=False, bipolar=False, default=None, on_reset=None, **kw):
         if vertical:
             kw.setdefault("size_hint_x", None)
             kw.setdefault("width", dp(30))
         else:
             kw.setdefault("size_hint_y", None)
-            kw.setdefault("height", dp(36))
+            kw.setdefault("height", dp(30))
         super().__init__(**kw)
         self.lo, self.hi, self.step = float(lo), float(hi), float(step or 0)
         self.vertical, self.bipolar = vertical, bipolar
         self.on_change, self.on_commit = on_change, on_commit
-        self.fmt = fmt or (lambda v: ("%d" % round(v)) if self.step >= 1 else ("%.2f" % v))
+        self.default, self.on_reset = default, on_reset
+        self.fmt = fmt or (lambda v: ("%d" % round(v)) if self.step >= 1 else ("%.3f" % v))
         self.dragging = False
+        self._pending = None          # touch that may become a drag
+        self._last_tap = 0.0
         self._grow = 0.0
         with self.canvas:
             self._ci = Color(*T.surface3)
@@ -519,7 +563,7 @@ class Slider3(Widget):
             self._ch = Color(*T.a("primary", 0.0))
             self._halo = Ellipse()
             self._ct = Color(*T.primary)
-            self._th = RoundedRectangle()
+            self._th = Ellipse()
         with self.canvas.after:
             self._cb = Color(*T.a("primary", 0))
             self._bubble = RoundedRectangle()
@@ -534,7 +578,8 @@ class Slider3(Widget):
 
     def _draw(self, *_):
         f = self._frac()
-        th = dp(6)
+        th = dp(3)                                   # thin track
+        knob = dp(14) + self._grow * dp(4)
         if self.vertical:
             x = (self.x + self.width / 2.0) - th / 2
             y0, L = self.y + dp(10), max(1, self.height - dp(20))
@@ -544,13 +589,10 @@ class Slider3(Widget):
                 mid = y0 + L * ((0 - self.lo) / (self.hi - self.lo))
                 a, b = sorted((mid, pos))
                 self._ta.pos, self._ta.size = (x, a), (th, max(0, b - a))
-                self._zero.pos, self._zero.size = (x - dp(3), mid - dp(.6)), (th + dp(6), dp(1.2))
+                self._zero.pos, self._zero.size = (x - dp(3), mid - dp(.5)), (th + dp(6), dp(1))
             else:
                 self._ta.pos, self._ta.size = (x, y0), (th, pos - y0)
                 self._zero.size = (0, 0)
-            self._ta.radius = [th / 2]
-            hw, hh = dp(20) + self._grow * dp(2), dp(4)
-            self._th.pos, self._th.size, self._th.radius = ((self.x + self.width / 2.0) - hw / 2, pos - hh / 2), (hw, hh), [hh / 2]
             cx, cy = (self.x + self.width / 2.0), pos
         else:
             y = (self.y + self.height / 2.0) - th / 2
@@ -561,25 +603,24 @@ class Slider3(Widget):
                 mid = x0 + L * ((0 - self.lo) / (self.hi - self.lo))
                 a, b = sorted((mid, pos))
                 self._ta.pos, self._ta.size = (a, y), (max(0, b - a), th)
-                self._zero.pos, self._zero.size = (mid - dp(.6), y - dp(3)), (dp(1.2), th + dp(6))
+                self._zero.pos, self._zero.size = (mid - dp(.5), y - dp(3)), (dp(1), th + dp(6))
             else:
                 self._ta.pos, self._ta.size = (x0, y), (pos - x0, th)
                 self._zero.size = (0, 0)
-            self._ta.radius = [th / 2]
-            hw, hh = dp(4), dp(22) + self._grow * dp(2)
-            self._th.pos, self._th.size, self._th.radius = (pos - hw / 2, (self.y + self.height / 2.0) - hh / 2), (hw, hh), [hw / 2]
             cx, cy = pos, (self.y + self.height / 2.0)
-        r = dp(16) * self._grow
+        self._ta.radius = [th / 2]
+        self._th.pos, self._th.size = (cx - knob / 2, cy - knob / 2), (knob, knob)
+        r = dp(15) * self._grow
         self._halo.pos, self._halo.size = (cx - r, cy - r), (2 * r, 2 * r)
-        self._ch.a = 0.16 * self._grow
+        self._ch.a = 0.18 * self._grow
         if self.dragging:
             from kivy.core.text import Label as CoreLabel
             t = CoreLabel(text=self.fmt(self.value), font_size=sp(12), bold=True)
             t.refresh()
             tw, tht = t.texture.size
-            bw, bh = tw + dp(16), dp(26)
+            bw, bh = tw + dp(16), dp(24)
             bx = cx - bw / 2
-            by = (cy + dp(18)) if not self.vertical else (cy + dp(14))
+            by = cy + dp(16)
             if self.vertical:
                 bx = self.right + dp(4) if self.right + bw + dp(4) < (self.parent.right if self.parent else 1e9) else self.x - bw - dp(4)
                 by = cy - bh / 2
@@ -595,7 +636,9 @@ class Slider3(Widget):
             f = (touch.y - self.y - dp(10)) / max(1, self.height - dp(20))
         else:
             f = (touch.x - self.x - dp(10)) / max(1, self.width - dp(20))
-        v = self.lo + max(0.0, min(1.0, f)) * (self.hi - self.lo)
+        self._apply(self.lo + max(0.0, min(1.0, f)) * (self.hi - self.lo))
+
+    def _apply(self, v):
         if self.step:
             v = round((v - self.lo) / self.step) * self.step + self.lo
         v = max(self.lo, min(self.hi, v))
@@ -604,50 +647,125 @@ class Slider3(Widget):
             if self.on_change:
                 self.on_change(v)
 
+    def reset(self):
+        if self.default is None:
+            return
+        self._apply(float(self.default))
+        if self.on_commit:
+            self.on_commit(self.value)
+        if self.on_reset:
+            self.on_reset(self.value)
+
     def on_touch_down(self, touch):
-        if not self.collide_point(*touch.pos):
+        if not self.collide_point(*touch.pos) or touch.is_mouse_scrolling:
             return False
-        if touch.is_mouse_scrolling:
-            return False
+        now = Clock.get_time()
+        if self.default is not None and now - self._last_tap < self.DOUBLE_TAP:
+            self._last_tap = 0.0
+            self.reset()
+            return True
+        self._last_tap = now
         touch.grab(self)
-        self.dragging = True
-        Animation.cancel_all(self, "_grow")
-        self._grow = 1.0
-        self._set_from_touch(touch)
-        self._draw()
+        touch.ud["slider_start"] = touch.pos
+        self._pending = touch
         return True
 
     def on_touch_move(self, touch):
-        if touch.grab_current is self:
+        if touch.grab_current is not self:
+            return False
+        if self._pending is touch:
+            sx, sy = touch.ud.get("slider_start", touch.pos)
+            along = abs(touch.y - sy) if self.vertical else abs(touch.x - sx)
+            across = abs(touch.x - sx) if self.vertical else abs(touch.y - sy)
+            if across > self.DRAG_START * 1.5 and across > along:
+                # the user is scrolling the page, not using the slider
+                self._pending = None
+                touch.ungrab(self)
+                return False
+            if along < self.DRAG_START:
+                return True
+            self._pending = None
+            self._last_tap = 0.0
+            self.dragging = True
+            Animation.cancel_all(self, "_grow")
+            self._grow = 1.0
+        if self.dragging:
             self._set_from_touch(touch)
             return True
         return False
 
     def on_touch_up(self, touch):
-        if touch.grab_current is self:
-            touch.ungrab(self)
+        if touch.grab_current is not self:
+            return False
+        touch.ungrab(self)
+        self._pending = None
+        if self.dragging:
             self.dragging = False
             self._grow = 0.0
             self._draw()
             if self.on_commit:
                 self.on_commit(self.value)
-            return True
-        return False
+        return True
 
     def set_value(self, v):
         if not self.dragging:
             self.value = max(self.lo, min(self.hi, float(v)))
 
 
+def number_dialog(title, value, lo, hi, step, on_value, default=None, fmt=None):
+    """Small sheet with a numeric keyboard for exact values."""
+    sheet = Sheet(title)
+    sheet.height = dp(236)
+    fmt = fmt or (lambda v: ("%d" % round(v)) if (step or 0) >= 1 else ("%.3f" % v))
+    row = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
+    ti = TextInput(text=("%d" % round(value)) if (step or 0) >= 1 else ("%.3f" % value).rstrip("0").rstrip("."),
+                   multiline=False, input_filter="float", size_hint_y=None, height=dp(48),
+                   background_normal="", background_active="", background_color=T.surface3,
+                   foreground_color=T.on_surface, cursor_color=T.primary, font_size=sp(18),
+                   selection_color=T.a("primary", 0.35), padding=(dp(14), dp(12)))
+    row.add_widget(ti)
+    sheet.box.add_widget(lbl("Range %s .. %s" % (fmt(lo), fmt(hi)), 12, T.on_var, size_hint_y=None, height=dp(20)))
+    sheet.box.add_widget(row)
+    err = lbl("", 12, T.error, size_hint_y=None, height=dp(18))
+    sheet.box.add_widget(err)
+    btns = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+
+    def apply(*_):
+        try:
+            v = float(ti.text.replace(",", "."))
+        except ValueError:
+            err.text = "Enter a number"
+            return
+        v = max(lo, min(hi, v))
+        if step:
+            v = round((v - lo) / step) * step + lo
+        sheet.dismiss()
+        on_value(v)
+    if default is not None:
+        btns.add_widget(Button3("Reset", lambda: (sheet.dismiss(), on_value(float(default))), kind="text", icon="reset"))
+    btns.add_widget(Button3("Cancel", sheet.dismiss, kind="outlined"))
+    btns.add_widget(Button3("Set", apply, kind="filled"))
+    sheet.box.add_widget(btns)
+    ti.bind(on_text_validate=apply)
+    sheet.open()
+    Clock.schedule_once(lambda _dt: (setattr(ti, "focus", True), ti.select_all()), 0.15)
+    return sheet
+
+
 class SliderRow(BoxLayout):
-    """Label + live value + slider. Value text updates while dragging."""
+    """Label + value chip + thin slider.
+
+    Tap the value chip to type an exact number; double tap the slider (or use
+    Reset in the dialog) to restore the default."""
 
     def __init__(self, title, lo, hi, value, on_change, step=0.0, unit="", fmt=None, bipolar=False,
                  default=None, icon=None, **kw):
-        super().__init__(orientation="vertical", size_hint_y=None, height=dp(64), spacing=0, **kw)
+        super().__init__(orientation="vertical", size_hint_y=None, height=dp(54), spacing=0, **kw)
         self.unit = unit
-        self.fmt = fmt or (lambda v: (("%+d" if bipolar else "%d") % round(v) if (step or 0) >= 1 else
-                                      ("%+.2f" if bipolar else "%.2f") % v) + unit)
+        self.lo, self.hi, self.step = float(lo), float(hi), float(step or 0)
+        self.title = title
+        self.fmt = fmt or (lambda v: ((("%+d" if bipolar else "%d") % round(v)) if (step or 0) >= 1 else
+                                      (("%+.3f" if bipolar else "%.3f") % v)) + unit)
         self.default = value if default is None else default
         self._cb = on_change
         head = BoxLayout(size_hint_y=None, height=dp(24), padding=(dp(10), 0))
@@ -655,21 +773,28 @@ class SliderRow(BoxLayout):
             head.add_widget(Icon(name=icon, tint=T.on_var, size_hint_x=None, width=dp(20)))
             head.add_widget(Widget(size_hint_x=None, width=dp(6)))
         head.add_widget(lbl(title, 13, T.on_surface))
-        self.chip = Tap(on_tap=self.reset, bg=T.surface3, radius=dp(8), size_hint=(None, None),
-                        width=dp(74), height=dp(22), padding=(dp(6), 0))
+        self.chip = Tap(on_tap=self.edit, bg=T.surface3, radius=dp(8), size_hint=(None, None),
+                        width=dp(78), height=dp(22), padding=(dp(6), 0))
         self.val = lbl(self.fmt(value), 12, T.primary, bold=True, halign="center")
         self.chip.add_widget(self.val)
         head.add_widget(self.chip)
         self.add_widget(head)
-        self.slider = Slider3(lo, hi, value, step, on_change=self._changed, fmt=self.fmt, bipolar=bipolar)
+        self.slider = Slider3(lo, hi, value, step, on_change=self._changed, fmt=self.fmt, bipolar=bipolar,
+                              default=self.default)
         self.add_widget(self.slider)
 
     def _changed(self, v):
         self.val.text = self.fmt(v)
         self._cb(v)
 
+    def edit(self):
+        """Tap the value chip: type an exact value."""
+        def setv(v):
+            self.slider.value = v
+            self._changed(v)
+        number_dialog(self.title, self.slider.value, self.lo, self.hi, self.step, setv, self.default, self.fmt)
+
     def reset(self):
-        """Tap the value chip to restore the default."""
         self.slider.value = self.default
         self._changed(self.default)
 
@@ -678,8 +803,142 @@ class SliderRow(BoxLayout):
         self.val.text = self.fmt(self.slider.value)
 
 
+# ---------------------------------------------------------------- color picker
+def _hex8(rgba):
+    return "#" + "".join("%02X" % int(round(max(0.0, min(1.0, c)) * 255)) for c in rgba)
+
+
+def _parse_hex(value, fallback=(1, 1, 1, 1)):
+    h = str(value or "").strip().lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    if len(h) == 6:
+        h += "FF"
+    try:
+        if len(h) == 8:
+            return [int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4, 6)]
+    except ValueError:
+        pass
+    return None if fallback is None else list(fallback)
+
+
+def color_dialog(title, value, on_value, default=None, swatches=None):
+    """Manual color picker: hue / saturation / brightness / alpha sliders, hex input and
+    palette swatches. Every movement calls ``on_value`` (#RRGGBBAA) so the preview is live."""
+    import colorsys
+    from kivy.core.window import Window
+    start = _parse_hex(value)
+    h, s_, v_ = colorsys.rgb_to_hsv(*start[:3])
+    state = {"h": h, "s": s_, "v": v_, "a": start[3], "busy": False}
+    sheet = Sheet(title)
+    sheet.height = min(Window.height * 0.85, dp(300) + 4 * dp(54) + (dp(42) if swatches else 0))
+    top = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(10))
+    sw = Box(bg=list(start), radius=dp(12), line=T.outline, size_hint_x=None, width=dp(64))
+    ti = TextInput(text=_hex8(start), multiline=False, size_hint_y=None, height=dp(46),
+                   background_normal="", background_active="", background_color=T.surface3,
+                   foreground_color=T.on_surface, cursor_color=T.primary, font_size=sp(16),
+                   padding=(dp(14), dp(12)))
+    top.add_widget(sw)
+    top.add_widget(ti)
+    sheet.box.add_widget(top)
+    rows = {}
+
+    def current():
+        r, g, b = colorsys.hsv_to_rgb(state["h"], state["s"], state["v"])
+        return [r, g, b, state["a"]]
+
+    def push(from_text=False):
+        rgba = current()
+        sw.bg = rgba
+        if not from_text:
+            state["busy"] = True
+            ti.text = _hex8(rgba)
+            state["busy"] = False
+        on_value(_hex8(rgba))
+
+    def sync_rows():
+        for k, row in rows.items():
+            row.set(state[k])
+
+    def slider(key, title_, fmt):
+        def ch(x, k=key):
+            state[k] = float(x)
+            push()
+        row = SliderRow(title_, 0, 1, state[key], ch, fmt=fmt, default=state[key])
+        rows[key] = row
+        sheet.box.add_widget(row)
+    pct = lambda x: "%d%%" % round(x * 100)
+    slider("h", "Hue", lambda x: "%d deg" % round(x * 360))
+    slider("s", "Saturation", pct)
+    slider("v", "Brightness", pct)
+    slider("a", "Alpha", pct)
+
+    def typed(_w, text):
+        if state["busy"] or len(text.strip().lstrip("#")) not in (6, 8):
+            return
+        rgba = _parse_hex(text, None)
+        if rgba is None:
+            return
+        hh, ss, vv = colorsys.rgb_to_hsv(*rgba[:3])
+        state.update(h=hh, s=ss, v=vv, a=rgba[3])
+        sync_rows()
+        push(from_text=True)
+    ti.bind(text=typed)
+    if swatches:
+        line = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(6))
+        for c in list(swatches)[:8]:
+            rgba = _parse_hex(c)
+
+            def pick(c_=rgba):
+                hh, ss, vv = colorsys.rgb_to_hsv(*c_[:3])
+                state.update(h=hh, s=ss, v=vv, a=c_[3])
+                sync_rows()
+                push()
+            line.add_widget(Tap(on_tap=pick, bg=rgba, radius=dp(18), line=T.outline))
+        sheet.box.add_widget(line)
+    btns = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+    if default is not None:
+        btns.add_widget(Button3("Reset", lambda: (sheet.dismiss(), on_value(_hex8(_parse_hex(default)))),
+                                kind="text", icon="reset"))
+    btns.add_widget(Button3("Cancel", lambda: (sheet.dismiss(), on_value(_hex8(start))), kind="outlined"))
+    btns.add_widget(Button3("Done", sheet.dismiss, kind="filled"))
+    sheet.box.add_widget(btns)
+    sheet.open()
+    return sheet
+
+
+class ColorField(Tap):
+    """Swatch + hex value; tap opens the color picker."""
+
+    def __init__(self, value, on_change, default=None, swatches=None, title="Color", **kw):
+        kw.setdefault("size_hint_y", None)
+        kw.setdefault("height", dp(44))
+        super().__init__(on_tap=self._open, bg=[0, 0, 0, 0], line=T.outline, radius=dp(12),
+                         padding=(dp(8), dp(6)), spacing=dp(10), **kw)
+        self.value, self.on_change, self.default = value, on_change, default
+        self.swatches, self.title = swatches, title
+        self.sw = Box(bg=_parse_hex(value), radius=dp(8), line=T.outline, size_hint_x=None, width=dp(44))
+        self.add_widget(self.sw)
+        self.label = lbl(str(value), 13)
+        self.add_widget(self.label)
+        self.add_widget(Icon(name="down", tint=T.on_var, size_hint_x=None, width=dp(18)))
+
+    def set(self, v):
+        self.value = v
+        self.sw.bg = _parse_hex(v)
+        self.label.text = str(v)
+
+    def _changed(self, v):
+        self.set(v)
+        self.on_change(v)
+
+    def _open(self):
+        sw = self.swatches() if callable(self.swatches) else self.swatches
+        color_dialog(self.title, self.value, self._changed, self.default, sw)
+
+
 # ---------------------------------------------------------------- switch
-class Switch3(ButtonBehavior, Widget):
+class Switch3(TouchGuard, ButtonBehavior, Widget):
     active = BooleanProperty(False)
 
     def __init__(self, active=False, on_change=None, **kw):
@@ -846,7 +1105,7 @@ class NavBar(Box):
             self.on_select(key)
 
 
-class _NavItem(ButtonBehavior, BoxLayout):
+class _NavItem(TouchGuard, ButtonBehavior, BoxLayout):
     _k = NumericProperty(0.0)
 
     def __init__(self, key, icon, title, cb, **kw):

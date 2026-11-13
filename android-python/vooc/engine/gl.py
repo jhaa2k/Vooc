@@ -204,6 +204,8 @@ uniform float time;
 uniform float beat;
 uniform float rms;
 uniform float bass;
+uniform float mid;
+uniform float treble;
 uniform float use_extra;
 uniform float fx_mix;
 uniform float blend_mode;
@@ -392,9 +394,18 @@ vec4 effect_main(vec2 uv, vec4 base) {
 """ + EFFECT_FOOTER
 
 
+BUILTIN_UNIFORMS = {"time", "resolution", "beat", "rms", "bass", "mid", "treble", "intensity",
+                    "use_extra", "fx_mix", "blend_mode", "fx_pos", "fx_scale", "fx_rot", "fx_pivot",
+                    "texture0", "texture1"}
+
+
 def custom_fs(user_code, variables):
-    decl = []
+    decl = ["uniform float intensity;"]
+    seen = set()
     for var in variables:
+        if var.get("name") in BUILTIN_UNIFORMS or var.get("name") in seen:
+            continue
+        seen.add(var.get("name"))
         glsl_type = {"Float": "float", "Vector2": "vec2", "Vector3": "vec3", "Color": "vec4"}.get(var["type"])
         if glsl_type:
             decl.append("uniform %s %s;" % (glsl_type, var["name"]))

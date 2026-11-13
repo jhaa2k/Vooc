@@ -36,6 +36,9 @@ SHAPES = ["None", "Circle", "SidedPolygon", "Line", "HorizontalLine",
           "VerticalLine", "Rectangle", "Square", "Triangle", "Star", "Heart",
           "WaveformPath", "CustomPath", "Oval", "Capsule", "Pentagon", "Hexagon"]
 
+SHADER_PRESETS = ["Custom", "Zoom Blur", "Twirl", "Kaleidoscope", "Reflection", "3D Box",
+                  "Color Correction", "Vignette", "Film Grain"]
+
 FONT_WEIGHTS = [str(w) for w in range(100, 1000, 100)]
 VARIABLE_TYPES = ["None", "Float", "Vector2", "Vector3", "Color"]
 
@@ -152,8 +155,8 @@ SCHEMA["COMPOSITION"] = OD([
     ("General", general_category("Main")),
     ("Render Settings", OD([
         ("Output", OD([
-            ("Resolution Width", number(1080, 16, 7680)),
-            ("Resolution Height", number(1920, 16, 7680)),
+            ("Resolution Width", number(1920, 16, 7680)),
+            ("Resolution Height", number(1080, 16, 7680)),
             ("FPS Limit", dropdown(["30", "60", "120"], "60")),
         ])),
         ("Canvas", OD([
@@ -174,6 +177,9 @@ SCHEMA["IMAGE"] = OD([
             ("Shape", dropdown(SHAPES, "Circle")),
             ("Image Index", number(0, 0, 99)),
             ("Size", slider(0.42, help="Base size relative to the canvas")),
+            ("Corner Radius", slider(0.0, help="Rounded crop for Rectangle / Square / None shapes")),
+            ("Opacity", slider(1.0)),
+            ("GIF Speed", slider(1.0, 0, 10, help="Playback speed of animated GIFs")),
         ])),
     ])),
     ("Color Adjustments", OD([
@@ -286,6 +292,10 @@ SCHEMA["BARS"] = OD([
         ("Audio", OD([
             ("Audio Provider Index", number(0, 0, 8)),
             ("Audio Channel", dropdown(["Mono", "Left", "Right", "Stereo"], "Mono")),
+            ("Frequency Min (Hz)", number(30, 20, 20000)),
+            ("Frequency Max (Hz)", number(8000, 40, 20000)),
+            ("Measure What", dropdown(["Frequency", "Beat", "Nothing"], "Frequency",
+                                       help="Frequency = live spectrum, Beat = all bars jump on beats, Nothing = static")),
         ])),
     ])),
 ])
@@ -490,6 +500,9 @@ SCHEMA["CUSTOMSHADER"] = OD([
     ("Shader Code", OD([
         ("GLSL", OD([
             ("Shader Vertex", code("", help="Optional. Leave empty to use the default vertex shader.")),
+            ("Effect Preset", dropdown(SHADER_PRESETS, "Custom",
+                                        help="Loads a ready-made shader (code + variables) into this layer")),
+            ("Intensity", slider(0.5, help="Strength of the preset effect (uniform 'intensity')")),
             ("Fragment Shader", code(DEFAULT_FRAGMENT)),
             ("Compile / Apply", action("Compile / Apply")),
         ])),

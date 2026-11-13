@@ -154,8 +154,9 @@ class ImageLayer(BaseLayer):
             tex = textures.load(frame.metadata.get("art", ""))
             if tex is not None:
                 return tex
+        t = frame.time * float(v.get(self.P + "GIF Speed", 1.0))
         for path in (v[self.P + "Pick Image"], v["Generated Album Art/Album Art/Fallback Image"]):
-            tex = textures.load(path)
+            tex = textures.frame(path, t)
             if tex is not None:
                 return tex
         return textures.placeholder_art()
@@ -183,12 +184,16 @@ class ImageLayer(BaseLayer):
             else:
                 bw = size * aspect
         shape = v[self.P + "Shape"]
-        key = (id(tex), shape, round(bw, 1), round(bh, 1), u0, v0, u1, v1)
+        radius = float(v.get(self.P + "Corner Radius", 0.0))
+        key = (id(tex), shape, round(bw, 1), round(bh, 1), u0, v0, u1, v1, round(radius, 3))
         if key != self._key:
             self._key = key
-            poly = shapes.mask_polygon(shape)
-            # fit the polygon into the box (keeps circle round inside a square box)
-            pts = (poly + 1.0) * 0.5
+            if radius > 0 and shape in ("None", "Rectangle", "Square"):
+                pts = shapes.rounded_rect(radius, bw, bh)
+            else:
+                poly = shapes.mask_polygon(shape)
+                # fit the polygon into the box (keeps circle round inside a square box)
+                pts = (poly + 1.0) * 0.5
             tc = tex.tex_coords        # respects flipped textures (album art, fbo)
 
             def uv(x, y):
@@ -208,6 +213,7 @@ class ImageLayer(BaseLayer):
     def _apply_uniforms(self, tex, frame):
         v = self.values
         c = self.ctx
+        self.color.a = float(v.get(self.P + "Opacity", 1.0))
         c["tint"] = hex_to_rgba(v["Color Adjustments/Adjustments/Tint"])
         c["brightness"] = (v["Color Adjustments/Adjustments/Brightness"] - 0.5) * 2.0
         c["contrast"] = v["Color Adjustments/Adjustments/Contrast"] * 2.0
@@ -470,21 +476,39 @@ class BarsLayer(BaseLayer):
         self.batch = QuadBatch(self.content)
         self.values_now = np.zeros(0, np.float32)
 
+    # engine bands are log spaced 30 Hz .. 16 kHz (see audio.analysis / timeline_hub)
+    F_LO, F_HI = 30.0, 16000.0
+
+    def _band_positions(self, n_bands, count, f_lo, f_hi):
+        f_lo = max(self.F_LO, min(f_lo, self.F_HI - 1))
+        f_hi = max(f_lo + 1, min(f_hi, self.F_HI))
+        hz = np.geomspace(f_lo, f_hi, count)
+        return np.log(hz / self.F_LO) / math.log(self.F_HI / self.F_LO) * n_bands - 0.5
+
     def _input(self, frame, count):
         v = self.values
         snap = frame.snapshot
-        channel = v["Behavior/Audio/Audio Channel"]
-        bands = {"Left": snap["bands_left"], "Right": snap["bands_right"]}.get(channel, snap["bands"])
-        src = np.asarray(bands, np.float32)[:220]       # top bands rarely carry energy
+        A = "Behavior/Audio/"
+        channel = v[A + "Audio Channel"]
+        f_lo = float(v.get(A + "Frequency Min (Hz)", 30))
+        f_hi = float(v.get(A + "Frequency Max (Hz)", 8000))
+        what = v.get(A + "Measure What", "Frequency")
+        if what == "Nothing":
+            return np.full(count, 0.35, np.float32)
+        if what == "Beat":
+            level = frame.measure.pulse(3.0) * 0.85 + snap["rms"] * 0.25
+            return np.full(count, level, np.float32)
+
+        def pick(bands, n):
+            src = np.asarray(bands, np.float32)
+            pos = self._band_positions(len(src), n, f_lo, f_hi)
+            return np.interp(pos, np.arange(len(src)), src)
         if channel == "Stereo":
             half = max(1, count // 2)
-            left = np.interp(np.linspace(0, 1, half), np.linspace(0, 1, 220),
-                             np.asarray(snap["bands_left"], np.float32)[:220])
-            right = np.interp(np.linspace(0, 1, count - half), np.linspace(0, 1, 220),
-                              np.asarray(snap["bands_right"], np.float32)[:220])
-            out = np.concatenate([left[::-1], right])
+            out = np.concatenate([pick(snap["bands_left"], half)[::-1], pick(snap["bands_right"], count - half)])
         else:
-            out = np.interp(np.linspace(0, 1, count), np.linspace(0, 1, len(src)), src)
+            bands = {"Left": snap["bands_left"], "Right": snap["bands_right"]}.get(channel, snap["bands"])
+            out = pick(bands, count)
         if v["Bars Setup/Bars/Flip Input"]:
             out = out[::-1]
         return out
@@ -493,6 +517,9 @@ class BarsLayer(BaseLayer):
         v = self.values
         B = "Bars Setup/Bars/"
         count = int(v[B + "Bar Count"])
+        cap = getattr(self.scene, "perf", {}).get("max_bars")
+        if cap:
+            count = max(4, min(count, int(cap)))
         target = self._input(frame, count) * v[B + "Height Scale"]
         if self.values_now.shape[0] != count:
             self.values_now = np.zeros(count, np.float32)
@@ -506,7 +533,11 @@ class BarsLayer(BaseLayer):
         k = 1.0 - (1.0 - np.clip(k, 0.001, 1.0)) ** step
         self.values_now += (target - self.values_now) * k
         m = min(frame.w, frame.h)
-        heights = np.clip(self.values_now, v[B + "Min Height Scale"], v[B + "Max Height Scale"]) * m
+        # Max Height Scale is the full-scale bar length (input 1.0); Height Scale amplifies
+        # the input, so loud songs only hit the ceiling when Height Scale is pushed up
+        max_h = v[B + "Max Height Scale"]
+        min_h = v[B + "Min Height Scale"]
+        heights = np.clip(self.values_now * max_h, min_h, max(max_h, min_h)) * m
 
         shape = v[B + "Shape Path"]
         all_corners, all_colors = [], []
@@ -623,6 +654,9 @@ class ParticlesLayer(BaseLayer):
         dt = min(0.1, frame.dt)
         limit = int(v[O + "Count Limit"])
         self.count_warning = limit > 2000
+        cap = getattr(self.scene, "perf", {}).get("max_particles")
+        if cap is not None:
+            limit = min(limit, int(cap))
         # Measure Overall Speed: the whole simulation accelerates on the beat
         speed_mult = 1.0 + frame.measure.offset(v[M + "Measure Overall Speed"],
                                                 v[M + "A X Amount"], v[M + "B Y Amount"])

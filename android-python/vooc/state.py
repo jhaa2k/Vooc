@@ -17,15 +17,20 @@ class ProjectState:
         self.scene={"ratio":"16:9","resolution":"1080p","fps":"30","theme":"Acid Night","ui_theme":"dark"}
         self.visualizer=dict(VISUALIZER_DEFAULTS)
         self.properties={}
+        self.engine=None
+        self.export={"resolution":"FHD 1080p","fps":"30","aspect":"16:9","codec":"H.264 (AVC)","quality":"Standard","audio":True}
+        self.perf={"preview_fps":60,"render_scale":1.0,"heavy_blur":True,"max_bars":256,"max_particles":2000}
+        self.palettes={}
+        self.look={"template":"Circle Classic","palette":"Acid","auto_palette":True}
         self.presets={"Classic Bars":dict(self.audio),"Deep Bass":dict(self.audio,bass=8,eq_0=6,eq_1=4),"Wide":dict(self.audio,virtualizer=70)}
     def data(self):
-        return {k:getattr(self,k) for k in ["layers","selected","playlist","current_track","repeat","shuffle","audio","scene","presets","visualizer","properties"]}
+        return {k:getattr(self,k) for k in ["layers","selected","playlist","current_track","repeat","shuffle","audio","scene","presets","visualizer","properties","engine","export","perf","palettes","look"]}
     @classmethod
     def from_data(cls,d):
         s=cls()
         for k,v in (d or {}).items():
             if not hasattr(s,k):continue
-            if k in ("audio","scene","visualizer") and isinstance(v,dict):
+            if k in ("audio","scene","visualizer","export","perf","look") and isinstance(v,dict):
                 getattr(s,k).update(v)
             else:
                 setattr(s,k,v)

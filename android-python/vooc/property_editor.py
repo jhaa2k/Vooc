@@ -1,97 +1,109 @@
-"""Hierarchical property editor (Material 3 styled) for advanced visualizer settings.
+"""Hierarchical property editor for the render engine (Material 3 styled).
 
-Two-column module grid -> details view (Back / title / Reset / Info) with
-collapsible sections that are built lazily on first open. Every control writes
-straight into ``state.properties`` and calls ``on_change`` on each movement so
-the preview updates live. Dropdowns always expose the complete option list.
+Main menu: two-column grid of the 11 modules (COMPOSITION ... CUSTOMSHADER).
+Details view: Back / Title / Reset / Info + collapsible accordion
+(Category -> Sub-category -> Property). Every control writes straight into the
+``LayerModel`` the SceneView renders, so the preview changes on every
+movement. Dropdowns always expose the complete option list from the schema.
+
+Custom shaders: Effect Preset loads a ready-made GLSL effect, Compile / Apply
+compiles on the GPU (errors are shown inline, the last good shader keeps
+running), Add Variable declares a uniform that immediately gets its own
+slider / color picker.
 """
-from copy import deepcopy
-
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
-from kivy.uix.scrollview import ScrollView
 from kivy.uix.widget import Widget
 
 from . import m3
 from .m3 import T
-from .property_schema import SCHEMA
+from .property_schema import MODULE_INFO, MODULES, SCHEMA, defaults
 
 _ICONS = {"COMPOSITION": "studio", "IMAGE": "image", "TEXT": "text", "BARS": "bars", "PARTICLES": "sparkle",
           "AUDIOPROVIDER": "tune", "BLUREFFECT": "eye", "RGBSPLITEFFECT": "layers", "MOTIONBLUREFFECT": "next",
           "MIRROREREFFECT": "copy", "CUSTOMSHADER": "more"}
+FONTS = ["Roboto", "RobotoMono", "DejaVuSans"]
+VARS = "Variables/Variable Mappings/Mappings"
 
 
-def _pretty(name):
+def pretty(name):
     special = {"AUDIOPROVIDER": "Audio Provider", "BLUREFFECT": "Blur Effect", "RGBSPLITEFFECT": "RGB Split",
                "MOTIONBLUREFFECT": "Motion Blur", "MIRROREREFFECT": "Mirrorer", "CUSTOMSHADER": "Custom Shader"}
     return special.get(name, name.title())
 
 
 class AdvancedProperties(BoxLayout):
-    def __init__(self, state, on_change=None, on_save=None, **kwargs):
+    """``project``: ProjectModel. ``scene``: callable returning the SceneView (for shader compiles).
+    ``on_change(layer)`` after every edit, ``pick_image(callback)`` opens the image picker."""
+
+    scroll_cls = None
+
+    def __init__(self, project, scene=None, on_change=None, pick_image=None, palette=None, toast=None,
+                 layer=None, on_back=None, **kwargs):
         super().__init__(orientation="vertical", spacing=dp(8), **kwargs)
-        self.state, self.on_change, self.on_save = state, on_change, on_save
-        if not hasattr(state, "properties"):
-            state.properties = {}
+        self.project, self.scene = project, scene or (lambda: None)
+        self.on_change = on_change or (lambda layer: None)
+        self.pick_image = pick_image
+        self.palette = palette or (lambda: [])
+        self.toast = toast or (lambda text: None)
+        self.on_back = on_back
         self.category = None
-        self._home()
+        self.first_tile = None
+        if layer is not None:
+            self.open_layer(layer)
+        else:
+            self._home()
 
-    # ------------------------------------------------------------ values
-    def _value(self, category, section, group, name, spec):
-        path = category + "." + section + "." + group + "." + name
-        if path not in self.state.properties:
-            self.state.properties[path] = deepcopy(spec.get("default"))
-        return path, self.state.properties[path]
+    def _new_scroll(self):
+        from kivy.uix.scrollview import ScrollView
+        cls = self.scroll_cls or ScrollView
+        return cls(do_scroll_x=False, bar_width=dp(3))
 
-    def _changed(self, path, value):
-        self.state.properties[path] = value
-        if self.on_change:
-            self.on_change()
-        if self.on_save:
-            self.on_save()
+    # ------------------------------------------------------------ helpers
+    def _changed(self, layer, path, value):
+        if layer.set(path, value):
+            self.on_change(layer)
 
-    def _count(self, category):
-        return sum(len(f) for groups in SCHEMA[category].values() for f in groups.values())
+    @staticmethod
+    def _count(module):
+        return sum(len(f) for groups in SCHEMA[module].values() for f in groups.values())
 
-    def _edited(self, category):
-        """Number of properties that differ from their schema default."""
-        props = self.state.properties
-        n = 0
-        for section, groups in SCHEMA[category].items():
-            for group, fields in groups.items():
-                for name, spec in fields.items():
-                    path = category + "." + section + "." + group + "." + name
-                    if path in props and props[path] != spec.get("default"):
-                        n += 1
-        return n
+    @staticmethod
+    def _edited(layer):
+        fresh = defaults(layer.module)
+        return sum(1 for k, v in layer.values.items() if fresh.get(k) != v)
 
     # ------------------------------------------------------------ home
     def _home(self):
         self.clear_widgets()
         self.category = None
         head = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(4), 0))
-        head.add_widget(m3.lbl("Advanced properties", 16, bold=True))
-        head.add_widget(m3.lbl("%d modules" % len(SCHEMA), 12, T.on_var, halign="right"))
+        head.add_widget(m3.lbl("Modules", 16, bold=True))
+        head.add_widget(m3.lbl("%d modules - tap to edit" % len(MODULES), 12, T.on_var, halign="right"))
         self.add_widget(head)
-        scroll = ScrollView(do_scroll_x=False, bar_width=dp(3))
+        scroll = self._new_scroll()
         grid = GridLayout(cols=2, spacing=dp(10), padding=(0, dp(2), 0, dp(12)), size_hint_y=None)
         grid.bind(minimum_height=grid.setter("height"))
         self.first_tile = None
-        for name in SCHEMA:
-            tile = m3.Tap(on_tap=lambda n=name: self._details(n), orientation="vertical", bg=T.surface2,
+        for name in MODULES:
+            layer = self.project.layer(name)
+            on = bool(layer.values.get("General/Layer/Visible", True))
+            tile = m3.Tap(on_tap=lambda l=layer: self.open_layer(l), orientation="vertical", bg=T.surface2,
                           radius=dp(18), padding=dp(12), spacing=dp(6), size_hint_y=None, height=dp(96))
             top = BoxLayout(size_hint_y=None, height=dp(34))
-            ic = m3.Box(bg=T.primary_container, radius=dp(12), size_hint=(None, None), size=(dp(34), dp(34)))
-            ic.add_widget(m3.Icon(name=_ICONS.get(name, "tune"), tint=T.on_primary_container))
-            ic.padding = dp(8)
+            ic = m3.Box(bg=T.primary_container if on else T.surface3, radius=dp(12), size_hint=(None, None),
+                        size=(dp(34), dp(34)), padding=dp(8))
+            ic.add_widget(m3.Icon(name=_ICONS.get(name, "tune"), tint=T.on_primary_container if on else T.on_var))
             top.add_widget(ic)
             top.add_widget(Widget())
-            edited = self._edited(name)
-            if edited:
-                top.add_widget(m3.lbl("%d edited" % edited, 11, T.primary, halign="right", size_hint_x=None, width=dp(70)))
+            edited = self._edited(layer)
+            tag = ("%d edited" % edited) if edited else ("" if on else "off")
+            if tag:
+                top.add_widget(m3.lbl(tag, 11, T.primary if edited else T.on_var, halign="right",
+                                      size_hint_x=None, width=dp(70)))
             tile.add_widget(top)
-            tile.add_widget(m3.lbl(_pretty(name), 14, bold=True))
+            tile.add_widget(m3.lbl(pretty(name), 14, bold=True))
             tile.add_widget(m3.lbl("%d settings" % self._count(name), 11, T.on_var))
             grid.add_widget(tile)
             if self.first_tile is None:
@@ -99,21 +111,35 @@ class AdvancedProperties(BoxLayout):
         scroll.add_widget(grid)
         self.add_widget(scroll)
 
+    def back(self):
+        if self.on_back is not None:
+            self.on_back()
+        else:
+            self._home()
+
     # ------------------------------------------------------------ details
-    def _details(self, category):
-        self.category = category
+    def open_layer(self, layer, open_sections=None):
+        self.layer = layer
+        self.category = layer.module
+        module = layer.module
         self.clear_widgets()
         top = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(4))
-        top.add_widget(m3.IconBtn("back", self._home))
-        top.add_widget(m3.lbl(_pretty(category), 17, bold=True))
-        top.add_widget(m3.IconBtn("reset", lambda: self._reset(category)))
-        top.add_widget(m3.IconBtn("info", lambda: self._info(category)))
+        top.add_widget(m3.IconBtn("back", self.back))
+        title = layer.values.get("General/Layer/Tag") or ""
+        col_t = BoxLayout(orientation="vertical")
+        col_t.add_widget(m3.lbl(pretty(module), 17, bold=True))
+        if title:
+            col_t.add_widget(m3.lbl(title, 11, T.on_var))
+        top.add_widget(col_t)
+        top.add_widget(m3.IconBtn("reset", lambda: self._reset(layer)))
+        top.add_widget(m3.IconBtn("info", lambda: self._info(module)))
         self.add_widget(top)
-        scroll = ScrollView(do_scroll_x=False, bar_width=dp(3))
+        scroll = self._new_scroll()
         col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=(0, 0, 0, dp(16)))
         col.bind(minimum_height=col.setter("height"))
-        first = True
-        for section, groups in SCHEMA[category].items():
+        self._open_sections = set(open_sections or [])
+        first = not self._open_sections
+        for section, groups in SCHEMA[module].items():
             count = sum(len(f) for f in groups.values())
             sec_card = m3.card(padding=(dp(4), dp(4)), spacing=dp(2), bg=T.surface1, radius=dp(18))
             header = m3.Tap(size_hint_y=None, height=dp(48), radius=dp(16), padding=(dp(12), 0), spacing=dp(8))
@@ -129,13 +155,15 @@ class AdvancedProperties(BoxLayout):
                     box.clear_widgets()
                     box.height = 0
                     arr.name = "down"
+                    self._open_sections.discard(sec)
                     return
                 arr.name = "up"
+                self._open_sections.add(sec)
                 for group, fields in grp.items():
                     box.add_widget(m3.lbl(group, 12, T.primary, bold=True, size_hint_y=None, height=dp(28)))
                     for name, spec in fields.items():
                         try:
-                            box.add_widget(self._control(category, sec, group, name, spec))
+                            box.add_widget(self._control(layer, sec + "/" + group + "/" + name, name, spec))
                         except Exception as exc:
                             box.add_widget(m3.lbl(name + ": " + str(exc), 11, T.error, size_hint_y=None, height=dp(30)))
                 box.add_widget(Widget(size_hint_y=None, height=dp(6)))
@@ -144,84 +172,209 @@ class AdvancedProperties(BoxLayout):
             sec_card.add_widget(header)
             sec_card.add_widget(holder)
             col.add_widget(sec_card)
-            if first:
+            if first or section in self._open_sections:
+                self._open_sections.discard(section)
                 toggle()
                 first = False
         scroll.add_widget(col)
         self.add_widget(scroll)
 
-    def _control(self, category, section, group, name, spec):
-        path, value = self._value(category, section, group, name, spec)
+    def _refresh(self):
+        self.open_layer(self.layer, set(self._open_sections))
+
+    # ------------------------------------------------------------ controls
+    def _slider(self, layer, path, name, spec, value):
+        lo, hi = float(spec.get("min", 0)), float(spec.get("max", 1))
+        st = float(spec.get("step", 0) or 0)
+        step = st if st >= 1 else 0.0
+        span = hi - lo
+        fmt = (lambda v: "%d" % round(v)) if step else (lambda v: "%.3f" % v if span <= 2 else "%.2f" % v)
+        return m3.SliderRow(name, lo, hi, max(lo, min(hi, float(value or 0))),
+                            lambda v, p=path: self._changed(layer, p, round(float(v), 4)), step=step, fmt=fmt,
+                            bipolar=(lo < 0 < hi), default=spec.get("default", lo))
+
+    def _control(self, layer, path, name, spec):
+        value = layer.get(path)
         kind = spec["type"]
         if kind == "slider":
-            lo, hi = float(spec.get("min", 0)), float(spec.get("max", 1))
-            span = hi - lo
-            step = 1.0 if span >= 50 and float(lo).is_integer() and float(hi).is_integer() else 0.0
-            fmt = (lambda v: "%d" % round(v)) if step else (lambda v: "%.3f" % v if span <= 2 else "%.1f" % v)
-            return m3.SliderRow(name, lo, hi, max(lo, min(hi, float(value or 0))),
-                                lambda v, p=path: self._changed(p, round(float(v), 3)), step=step, fmt=fmt,
-                                bipolar=(lo < 0 < hi), default=spec.get("default", lo))
+            return self._slider(layer, path, name, spec, value)
+        if kind == "number":
+            lo, hi = int(spec.get("min", 0)), int(spec.get("max", 99999))
+            hi_ui = min(hi, 8192)
+            return m3.SliderRow(name, lo, hi_ui, max(lo, min(hi_ui, int(value))),
+                                lambda v, p=path: self._changed(layer, p, int(round(v))), step=1,
+                                fmt=lambda v: "%d" % round(v), default=spec.get("default", lo))
         if kind == "checkbox":
-            return m3.switch_row(name, bool(value), lambda v, p=path: self._changed(p, bool(v)))
+            return m3.switch_row(name, bool(value), lambda v, p=path: self._changed(layer, p, bool(v)))
+        if kind == "variables":
+            return self._variables(layer, path, value)
         row = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
-        row.add_widget(m3.lbl(name, 12, T.on_var, size_hint_y=None, height=dp(20)))
+        row.bind(minimum_height=row.setter("height"))
+        if kind != "action":
+            row.add_widget(m3.lbl(name, 12, T.on_var, size_hint_y=None, height=dp(20)))
         if kind == "dropdown":
             options = [str(v) for v in spec.get("options", [])]
-            row.add_widget(m3.SelectField(name, options, str(value), lambda v, p=path: self._changed(p, v)))
+            row.add_widget(m3.SelectField(name, options, str(value),
+                                          lambda v, p=path: self._dropdown(layer, p, v)))
+        elif kind == "font":
+            options = FONTS + ([value] if value and value not in FONTS else [])
+            row.add_widget(m3.SelectField(name, options, str(value), lambda v, p=path: self._changed(layer, p, v)))
         elif kind == "action":
-            row.add_widget(m3.Button3(str(value), lambda p=path: self._action(p, category), kind="tonal"))
+            row.add_widget(m3.Button3(str(spec.get("label", value)), lambda p=path: self._action(layer, p),
+                                      kind="tonal", icon="check" if "Compile" in path else "plus"))
+            if "Compile" in path:
+                err = (getattr(self.scene(), "shader_errors", {}) or {}).get(layer.id, "")
+                status = ("Shader error: " + err[:400]) if err else "Shader compiled OK"
+                row.add_widget(m3.lbl(status, 11, T.error if err else T.primary, shorten=False,
+                                      size_hint_y=None, height=dp(60) if err else dp(20), valign="top"))
         elif kind == "color":
-            line = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
-            sw = m3.Box(bg=self._rgba(value), radius=dp(12), line=T.outline, size_hint_x=None, width=dp(46))
-
-            def col_changed(v, p=path, s=sw):
-                self._changed(p, v)
-                s.bg = self._rgba(v)
-            line.add_widget(sw)
-            line.add_widget(m3.text_field(value if value is not None else "", col_changed, "#RRGGBB"))
+            row.add_widget(m3.ColorField(value, lambda v, p=path: self._changed(layer, p, v),
+                                         default=spec.get("default"), swatches=self.palette, title=name))
+        elif kind == "image":
+            line = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+            line.add_widget(m3.lbl(value.split("/")[-1] if value else "No image", 13,
+                                   T.on_surface if value else T.on_var))
+            line.add_widget(m3.Button3("Choose", lambda p=path: self._choose(layer, p), kind="tonal",
+                                       icon="image", size_hint_x=None, width=dp(110)))
+            if value:
+                line.add_widget(m3.IconBtn("close", lambda p=path: (self._changed(layer, p, ""), self._refresh()),
+                                           size=dp(40)))
             row.add_widget(line)
+        elif kind == "code":
+            row.add_widget(m3.text_field(value or "", lambda v, p=path: layer.set(p, v), "GLSL",
+                                         multiline=True, height=dp(240)))
+            row.add_widget(m3.lbl("Edits run after Compile / Apply", 11, T.on_var, size_hint_y=None, height=dp(18)))
         else:
-            def text_changed(v, p=path, k=kind):
-                if k == "number":
-                    v = int(v) if v.lstrip("-").isdigit() else self._number(v)
-                self._changed(p, v)
-            row.add_widget(m3.text_field(value if value is not None else "", text_changed, kind.upper(),
-                                         multiline=(kind == "code")))
-        row.bind(minimum_height=row.setter("height"))
+            row.add_widget(m3.text_field(value if value is not None else "",
+                                         lambda v, p=path: self._changed(layer, p, v), name,
+                                         multiline=bool(spec.get("multiline"))))
         return row
 
-    @staticmethod
-    def _rgba(value):
-        try:
-            return m3._hex(str(value)[:7])
-        except Exception:
-            return [0, 0, 0, 0]
+    def _dropdown(self, layer, path, value):
+        self._changed(layer, path, value)
+        if path == "Shader Code/GLSL/Effect Preset" and value != "Custom":
+            from .engine.shader_presets import apply_preset
+            if apply_preset(layer, value):
+                if not layer.get("General/Layer/Visible"):
+                    layer.set("General/Layer/Visible", True)
+                self._compile(layer)
+                self.on_change(layer)
+                self._refresh()
 
-    def _number(self, value):
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return 0
+    def _choose(self, layer, path):
+        if self.pick_image is None:
+            self.toast("Image picker not available")
+            return
 
-    def _action(self, path, category):
-        if path.endswith(".Compile / Apply"):
-            self._changed("runtime.shader_compile_requested", True)
-        elif path.endswith(".Add Variable"):
-            self._changed("runtime.shader_variable_add_requested", True)
+        def done(p):
+            if p:
+                self._changed(layer, path, p)
+                self._refresh()
+        self.pick_image(done)
 
-    def _reset(self, category):
-        prefix = category + "."
-        for path in list(self.state.properties):
-            if path.startswith(prefix):
-                del self.state.properties[path]
-        if self.on_change:
-            self.on_change()
-        self._details(category)
+    def _compile(self, layer):
+        scene = self.scene()
+        if scene is None:
+            return ""
+        err = scene.compile_shader(layer)
+        self.toast("Shader error - see details" if err else "Shader compiled")
+        return err
 
-    def _info(self, category):
-        sheet = m3.Sheet(_pretty(category))
-        sheet.height = dp(220)
-        sheet.box.add_widget(m3.lbl("%d settings. Values are saved per property in the project JSON and "
-                                    "applied live to the preview. Tap a value chip to reset one slider."
-                                    % self._count(category), 13, T.on_var, shorten=False, valign="top"))
+    def _action(self, layer, path):
+        if path.endswith("Compile / Apply"):
+            self._compile(layer)
+            self.on_change(layer)
+            self._refresh()
+        elif path.endswith("Add Variable"):
+            name = str(layer.get("Variables/Declare/New Variable Name") or "").strip()
+            kind = layer.get("Variables/Declare/New Variable")
+            if not name or not (name[0].isalpha() or name[0] == "_") or not name.replace("_", "").isalnum():
+                self.toast("Variable name must be a valid GLSL identifier")
+                return
+            if kind == "None":
+                self.toast("Pick a variable type first")
+                return
+            mappings = [dict(v) for v in layer.get(VARS)]
+            if any(v["name"] == name for v in mappings):
+                self.toast("Variable %s already exists" % name)
+                return
+            default = {"Float": 0.5, "Vector2": [0.5, 0.5], "Vector3": [0.5, 0.5, 0.5],
+                       "Color": "#FFFFFFFF"}[kind]
+            mappings.append({"name": name, "type": kind, "value": default})
+            layer.set(VARS, mappings)
+            self._compile(layer)
+            self.on_change(layer)
+            self._refresh()
+
+    # ------------------------------------------------------------ shader variables
+    def _variables(self, layer, path, mappings):
+        from .engine.shader_presets import RANGES
+        box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
+        box.bind(minimum_height=box.setter("height"))
+        if not mappings:
+            box.add_widget(m3.lbl("No variables. Declare one above.", 12, T.on_var, size_hint_y=None, height=dp(24)))
+        for index, var in enumerate(mappings):
+            head = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(6))
+            head.add_widget(m3.lbl("%s  (%s)" % (var["name"], var["type"]), 13, T.on_surface, bold=True))
+            head.add_widget(m3.IconBtn("delete", lambda i=index: self._delete_var(layer, i), size=dp(38)))
+            box.add_widget(head)
+
+            def setv(v, i=index, comp=None):
+                maps = [dict(x) for x in layer.get(VARS)]
+                if comp is None:
+                    maps[i]["value"] = v
+                else:
+                    cur = list(maps[i]["value"]) if isinstance(maps[i]["value"], (list, tuple)) else [0.0] * 3
+                    cur[comp] = round(float(v), 4)
+                    maps[i]["value"] = cur
+                layer.set(VARS, maps)
+                self.on_change(layer)
+            lo, hi = RANGES.get(var["name"], (0.0, 1.0))
+            if var["type"] == "Float":
+                val = float(var.get("value", 0) or 0)
+                hi = max(hi, val)
+                box.add_widget(m3.SliderRow("Value", lo, hi, val, lambda v, s=setv: s(round(float(v), 4)),
+                                            default=val))
+            elif var["type"] in ("Vector2", "Vector3"):
+                n = 2 if var["type"] == "Vector2" else 3
+                vals = list(var.get("value") or [0.0] * n) + [0.0] * n
+                for c in range(n):
+                    box.add_widget(m3.SliderRow("xyz"[c].upper(), -1.0, 2.0, float(vals[c]),
+                                                lambda v, s=setv, c=c: s(v, comp=c), default=float(vals[c])))
+            elif var["type"] == "Color":
+                box.add_widget(m3.ColorField(var.get("value", "#FFFFFFFF"), lambda v, s=setv: s(v),
+                                             default="#FFFFFFFF", swatches=self.palette, title=var["name"]))
+        return box
+
+    def _delete_var(self, layer, index):
+        maps = [dict(x) for x in layer.get(VARS)]
+        if 0 <= index < len(maps):
+            maps.pop(index)
+            layer.set(VARS, maps)
+            self._compile(layer)
+            self.on_change(layer)
+            self._refresh()
+
+    # ------------------------------------------------------------ reset / info
+    def _reset(self, layer):
+        tag = layer.values.get("General/Layer/Tag")
+        visible = layer.values.get("General/Layer/Visible")
+        layer.reset()
+        if layer.module in ("BLUREFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT", "RGBSPLITEFFECT", "CUSTOMSHADER"):
+            layer.set("General/Layer/Visible", visible)      # reset values, keep the effect on/off as it was
+        if tag and layer.module == "CUSTOMSHADER":
+            from .engine.shader_presets import PRESETS, apply_preset
+            if tag in PRESETS:
+                apply_preset(layer, tag)
+        if layer.module == "CUSTOMSHADER":
+            self._compile(layer)
+        self.on_change(layer)
+        self._refresh()
+
+    def _info(self, module):
+        sheet = m3.Sheet(pretty(module))
+        sheet.height = dp(300)
+        sheet.box.add_widget(m3.lbl(MODULE_INFO.get(module, "") + "\n\n%d settings. Changes apply live. Double tap a "
+                                    "slider to reset it, tap its value to type an exact number." % self._count(module),
+                                    13, T.on_var, shorten=False, valign="top"))
         sheet.open()

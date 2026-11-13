@@ -92,6 +92,8 @@ class EffectPass:
         f["beat"] = float(frame.measure.pulse(1.0))
         f["rms"] = float(frame.snapshot["rms"])
         f["bass"] = float(frame.snapshot["bass"])
+        f["mid"] = float(frame.snapshot.get("mid", 0.0))
+        f["treble"] = float(frame.snapshot.get("treble", 0.0))
         f["fx_mix"] = 1.0
         f["blend_mode"] = _blend_index(self.values[G + "Layer/Blend Mode"])
         f["fx_pos"], f["fx_scale"] = t["pos"], t["scale"]
@@ -225,6 +227,7 @@ class CustomShaderPass(EffectPass):
 
     def uniforms(self, frame, t):
         f = self.fbo
+        f["intensity"] = float(self.values.get("Shader Code/GLSL/Intensity", 0.5))
         for var in self.values[self.VARS]:
             val = var.get("value")
             try:

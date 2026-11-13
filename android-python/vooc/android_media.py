@@ -241,3 +241,56 @@ def choose_image(callback):
         ["*.png", "*.jpg", "*.jpeg", "*.webp"],
         _IMAGE_REQUEST, "Choose image"
     )
+
+
+_FILE_REQUEST = 61423
+
+def choose_template(callback):
+    """Pick a Vooc template (.viz / .json) to import."""
+    _open_picker(callback, "*/*", ["*.viz", "*.json"], _FILE_REQUEST, "Import template")
+
+
+def publish_file(path, display_name, mime, collection="Download"):
+    """Copy a finished file into shared storage so Gallery / Files can see it.
+
+    Android 10+: MediaStore (Movies/Vooc or Download/Vooc), no permission needed.
+    Older Android / desktop: the file stays where it is. Returns a user-facing location."""
+
+    try:
+        from jnius import autoclass
+    except Exception:
+        return str(path)
+    try:
+        Build = autoclass("android.os.Build$VERSION")
+        if Build.SDK_INT < 29:
+            return str(path)
+        act = autoclass("org.kivy.android.PythonActivity").mActivity
+        resolver = act.getContentResolver()
+        ContentValues = autoclass("android.content.ContentValues")
+
+        values = ContentValues()
+        values.put("_display_name", display_name)
+        values.put("mime_type", mime)
+        folder = ("Movies/Vooc" if collection == "Movies" else "Download/Vooc")
+        values.put("relative_path", folder)
+        if collection == "Movies":
+            target = autoclass("android.provider.MediaStore$Video$Media").EXTERNAL_CONTENT_URI
+        else:
+            target = autoclass("android.provider.MediaStore$Downloads").EXTERNAL_CONTENT_URI
+        uri = resolver.insert(target, values)
+        if uri is None:
+            return str(path)
+        out = resolver.openOutputStream(uri)
+        try:
+            with open(path, "rb") as fh:
+                while True:
+                    chunk = fh.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk, 0, len(chunk))
+        finally:
+            out.close()
+        return folder + "/" + display_name
+    except Exception as exc:
+        print("Vooc publish failed: %s" % exc)
+        return str(path)

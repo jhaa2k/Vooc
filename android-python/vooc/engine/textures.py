@@ -27,6 +27,106 @@ def load(path):
     return tex
 
 
+class Animated:
+    """Frames of an animated GIF: textures + per-frame durations (seconds)."""
+
+    def __init__(self, textures_, delays):
+        self.frames = textures_
+        self.delays = [max(0.02, float(d)) for d in delays]
+        self.total = sum(self.delays)
+        self.width, self.height = textures_[0].width, textures_[0].height
+
+    def at(self, t):
+        if len(self.frames) == 1 or self.total <= 0:
+            return self.frames[0]
+        t = t % self.total
+        for tex, d in zip(self.frames, self.delays):
+            if t < d:
+                return tex
+            t -= d
+        return self.frames[-1]
+
+
+_anim_cache = {}
+MAX_GIF_FRAMES = 60
+MAX_GIF_SIDE = 480
+
+
+def _is_gif(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read(6) in (b"GIF87a", b"GIF89a")
+    except OSError:
+        return False
+
+
+def _gif_android(path):
+    import base64
+    from jnius import autoclass
+    dec = autoclass("com.jhaa2k.vooc.GifFrames")()
+    if not dec.decode(path, MAX_GIF_FRAMES, MAX_GIF_SIDE):
+        return None
+    w, h, n = dec.getWidth(), dec.getHeight(), dec.getCount()
+    texs = []
+    for i in range(n):
+        raw = base64.b64decode(str(dec.getFrame(i)))
+        arr = np.frombuffer(raw, np.uint8).reshape(h, w, 4)[::-1]
+        texs.append(_from_rgba(arr))
+    if not texs:
+        return None
+    return Animated(texs, [dec.getStepMs() / 1000.0] * len(texs))
+
+
+def _gif_pil(path):
+    from PIL import Image, ImageSequence
+    im = Image.open(path)
+    texs, delays = [], []
+    for i, fr in enumerate(ImageSequence.Iterator(im)):
+        if i >= MAX_GIF_FRAMES:
+            break
+        rgba = fr.convert("RGBA")
+        k = min(1.0, MAX_GIF_SIDE / float(max(rgba.size)))
+        if k < 1:
+            rgba = rgba.resize((max(1, int(rgba.width * k)), max(1, int(rgba.height * k))))
+        arr = np.asarray(rgba, np.uint8)[::-1]
+        texs.append(_from_rgba(arr))
+        delays.append(fr.info.get("duration", im.info.get("duration", 100)) / 1000.0)
+    return Animated(texs, delays) if texs else None
+
+
+def load_animated(path):
+    """Animated object for GIF files with more than one frame, else None."""
+    if not path or not os.path.exists(path) or not _is_gif(path):
+        return None
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        return None
+    if key in _anim_cache:
+        return _anim_cache[key]
+    anim = None
+    try:
+        if "ANDROID_ARGUMENT" in os.environ or "ANDROID_PRIVATE" in os.environ:
+            anim = _gif_android(path)
+        else:
+            anim = _gif_pil(path)
+    except Exception as exc:
+        print("Vooc: GIF decode failed (%s), using first frame" % exc)
+        anim = None
+    if anim is not None and len(anim.frames) < 2:
+        anim = None
+    _anim_cache[key] = anim
+    return anim
+
+
+def frame(path, t):
+    """Texture of an image at time t (animated GIFs advance, others are static)."""
+    anim = load_animated(path)
+    if anim is not None:
+        return anim.at(t)
+    return load(path)
+
+
 def _from_rgba(arr):
     h, w = arr.shape[:2]
     tex = Texture.create(size=(w, h), colorfmt="rgba")

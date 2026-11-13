@@ -84,6 +84,19 @@ def mask_polygon(name):
     return poly
 
 
+def rounded_rect(radius, bw, bh, steps=10):
+    """Rounded rectangle in 0..1 box space; radius 0..1 of half the short side."""
+    m = min(bw, bh)
+    r = max(0.0, min(1.0, radius)) * 0.5 * m
+    rx, ry = r / max(bw, 1e-6), r / max(bh, 1e-6)
+    pts = []
+    for cx, cy, a0 in ((1 - rx, 1 - ry, 0.0), (rx, 1 - ry, 90.0), (rx, ry, 180.0), (1 - rx, ry, 270.0)):
+        for k in range(steps + 1):
+            a = np.radians(a0 + 90.0 * k / steps)
+            pts.append((cx + np.cos(a) * rx, cy + np.sin(a) * ry))
+    return np.array(pts, float)
+
+
 def _ensure_ccw(poly):
     x, y = poly[:, 0], poly[:, 1]
     area = np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y)
@@ -110,11 +123,14 @@ def sample_path(name, count, waveform=None):
         if waveform is None or len(waveform) < 2:
             wave = np.zeros(count)
         else:
-            wave = np.interp(t, np.linspace(0, 1, len(waveform)), waveform)
-        pts = np.stack([t * 2 - 1, wave * 0.5], 1)
-        d = np.gradient(pts, axis=0)
-        nrm = np.stack([-d[:, 1], d[:, 0]], 1)
-        nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-6)
+            w = np.asarray(waveform, float)
+            k = max(1, len(w) // 24)
+            if k > 1:  # smooth so the path reads as a wave, not noise
+                w = np.convolve(w, np.ones(k) / k, mode="same")
+            wave = np.clip(np.interp(t, np.linspace(0, 1, len(w)), w), -1.0, 1.0)
+        pts = np.stack([t * 2 - 1, wave * 0.35], 1)
+        # bars stay upright on a waveform; rotating with the slope looks like noise
+        nrm = np.tile([0.0, 1.0], (count, 1))
         return pts, nrm, False
 
     poly = _ensure_ccw(outline(name))

@@ -17,11 +17,21 @@ try:
     from vooc import m3
     from vooc.m3 import T
     from vooc.state import ProjectState, THEMES, AUDIO_DEFAULTS, VISUALIZER_DEFAULTS, EQ_PRESETS
-    from vooc.visualizer import Spectrum, STYLES, PALETTES, palette_stops
     from vooc.spectrum_source import SpectrumLoader
     from vooc.android_audio import AndroidMediaPlayerSource
-    from vooc.android_media import choose_audio, choose_image
-    from vooc.property_editor import AdvancedProperties
+    from vooc.android_media import choose_audio, choose_image, choose_template, publish_file
+    from vooc.property_editor import AdvancedProperties, pretty as pretty_module, _ICONS as EDITOR_ICONS
+    from vooc.property_schema import field_spec, iter_fields
+    from vooc.model import ProjectModel, LayerModel
+    from vooc.audio.timeline_hub import TimelineHub
+    from vooc.engine.scene import SceneView
+    from vooc.engine.shader_presets import apply_preset as apply_shader_preset, PRESETS as SHADER_PRESET_TABLE
+    from vooc.templates import (TemplateStore, apply_template, builtin as builtin_template,
+                                BUILTINS as BUILTIN_TEMPLATES)
+    from vooc.palettes import BUILTIN as PALETTE_BUILTIN, apply_palette, extract_palette
+    from vooc.media_meta import read_metadata
+    from vooc.exporter import (Exporter, plan_export, frame_size, RESOLUTIONS, FPS_OPTIONS, ASPECTS, CODECS,
+                               QUALITY)
 except BaseException:
     import traceback
     _STARTUP_IMPORT_ERROR = traceback.format_exc()
@@ -100,6 +110,43 @@ class Scroll(ScrollView):
 NAV = [("library", "note", "Library"), ("visual", "bars", "Visual"), ("sound", "tune", "Sound"),
        ("layers", "layers", "Layers"), ("studio", "studio", "Studio")]
 
+# Quick effect toggles on the Visual page: (title, module, shader preset, intensity path, lo, hi)
+QUICK_EFFECTS = [
+    ("Glow", "BLUREFFECT", None, "Blur Settings/Radius/Blur Multiplier", 0.0, 10.0),
+    ("Motion Blur", "MOTIONBLUREFFECT", None, "Motion Blur/Motion/Blur Amount Multiplier", 0.0, 10.0),
+    ("RGB Split", "RGBSPLITEFFECT", None, "Effect Settings/Split/Split Amount", 0.0, 1.0),
+    ("Mirror", "MIRROREREFFECT", None, "Appearance/Mirror/Offset", 0.0, 1.0),
+    ("Zoom Blur", "CUSTOMSHADER", "Zoom Blur", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+    ("Twirl", "CUSTOMSHADER", "Twirl", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+    ("Kaleidoscope", "CUSTOMSHADER", "Kaleidoscope", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+    ("Reflection", "CUSTOMSHADER", "Reflection", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+    ("3D Box", "CUSTOMSHADER", "3D Box", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+    ("Color Correction", "CUSTOMSHADER", "Color Correction", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+    ("Vignette", "CUSTOMSHADER", "Vignette", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+    ("Film Grain", "CUSTOMSHADER", "Film Grain", "Shader Code/GLSL/Intensity", 0.0, 1.0),
+]
+ADDABLE = [("Text", "TEXT", "text"), ("Image", "IMAGE", "image"), ("Spectrum bars", "BARS", "bars"),
+           ("Particles", "PARTICLES", "sparkle"), ("Glow / Blur", "BLUREFFECT", "eye"),
+           ("Motion Blur", "MOTIONBLUREFFECT", "next"), ("RGB Split", "RGBSPLITEFFECT", "layers"),
+           ("Mirrorer", "MIRROREREFFECT", "copy"), ("Custom Shader", "CUSTOMSHADER", "more")]
+FIXED_MODULES = ("COMPOSITION", "AUDIOPROVIDER")
+B = "Bars Setup/Bars/"
+CANVAS = "Render Settings/Canvas/"
+OUT = "Render Settings/Output/"
+
+
+class Progress(m3.Box):
+    def __init__(self, **kw):
+        super().__init__(bg=T.surface3, radius=dp(4), size_hint_y=None, height=dp(8), **kw)
+        self.fill = m3.Box(bg=T.primary, radius=dp(4), size_hint=(None, 1))
+        self.add_widget(self.fill)
+        self.value = 0.0
+        self.bind(size=lambda *_: self.set(self.value))
+
+    def set(self, v):
+        self.value = max(0.0, min(1.0, float(v)))
+        self.fill.width = max(dp(8) if self.value > 0 else 0, self.width * self.value)
+
 
 class VoocRoot(FloatLayout):
     def __init__(self, **kw):
@@ -117,10 +164,24 @@ class VoocRoot(FloatLayout):
         self._end_handled = False
         self.sound = None
         self.native = None
+        self.timeline = None
+        self.meta = {"title": "", "artist": "", "album": "", "art": ""}
+        self.selected_layer = None
+        self._edit_layer = None
+        self.exporter = None
+        self.export_state = {"running": False, "progress": 0.0, "text": "", "result": ""}
+        self.project = self._load_project()
+        self.templates = TemplateStore(Path(self._data_dir()) / "templates")
         if AndroidMediaPlayerSource.is_available():
             self.native = AndroidMediaPlayerSource(lambda *a: None, self._native_error, self._native_completed,
                                                    self._native_focus_changed)
             self.native.configure_fx(self.s.audio, self.s.eq_freqs)
+        self.hub = TimelineHub(self.project.layer("AUDIOPROVIDER"), timeline=lambda: self.timeline,
+                               position=lambda: self.clock()[0], playing=lambda: self.clock()[1],
+                               duration=lambda: self.duration, on_error=self._native_error)
+        self.hub.metadata = self.meta
+        self.scene = SceneView(self.project, self.hub, size_hint=(1, 1), pos_hint={"x": 0, "y": 0})
+        self.scene.set_perf(**self.s.perf)
         self.analysis = {"state": "idle", "progress": 0.0}
         self.loader = SpectrumLoader(self._spectrum_ready, self._spectrum_progress,
                                      scheduler=lambda fn: Clock.schedule_once(lambda _dt: fn(), 0))
@@ -133,6 +194,29 @@ class VoocRoot(FloatLayout):
         Clock.schedule_interval(self._smoke_autoload, 1.0)
         if Window is not None:
             Window.bind(on_keyboard=self._on_key)
+
+    def _data_dir(self):
+        cached = getattr(self, "_data_dir_cache", None)
+        if cached:
+            return cached
+        app = App.get_running_app()
+        path = app.user_data_dir if app else os.path.expanduser("~/.vooc")
+        if app:
+            self._data_dir_cache = path
+        return path
+
+    def _load_project(self):
+        if isinstance(self.s.engine, dict) and self.s.engine.get("layers"):
+            try:
+                return ProjectModel.from_dict(self.s.engine)
+            except Exception as exc:
+                print("Vooc engine project invalid, using defaults: %s" % exc)
+        project = ProjectModel()
+        try:
+            apply_template(project, builtin_template(self.s.look.get("template", "Circle Classic")))
+        except Exception:
+            pass
+        return project
 
     def _retry_insets(self, _dt, tries=[0]):
         ins = system_insets()
@@ -147,11 +231,6 @@ class VoocRoot(FloatLayout):
 
     # ================================================================ UI
     def build_ui(self):
-        if getattr(self, "preview", None) is not None:
-            try:
-                self.preview._ev.cancel()
-            except Exception:
-                pass
         self.clear_widgets()
         if Window is not None:
             Window.clearcolor = T.bg
@@ -189,14 +268,15 @@ class VoocRoot(FloatLayout):
         return bar
 
     def _preview_ratio(self):
+        comp = self.project.layer("COMPOSITION")
         try:
-            a, b = str(self.s.scene.get("ratio", "16:9")).split(":")
-            return max(0.3, min(3.0, float(a) / float(b)))
+            return max(0.3, min(3.0, float(comp.get(OUT + "Resolution Width")) /
+                                float(comp.get(OUT + "Resolution Height"))))
         except Exception:
             return 16 / 9.0
 
     def _visual_card(self):
-        """Preview at the real export aspect ratio (16:9 by default), never stretched."""
+        """Live engine preview at the real output aspect ratio (16:9 by default), never stretched."""
         pad = dp(4)
         frame = m3.Box(bg=T.surface1, radius=dp(24), padding=pad, size_hint_y=None)
         holder = FloatLayout()
@@ -214,7 +294,7 @@ class VoocRoot(FloatLayout):
             frame.height = h + pad * 2
             stage.size = (w, h)
             stage.pos = (holder.x + (holder.width - w) / 2.0, holder.y + (holder.height - h) / 2.0)
-            chip_w = min(dp(96), w * 0.46)
+            chip_w = min(dp(118), w * 0.46)
             for chip in (getattr(self, "status", None), getattr(self, "style_chip", None)):
                 if chip is not None and chip.parent is stage:
                     chip.width = chip_w
@@ -226,11 +306,9 @@ class VoocRoot(FloatLayout):
         holder.bind(pos=fit, size=fit)
         holder.add_widget(stage)
         self.visual_frame = frame
-        self.preview = Spectrum(self.s, clock_source=self.clock, size_hint=(1, 1), pos_hint={"x": 0, "y": 0})
-        if self.loader is not None and self.track and self.track in self.loader._cache:
-            self.preview.set_timeline(self.loader._cache[self.track])
-        stage.add_widget(self.preview)
-        # mask the corners of the live canvas so it matches the card radius
+        if self.scene.parent is not None:
+            self.scene.parent.remove_widget(self.scene)
+        stage.add_widget(self.scene)
         self.status = m3.Box(bg=T.a("scrim", .55), radius=dp(12), size_hint=(None, None), height=dp(26), width=dp(96),
                              pos_hint={"x": .02, "top": .96}, padding=(dp(10), 0), spacing=dp(6))
         self.status_dot = Widget(size_hint=(None, 1), width=dp(8))
@@ -246,7 +324,7 @@ class VoocRoot(FloatLayout):
         self.style_chip = m3.Tap(on_tap=self.cycle_style, bg=T.a("scrim", .55), radius=dp(13), size_hint=(None, None),
                                  height=dp(26), width=dp(96), pos_hint={"right": .98, "top": .96}, padding=(dp(10), 0), spacing=dp(4))
         self.style_chip.add_widget(m3.Icon(name="sparkle", tint=(.78, 1, .2, 1), size_hint_x=None, width=dp(14)))
-        self.style_text = m3.lbl(self.preview.style(), 11, (1, 1, 1, .92), bold=True)
+        self.style_text = m3.lbl(self.s.look.get("template", "Template"), 11, (1, 1, 1, .92), bold=True)
         self.style_chip.add_widget(self.style_text)
         stage.add_widget(self.style_chip)
         frame.add_widget(holder)
@@ -330,12 +408,11 @@ class VoocRoot(FloatLayout):
             base = Path(app.user_data_dir)
             if not (base / "smoke_targets").exists() or Window is None:
                 return
-            W, H = float(Window.width), float(Window.height)
+            H = float(Window.height)
             off_top = 0
             try:
                 from jnius import autoclass
                 if autoclass("android.os.Build$VERSION").SDK_INT < 35:
-                    # window starts below the status bar: shift to screen coordinates
                     act = autoclass("org.kivy.android.PythonActivity").mActivity
                     ins = act.getWindow().getDecorView().getRootWindowInsets()
                     off_top = int(ins.getSystemWindowInsetTop()) if ins is not None else 0
@@ -372,9 +449,10 @@ class VoocRoot(FloatLayout):
         if not self.s.playlist:
             empty = m3.card(bg=T.surface1)
             empty.add_widget(m3.lbl("Your imported tracks will appear here.", 13, T.on_var, size_hint_y=None, height=dp(24)))
-            empty.add_widget(m3.lbl("MP3, M4A, AAC, FLAC, OGG and WAV are supported.", 11, T.on_var, size_hint_y=None, height=dp(20)))
+            empty.add_widget(m3.lbl("MP3, M4A, AAC, FLAC, OGG, OPUS and WAV are supported.", 11, T.on_var,
+                                    size_hint_y=None, height=dp(20)))
             col.add_widget(empty)
-        for i, path in enumerate(self.s.playlist):
+        for path in self.s.playlist:
             on = path == self.track
             tile = m3.Tap(on_tap=lambda p=path: self.load_track(p, autoplay=True), size_hint_y=None, height=dp(60),
                           radius=dp(18), bg=T.secondary_container if on else T.surface1, padding=(dp(12), 0), spacing=dp(12))
@@ -384,78 +462,320 @@ class VoocRoot(FloatLayout):
             wrap.add_widget(badge)
             tile.add_widget(wrap)
             info = BoxLayout(orientation="vertical", padding=(0, dp(10)))
-            info.add_widget(m3.lbl(Path(path).stem, 14, T.on_secondary_container if on else T.on_surface, bold=on))
-            info.add_widget(m3.lbl(Path(path).suffix.upper().lstrip(".") + ("  -  now playing" if on else ""), 11, T.on_var))
+            title = (self.meta.get("title") if on and self.meta.get("title") else Path(path).stem)
+            info.add_widget(m3.lbl(title, 14, T.on_secondary_container if on else T.on_surface, bold=on))
+            sub = Path(path).suffix.upper().lstrip(".")
+            if on and self.meta.get("artist"):
+                sub = self.meta["artist"] + "  -  " + sub
+            info.add_widget(m3.lbl(sub + ("  -  now playing" if on else ""), 11, T.on_var))
             tile.add_widget(info)
             tile.add_widget(m3.IconBtn("close", lambda p=path: self.remove_track(p), size=dp(40)))
             col.add_widget(tile)
 
-    # ---------------------------------------------------------------- visual
+    # ---------------------------------------------------------------- visual (quick look editor)
+    def _engine_changed(self, layer=None):
+        if layer is not None and layer.module == "COMPOSITION" and self._fit_visual:
+            self._fit_visual()
+        self._save_trigger()
+
+    def _setv(self, layer, path, value):
+        if layer.set(path, value):
+            self._engine_changed(layer)
+
     def _page_visual(self, col):
-        v = self.s.visualizer
-        col.add_widget(m3.section("Style"))
-        col.add_widget(m3.ChipGroup(STYLES, self.preview.style(), lambda o: self.set_vis("style", o)))
-        col.add_widget(m3.section("Palette"))
-        sw = {}
-        for name in PALETTES:
-            stops = palette_stops(name)
-            sw[name] = (stops[0], stops[-1])
-        col.add_widget(m3.ChipGroup(list(PALETTES), self._palette_name(), lambda o: self.set_vis("palette", o), swatches=sw))
+        bars = self.project.layer("BARS")
+        look = self.s.look
+        # templates
+        col.add_widget(m3.section("Templates", "reuse a look on any track"))
+        names = BUILTIN_TEMPLATES + [n for n in self.templates.names() if n not in BUILTIN_TEMPLATES]
+        col.add_widget(m3.ChipGroup(names, look.get("template", ""), self.apply_template_named))
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        row.add_widget(m3.Button3("Save", self.save_template, kind="tonal", icon="save"))
+        row.add_widget(m3.Button3("Import", self.import_template, kind="outlined", icon="folder"))
+        row.add_widget(m3.Button3("Share", self.export_template, kind="outlined", icon="export"))
+        col.add_widget(row)
+        # colors
+        col.add_widget(m3.section("Colors", "applies to every layer"))
+        pals = dict(PALETTE_BUILTIN)
+        pals.update(self.s.palettes)
+        sw = {k: (m3._hex(v[1]), m3._hex(v[2])) for k, v in pals.items()}
+        col.add_widget(m3.ChipGroup(list(pals), look.get("palette", ""), self.apply_palette_named, swatches=sw))
+        colors = self._current_palette()
+        pc = m3.card(spacing=dp(6))
+        grid = GridLayout(cols=2, spacing=dp(8), size_hint_y=None, height=dp(44) * 2 + dp(8))
+        for i, name in enumerate(["Deep", "Main", "Accent", "Highlight"]):
+            grid.add_widget(m3.ColorField(colors[i] + "FF" if len(colors[i]) == 7 else colors[i],
+                                          lambda v, i=i: self._edit_palette_color(i, v), title=name + " color"))
+        pc.add_widget(grid)
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        row.add_widget(m3.Button3("From album art", self.palette_from_art, kind="tonal", icon="image"))
+        row.add_widget(m3.Button3("Save palette", self.save_palette, kind="outlined", icon="save"))
+        pc.add_widget(row)
+        pc.add_widget(m3.switch_row("Auto colors from album art", bool(look.get("auto_palette", True)),
+                                    lambda on: (look.__setitem__("auto_palette", bool(on)), self._save_trigger()),
+                                    "Recolor when a track with cover art loads"))
+        col.add_widget(pc)
+        # spectrum
+        col.add_widget(m3.section("Spectrum", "double tap = reset, tap value = type"))
         card = m3.card(spacing=dp(2))
-        rows = [("Bars", "bar_count", 16, 128, 4, lambda x: "%d" % x),
-                ("Sensitivity", "sensitivity", .2, 3.0, 0, lambda x: "%.2fx" % x),
-                ("Smoothing", "smoothing", 0, .95, 0, lambda x: "%d%%" % round(x * 100)),
-                ("Height", "height", .3, 2.0, 0, lambda x: "%.2fx" % x),
-                ("Bar gap", "gap", 0, 1.0, 0, lambda x: "%d%%" % round(x * 100)),
-                ("Glow", "glow", 0, 1.0, 0, lambda x: "%d%%" % round(x * 100)),
-                ("Peak fall speed", "peak_fall", .2, 3.0, 0, lambda x: "%.2fx" % x)]
-        for title, key, lo, hi, step, fmt in rows:
-            card.add_widget(m3.SliderRow(title, lo, hi, float(v.get(key, VISUALIZER_DEFAULTS[key])),
-                                         lambda x, k=key, st=step: self.set_vis(k, int(round(x)) if st else round(x, 3)),
-                                         step=step, fmt=fmt, default=VISUALIZER_DEFAULTS[key]))
-        col.add_widget(m3.section("Motion", "tap a value to reset"))
+        rows = [("Bar count", B + "Bar Count", 4, 256, 1, lambda x: "%d" % x),
+                ("Sensitivity", B + "Height Scale", 0, 10, 0, lambda x: "%.2fx" % x),
+                ("Max height", B + "Max Height Scale", 0, 1, 0, lambda x: "%d%%" % round(x * 100)),
+                ("Smoothing", "Behavior/Physics/Softness", 0, 1, 0, lambda x: "%d%%" % round(x * 100)),
+                ("Rise delay", "Behavior/Physics/Reaction Delay", 0, 1, 0, lambda x: "%d%%" % round(x * 100)),
+                ("Bar width", B + "Bar Width", 0, 1, 0, lambda x: "%d%%" % round(x * 100)),
+                ("Bar spacing", B + "Bar Spacing", 0, 1, 0, lambda x: "%d%%" % round(x * 100)),
+                ("Path size", B + "Path Size", 0, 1, 0, lambda x: "%d%%" % round(x * 100)),
+                ("Frequency min", "Behavior/Audio/Frequency Min (Hz)", 20, 2000, 1, lambda x: "%d Hz" % x),
+                ("Frequency max", "Behavior/Audio/Frequency Max (Hz)", 1000, 16000, 1,
+                 lambda x: ("%.1f kHz" % (x / 1000.0)) if x >= 1000 else "%d Hz" % x),
+                ("Rotation", "General/Scale & Rotation/Rotation", 0, 1, 0, lambda x: "%d deg" % round(x * 360))]
+        for title, path, lo, hi, step, fmt in rows:
+            spec = field_spec("BARS", path)
+            card.add_widget(m3.SliderRow(title, lo, hi, max(lo, min(hi, float(bars.get(path)))),
+                                         lambda x, p=path, st=step: self._setv(bars, p, int(round(x)) if st else round(x, 4)),
+                                         step=step, fmt=fmt, default=spec["default"]))
+        seg_count = sum(1 for i in (1, 2, 3) if bars.get("Segment %d/Segment %d/Enable Segment" % (i, i)))
+        card.add_widget(m3.SliderRow("Segments", 1, 3, max(1, seg_count), self._set_segments, step=1,
+                                     fmt=lambda x: "%d" % x, default=1))
+        for title, path in [("Shape / orientation", B + "Shape Path"), ("Measure what", "Behavior/Audio/Measure What"),
+                            ("Audio channel", "Behavior/Audio/Audio Channel")]:
+            card.add_widget(m3.lbl(title, 12, T.on_var, size_hint_y=None, height=dp(22)))
+            card.add_widget(m3.SelectField(title, field_spec("BARS", path)["options"], bars.get(path),
+                                           lambda v, p=path: self._setv(bars, p, v)))
+        card.add_widget(m3.switch_row("Mirror bars", bool(bars.get("Segment 1/Segment 1/Mirror")),
+                                      lambda on: self._setv(bars, "Segment 1/Segment 1/Mirror", bool(on))))
+        card.add_widget(m3.switch_row("Flip input", bool(bars.get(B + "Flip Input")),
+                                      lambda on: self._setv(bars, B + "Flip Input", bool(on)), "High frequencies first"))
         col.add_widget(card)
-        sw_card = m3.card(spacing=0, padding=(dp(4), dp(4)))
-        for title, key, sub in [("Peak caps", "peaks", "Falling peak markers"), ("Beat pulse", "beat_pulse", "Flash and bounce on kicks"),
-                                ("Particles", "particles", "Sparks fly on every beat"), ("Reflection", "reflection", "Mirror glow under bars"),
-                                ("Auto spin", "spin", "Rotate radial and orbit styles")]:
-            sw_card.add_widget(m3.switch_row(title, bool(v.get(key, VISUALIZER_DEFAULTS[key])),
-                                             lambda on, k=key: self.set_vis(k, bool(on)), sub))
-        col.add_widget(m3.section("Effects"))
-        col.add_widget(sw_card)
-        col.add_widget(m3.section("Background"))
-        col.add_widget(m3.ChipGroup(list(THEMES), self.s.scene.get("theme", "Acid Night"), self._set_bg_theme,
-                                    swatches={k: (m3._hex(c), m3._hex(c)) for k, c in THEMES.items()}))
-        col.add_widget(m3.Button3("Reset visualizer", self.reset_visualizer, kind="outlined", icon="reset"))
+        # effects
+        col.add_widget(m3.section("Effects", "%d effects" % len(QUICK_EFFECTS)))
+        fx = m3.card(spacing=dp(2), padding=(dp(6), dp(6)))
+        for title, module, preset, path, lo, hi in QUICK_EFFECTS:
+            layer = self._effect_layer(module, preset, create=False)
+            on = bool(layer is not None and layer.get("General/Layer/Visible"))
+            fx.add_widget(m3.switch_row(title, on, lambda v, t=title: self.toggle_effect(t, bool(v))))
+            if on:
+                spec = field_spec(module, path)
+                fx.add_widget(m3.SliderRow("Intensity", lo, hi, max(lo, min(hi, float(layer.get(path)))),
+                                           lambda x, l=layer, p=path: self._setv(l, p, round(x, 4)),
+                                           default=spec["default"] if preset is None else _preset_intensity(preset)))
+        col.add_widget(fx)
+        # other layers
+        col.add_widget(m3.section("Layers on canvas"))
+        other = m3.card(spacing=0, padding=(dp(4), dp(4)))
+        for title, module, sub in [("Album art", "IMAGE", "Cover of the current track"),
+                                   ("Particles", "PARTICLES", "Sparks driven by the beat"),
+                                   ("Title / artist text", "TEXT", "%title% and %artist%")]:
+            layer = self.project.layer(module)
+            other.add_widget(m3.switch_row(title, bool(layer.get("General/Layer/Visible")),
+                                           lambda v, l=layer: self._setv(l, "General/Layer/Visible", bool(v)), sub))
+        part = self.project.layer("PARTICLES")
+        other.add_widget(m3.SliderRow("Particle count", 0, 5000, float(part.get("Overall Settings/Emitter/Count Limit")),
+                                      lambda x: self._setv(part, "Overall Settings/Emitter/Count Limit", int(x)),
+                                      step=10, fmt=lambda x: "%d" % x, default=300))
+        comp = self.project.layer("COMPOSITION")
+        other.add_widget(m3.lbl("Background", 12, T.on_var, size_hint_y=None, height=dp(22)))
+        other.add_widget(m3.ColorField(comp.get(CANVAS + "Background Color"),
+                                       lambda v: self._setv(comp, CANVAS + "Background Color", v),
+                                       default="#070906FF", swatches=self._palette_swatches, title="Background"))
+        col.add_widget(other)
+        col.add_widget(m3.Button3("Reset look to template", lambda: self.apply_template_named(look.get("template", "Circle Classic")),
+                                  kind="outlined", icon="reset"))
 
-    def _palette_name(self):
-        p = self.s.visualizer.get("palette", "Acid")
-        from vooc.visualizer import _PALETTE_ALIASES
-        return _PALETTE_ALIASES.get(p, p)
+    def _set_segments(self, x):
+        bars = self.project.layer("BARS")
+        n = int(round(x))
+        for i in (1, 2, 3):
+            bars.set("Segment %d/Segment %d/Enable Segment" % (i, i), i <= n)
+        self._engine_changed(bars)
 
-    def set_vis(self, key, value):
-        self.s.visualizer[key] = value
-        self.preview.refresh()
-        if key == "style":
-            self.style_text.text = self.preview.style()
+    def _effect_layer(self, module, preset, create=True):
+        for l in self.project.layers:
+            if l.module != module:
+                continue
+            if preset is None or l.get("General/Layer/Tag") == preset or \
+                    (preset and l.get("Shader Code/GLSL/Effect Preset") == preset):
+                return l
+        if not create:
+            return None
+        layer = LayerModel(module)
+        if preset:
+            apply_shader_preset(layer, preset)
+        self._insert_layer(layer)
+        return layer
+
+    def _insert_layer(self, layer):
+        """New layers go above everything except the top text layer (text stays sharp)."""
+        idx = len(self.project.layers)
+        for i in range(len(self.project.layers) - 1, -1, -1):
+            if self.project.layers[i].module == "TEXT":
+                idx = i
+                break
+        if layer.module == "TEXT":
+            idx = len(self.project.layers)
+        self.project.layers.insert(idx, layer)
+
+    def toggle_effect(self, title, on):
+        entry = next(e for e in QUICK_EFFECTS if e[0] == title)
+        _t, module, preset, _p, _lo, _hi = entry
+        layer = self._effect_layer(module, preset, create=on)
+        if layer is None:
+            return
+        layer.set("General/Layer/Visible", on)
+        if on and module == "CUSTOMSHADER":
+            err = self.scene.compile_shader(layer)
+            if err:
+                self.toast("Shader error: " + err[:80])
+        self._engine_changed(layer)
+        if on and module in ("BLUREFFECT", "MOTIONBLUREFFECT") and not self.s.perf.get("heavy_blur", True):
+            self.toast("Heavy blur is off in Studio > Scene (preview only)")
+        self.show("visual")
+
+    # ---------------------------------------------------------------- palettes
+    def _current_palette(self):
+        name = self.s.look.get("palette", "Acid")
+        pals = dict(PALETTE_BUILTIN)
+        pals.update(self.s.palettes)
+        return list(self.s.look.get("colors") or pals.get(name) or PALETTE_BUILTIN["Acid"])
+
+    def _palette_swatches(self):
+        return [c[:7] + "FF" for c in self._current_palette()] + ["#FFFFFFFF", "#000000FF"]
+
+    def apply_palette_named(self, name):
+        pals = dict(PALETTE_BUILTIN)
+        pals.update(self.s.palettes)
+        if name not in pals:
+            return
+        self.s.look["palette"] = name
+        self.s.look["colors"] = list(pals[name])
+        apply_palette(self.project, pals[name])
+        self._engine_changed()
+        self.show("visual")
+
+    def _edit_palette_color(self, index, value):
+        colors = self._current_palette()
+        colors[index] = value[:7]
+        self.s.look["colors"] = colors
+        self.s.look["palette"] = ""
+        apply_palette(self.project, colors)
+        self._engine_changed()
+
+    def save_palette(self):
+        n = len(self.s.palettes) + 1
+        name = "My palette %d" % n
+        while name in self.s.palettes:
+            n += 1
+            name = "My palette %d" % n
+        self.s.palettes[name] = [c[:7] for c in self._current_palette()]
+        self.s.look["palette"] = name
         self._save_trigger()
+        self.toast("Saved " + name)
+        self.show("visual")
 
-    def _set_bg_theme(self, name):
-        self.s.scene["theme"] = name
-        self.preview.refresh()
-        self._save_trigger()
-
-    def cycle_style(self):
-        cur = self.preview.style()
-        nxt = STYLES[(STYLES.index(cur) + 1) % len(STYLES)]
-        self.set_vis("style", nxt)
+    def palette_from_art(self, quiet=False):
+        art = self.meta.get("art")
+        if not art or not os.path.isfile(art):
+            img = self.project.layer("IMAGE").get("Image Source/Source/Pick Image")
+            art = img if img and os.path.isfile(img) else ""
+        if not art:
+            if not quiet:
+                self.toast("This track has no album art. Pick an image in the Image layer.")
+            return
+        try:
+            colors = extract_palette(art)
+        except Exception as exc:
+            if not quiet:
+                self.toast("Could not read colors: %s" % exc)
+            return
+        self.s.palettes["Album art"] = colors
+        self.s.look["palette"] = "Album art"
+        self.s.look["colors"] = colors
+        apply_palette(self.project, colors)
+        self._engine_changed()
+        if not quiet:
+            self.toast("Colors taken from the album art")
         if self.page == "visual":
             self.show("visual")
 
-    def reset_visualizer(self):
-        self.s.visualizer = dict(VISUALIZER_DEFAULTS)
-        self.set_vis("style", "Bars")
-        self.show("visual")
+    # ---------------------------------------------------------------- templates
+    def apply_template_named(self, name):
+        try:
+            data = self.templates.load(name)
+            apply_template(self.project, data)
+        except Exception as exc:
+            self.toast("Template failed: %s" % exc)
+            return
+        self.s.look["template"] = name
+        if self.s.look.get("colors") and self.s.look.get("palette") not in ("", None) and name not in BUILTIN_TEMPLATES:
+            pass
+        self.style_text.text = name
+        self.selected_layer = None
+        self._edit_layer = None
+        self.scene.set_perf(**self.s.perf)
+        self._engine_changed(self.project.layer("COMPOSITION"))
+        if self.page in ("visual", "layers"):
+            self.show(self.page)
+
+    def cycle_style(self):
+        names = BUILTIN_TEMPLATES + [n for n in self.templates.names() if n not in BUILTIN_TEMPLATES]
+        cur = self.s.look.get("template", names[0])
+        nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
+        self.apply_template_named(nxt)
+
+    def save_template(self):
+        sheet = m3.Sheet("Save template")
+        sheet.height = dp(220)
+        base = self.s.look.get("template") or "My look"
+        name = {"v": base if base not in BUILTIN_TEMPLATES else "My " + base}
+        sheet.box.add_widget(m3.text_field(name["v"], lambda v: name.__setitem__("v", v), "Template name"))
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+
+        def do():
+            n = name["v"].strip() or "My look"
+            if n in BUILTIN_TEMPLATES:
+                n = "My " + n
+            try:
+                self.templates.save(self.project, n)
+            except Exception as exc:
+                self.toast("Save failed: %s" % exc)
+                return
+            sheet.dismiss()
+            self.s.look["template"] = n
+            self.style_text.text = n
+            self._save_trigger()
+            self.toast("Template saved: " + n)
+            self.show("visual")
+        row.add_widget(m3.Button3("Cancel", sheet.dismiss, kind="outlined"))
+        row.add_widget(m3.Button3("Save", do, kind="filled", icon="save"))
+        sheet.box.add_widget(row)
+        sheet.open()
+
+    def import_template(self):
+        def got(path):
+            if not path:
+                return
+            try:
+                name = self.templates.import_file(path)
+            except Exception as exc:
+                self.toast("Not a valid template: %s" % exc)
+                return
+            self.apply_template_named(name)
+            self.toast("Imported " + name)
+        choose_template(got)
+
+    def export_template(self):
+        name = self.s.look.get("template") or "My look"
+        try:
+            if name in BUILTIN_TEMPLATES or self.templates.path(name) is None:
+                path = self.templates.save(self.project, name if name not in BUILTIN_TEMPLATES else "My " + name)
+            else:
+                path = self.templates.save(self.project, name)
+        except Exception as exc:
+            self.toast("Export failed: %s" % exc)
+            return
+        where = publish_file(str(path), Path(path).name, "application/json", "Download")
+        self.toast("Template saved to " + where)
 
     # ---------------------------------------------------------------- sound
     def _page_sound(self, col):
@@ -465,18 +785,33 @@ class VoocRoot(FloatLayout):
         card = m3.card(spacing=dp(2))
         pct = lambda x: "%d%%" % round(x)
         db = lambda x: "%+.1f dB" % x
-        for title, key, lo, hi, step, fmt, bip, icon in [
-                ("Volume", "volume", 0, 150, 1, pct, False, None),
-                ("Balance", "balance", -100, 100, 1, lambda x: "C" if round(x) == 0 else ("L%d" % -round(x) if x < 0 else "R%d" % round(x)), True, None),
-                ("Pre-amp", "pre", -12, 12, .5, db, True, None),
-                ("Bass boost", "bass", 0, 12, .5, db, False, None),
-                ("3D surround", "virtualizer", 0, 100, 1, pct, False, None),
-                ("Speed", "speed", 50, 200, 1, pct, False, None),
-                ("Pitch", "pitch", 50, 200, 1, pct, False, None)]:
+        for title, key, lo, hi, step, fmt, bip in [
+                ("Volume", "volume", 0, 150, 1, pct, False),
+                ("Balance", "balance", -100, 100, 1, lambda x: "C" if round(x) == 0 else ("L%d" % -round(x) if x < 0 else "R%d" % round(x)), True),
+                ("Pre-amp", "pre", -12, 12, .5, db, True),
+                ("Bass boost", "bass", 0, 12, .5, db, False),
+                ("3D surround", "virtualizer", 0, 100, 1, pct, False),
+                ("Speed", "speed", 50, 200, 1, pct, False),
+                ("Pitch", "pitch", 50, 200, 1, pct, False)]:
             val = max(lo, min(hi, float(a.get(key, AUDIO_DEFAULTS[key]))))
             card.add_widget(m3.SliderRow(title, lo, hi, val, lambda x, k=key: self.set_audio(k, x), step=step, fmt=fmt,
                                          bipolar=bip, default=AUDIO_DEFAULTS[key]))
         col.add_widget(card)
+        # visual sync (AUDIOPROVIDER)
+        ap = self.project.layer("AUDIOPROVIDER")
+        col.add_widget(m3.section("Visual sync", "keeps bars on the beat"))
+        sc = m3.card(spacing=dp(2))
+        sc.add_widget(m3.SliderRow("Visual offset", -500, 500, float(ap.get("Sync & Offset/Timing/Audio Offset")),
+                                   lambda x: self._setv(ap, "Sync & Offset/Timing/Audio Offset", round(x)), step=1,
+                                   fmt=lambda x: "%+d ms" % x, bipolar=True, default=0))
+        sc.add_widget(m3.SliderRow("Analysis gain", 0, 4, float(ap.get("General/Routing/Preamp")),
+                                   lambda x: self._setv(ap, "General/Routing/Preamp", round(x, 3)),
+                                   fmt=lambda x: "%.2fx" % x, default=field_spec("AUDIOPROVIDER", "General/Routing/Preamp")["default"]))
+        sc.add_widget(m3.lbl("Audio source", 12, T.on_var, size_hint_y=None, height=dp(22)))
+        sc.add_widget(m3.SelectField("Audio source", field_spec("AUDIOPROVIDER", "General/Routing/Audio Source")["options"],
+                                     ap.get("General/Routing/Audio Source"),
+                                     lambda v: self._setv(ap, "General/Routing/Audio Source", v)))
+        col.add_widget(sc)
         col.add_widget(m3.section("Equalizer", "10 bands, -12..+12 dB"))
         presets = list(EQ_PRESETS) + [n for n in self.s.presets if n not in EQ_PRESETS]
         col.add_widget(m3.ChipGroup(presets, self._eq_preset_name(), self.apply_eq_preset))
@@ -491,7 +826,7 @@ class VoocRoot(FloatLayout):
             def changed(x, k=key, l=value_lbl):
                 l.text = "%+.0f" % x
                 self.set_audio(k, x)
-            sl = m3.Slider3(-12, 12, float(a.get(key, 0)), 0.5, on_change=changed, vertical=True, bipolar=True,
+            sl = m3.Slider3(-12, 12, float(a.get(key, 0)), 0.5, on_change=changed, vertical=True, bipolar=True, default=0.0,
                             fmt=lambda x: "%+.1f dB" % x, size_hint_x=1, width=dp(30))
             sl.value_lbl = value_lbl
             self.eq_sliders.append(sl)
@@ -552,53 +887,172 @@ class VoocRoot(FloatLayout):
             self.set_audio("eq_%d" % i, 0)
         self.show("sound")
 
-    # ---------------------------------------------------------------- layers
+    # ---------------------------------------------------------------- layers (engine layer stack)
+    def _layer_title(self, layer):
+        tag = layer.values.get("General/Layer/Tag") or ""
+        base = pretty_module(layer.module)
+        return base + ("  -  " + tag if tag and tag.lower() not in (base.lower(), "main", "") else "")
+
     def _page_layers(self, col):
-        add = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
-        add.add_widget(m3.Button3("Text", lambda: self.add_layer("Text"), kind="tonal", icon="text"))
-        add.add_widget(m3.Button3("Image", self.add_image_layer, kind="tonal", icon="image"))
-        add.add_widget(m3.Button3("Spectrum", lambda: self.add_layer("Spectrum"), kind="tonal", icon="bars"))
+        col.add_widget(m3.section("Add layer"))
+        add = GridLayout(cols=3, spacing=dp(8), size_hint_y=None)
+        add.bind(minimum_height=add.setter("height"))
+        for title, module, icon in ADDABLE:
+            add.add_widget(m3.Button3(title, lambda m=module: self.add_layer(m), kind="tonal", icon=icon, height=dp(44)))
         col.add_widget(add)
         col.add_widget(m3.section("Layer stack", "top draws last"))
-        if not self.s.layers:
-            col.add_widget(m3.lbl("No layers", 13, T.on_var, size_hint_y=None, height=dp(30)))
-            return
-        self.s.selected = max(0, min(self.s.selected, len(self.s.layers) - 1))
-        for i, l in enumerate(self.s.layers):
-            sel = i == self.s.selected
-            tile = m3.Tap(on_tap=lambda ix=i: self.select_layer(ix), size_hint_y=None, height=dp(54), radius=dp(16),
+        layers = self.project.layers
+        if self.selected_layer not in layers:
+            self.selected_layer = next((l for l in reversed(layers) if l.module not in FIXED_MODULES), None)
+        for layer in reversed(layers):           # top of the stack first
+            sel = layer is self.selected_layer
+            visible = bool(layer.values.get("General/Layer/Visible", True))
+            tile = m3.Tap(on_tap=lambda l=layer: self.select_layer(l), size_hint_y=None, height=dp(54), radius=dp(16),
                           bg=T.secondary_container if sel else T.surface1, padding=(dp(12), 0), spacing=dp(8))
-            icon = {"spectrum": "bars", "text": "text", "image": "image"}.get(l.get("type"), "layers")
-            tile.add_widget(m3.Icon(name=icon, tint=T.on_secondary_container if sel else T.on_var, size_hint_x=None, width=dp(22)))
-            tile.add_widget(m3.lbl(l.get("name", "Layer"), 14, T.on_secondary_container if sel else T.on_surface, bold=sel))
-            eye = m3.IconBtn("eye" if l.get("visible", True) else "eye_off", lambda ix=i: self.toggle_visible(ix), size=dp(40))
-            eye.active = l.get("visible", True)
-            eye._colors()
-            lock = m3.IconBtn("lock" if l.get("locked") else "unlock", lambda ix=i: self.toggle_lock(ix), size=dp(40))
-            tile.add_widget(eye)
-            tile.add_widget(lock)
+            tile.add_widget(m3.Icon(name=EDITOR_ICONS.get(layer.module, "layers"),
+                                    tint=T.on_secondary_container if sel else (T.on_var if visible else T.outline),
+                                    size_hint_x=None, width=dp(22)))
+            tile.add_widget(m3.lbl(self._layer_title(layer), 14,
+                                   T.on_secondary_container if sel else (T.on_surface if visible else T.on_var), bold=sel))
+            if layer.module not in FIXED_MODULES:
+                eye = m3.IconBtn("eye" if visible else "eye_off", lambda l=layer: self.toggle_visible(l), size=dp(40))
+                eye.active = visible
+                eye._colors()
+                tile.add_widget(eye)
+            tile.add_widget(m3.IconBtn("tune", lambda l=layer: self.edit_layer(l), size=dp(40)))
             col.add_widget(tile)
-        l = self.s.layers[self.s.selected]
-        col.add_widget(m3.section("Inspector", "locked" if l.get("locked") else "live"))
-        card = m3.card(spacing=dp(4))
-        card.add_widget(m3.text_field(l.get("name", ""), lambda v: self.set_layer_value("name", v, refresh=True), "Layer name / text"))
-        if l.get("type") == "image":
-            card.add_widget(m3.Button3("Replace image", self.import_layer_image, kind="tonal", icon="image"))
-        for title, key, lo, hi, step, d, fmt in [("Position X", "x", 0, 100, 1, 50, lambda x: "%d%%" % x),
-                                                 ("Position Y", "y", 0, 100, 1, 50, lambda x: "%d%%" % x),
-                                                 ("Scale", "scale", .25, 4.0, 0, 1.0, lambda x: "%.2fx" % x),
-                                                 ("Opacity", "opacity", 0, 1.0, 0, 1.0, lambda x: "%d%%" % round(x * 100)),
-                                                 ("Rotation", "rotation", -180, 180, 1, 0, lambda x: "%d deg" % x)]:
-            card.add_widget(m3.SliderRow(title, lo, hi, float(l.get(key, d)), lambda x, k=key: self.set_layer_value(k, round(x, 3)),
-                                         step=step, fmt=fmt, default=d, bipolar=(key == "rotation")))
+        l = self.selected_layer
+        if l is None:
+            return
+        col.add_widget(m3.section("Inspector", pretty_module(l.module)))
+        card = m3.card(spacing=dp(2))
+        G = "General/"
+        rows = [("Position X", G + "Position/Position X", 0, 1), ("Position Y", G + "Position/Position Y", 0, 1),
+                ("Scale", G + "Scale & Rotation/Scale X", 0, 4), ("Rotation", G + "Scale & Rotation/Rotation", 0, 1)]
+        if l.module == "IMAGE":
+            S = "Image Source/Source/"
+            rows += [("Size", S + "Size", 0, 1), ("Corner radius", S + "Corner Radius", 0, 1),
+                     ("Opacity", S + "Opacity", 0, 1), ("GIF speed", S + "GIF Speed", 0, 4)]
+        elif l.module == "TEXT":
+            rows += [("Font size", "Typography/Font/Font Size", 0, 0.2)]
+        if l.module in FIXED_MODULES and l.module == "AUDIOPROVIDER":
+            rows = []
+        for title, path, lo, hi in rows:
+            spec = field_spec(l.module, path)
+            fmt = (lambda x: "%d deg" % round(x * 360)) if "Rotation" in path else (lambda x: "%.3f" % x)
+            card.add_widget(m3.SliderRow(title, lo, hi, max(lo, min(hi, float(l.get(path)))),
+                                         lambda x, p=path: self._setv(l, p, round(x, 4)), fmt=fmt, default=spec["default"]))
+        if l.module == "IMAGE":
+            card.add_widget(m3.lbl("Shape (crop)", 12, T.on_var, size_hint_y=None, height=dp(22)))
+            card.add_widget(m3.SelectField("Shape", field_spec("IMAGE", "Image Source/Source/Shape")["options"],
+                                           l.get("Image Source/Source/Shape"),
+                                           lambda v: self._setv(l, "Image Source/Source/Shape", v)))
+            card.add_widget(m3.Button3("Choose image / GIF", lambda: self._pick_layer_image(l), kind="tonal", icon="image"))
+        if l.module == "TEXT":
+            card.add_widget(m3.text_field(l.get("Content/Text/Text Input"),
+                                          lambda v: self._setv(l, "Content/Text/Text Input", v),
+                                          "Text (%title%, %artist%, %time%)", multiline=True, height=dp(80)))
+            card.add_widget(m3.ColorField(l.get("Appearance/Fill/Text Color"),
+                                          lambda v: self._setv(l, "Appearance/Fill/Text Color", v),
+                                          default="#FFFFFFFF", swatches=self._palette_swatches, title="Text color"))
+            card.add_widget(m3.SelectField("Animation", field_spec("TEXT", "Text Animation/Animation/Animation Type")["options"],
+                                           l.get("Text Animation/Animation/Animation Type"),
+                                           lambda v: self._setv(l, "Text Animation/Animation/Animation Type", v)))
+        card.add_widget(m3.Button3("All %d properties" % sum(1 for _ in iter_fields(l.module)), lambda: self.edit_layer(l),
+                                   kind="filled", icon="tune"))
         col.add_widget(card)
         tools = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(4))
         tools.add_widget(Widget())
-        for icon, fn in [("up", lambda: self.move_layer(-1)), ("down", lambda: self.move_layer(1)),
+        for icon, fn in [("up", lambda: self.move_layer(1)), ("down", lambda: self.move_layer(-1)),
                          ("copy", self.duplicate), ("delete", self.delete_layer)]:
             tools.add_widget(m3.IconBtn(icon, fn, kind="tonal"))
         tools.add_widget(Widget())
         col.add_widget(tools)
+
+    def _pick_layer_image(self, layer):
+        def got(path):
+            if path:
+                layer.set("Image Source/Source/Pick Image", path)
+                layer.set("Generated Album Art/Album Art/Enable Auto-Fetch", False)
+                self._engine_changed(layer)
+                if self.page == "layers":
+                    self.show("layers")
+        choose_image(got)
+
+    def add_layer(self, module):
+        layer = LayerModel(module)
+        if module in ("BLUREFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT", "CUSTOMSHADER", "RGBSPLITEFFECT"):
+            layer.set("General/Layer/Visible", True)
+        if module == "TEXT":
+            layer.set("Content/Text/Text Input", "Your text")
+            layer.set("Content/Text/Use Metadata Variables", True)
+        self._insert_layer(layer)
+        self.selected_layer = layer
+        if module == "CUSTOMSHADER":
+            self.scene.compile_shader(layer)
+        self._engine_changed(layer)
+        if module == "IMAGE":
+            layer.set("Generated Album Art/Album Art/Enable Auto-Fetch", False)
+            self._pick_layer_image(layer)
+        self.show("layers")
+
+    def select_layer(self, layer):
+        self.selected_layer = layer
+        self.show("layers")
+
+    def edit_layer(self, layer):
+        self._edit_layer = layer
+        self.studio_tab = "Properties"
+        self.nav.select("studio")
+
+    def toggle_visible(self, layer):
+        layer.set("General/Layer/Visible", not layer.get("General/Layer/Visible"))
+        if layer.module == "CUSTOMSHADER" and layer.get("General/Layer/Visible"):
+            self.scene.compile_shader(layer)
+        self._engine_changed(layer)
+        self.show("layers")
+
+    def move_layer(self, direction):
+        """direction +1 = up (towards the top / drawn later)."""
+        l = self.selected_layer
+        layers = self.project.layers
+        if l not in layers:
+            return
+        i = layers.index(l)
+        j = i + direction
+        if 0 <= j < len(layers):
+            layers[i], layers[j] = layers[j], layers[i]
+            self._engine_changed(l)
+            self.show("layers")
+
+    def duplicate(self):
+        l = self.selected_layer
+        if l is None or l.module in FIXED_MODULES:
+            self.toast("This layer cannot be duplicated")
+            return
+        from copy import deepcopy
+        copy = LayerModel(l.module, deepcopy(l.values))
+        self.project.layers.insert(self.project.layers.index(l) + 1, copy)
+        self.selected_layer = copy
+        if copy.module == "CUSTOMSHADER":
+            self.scene.compile_shader(copy)
+        self._engine_changed(copy)
+        self.show("layers")
+
+    def delete_layer(self):
+        l = self.selected_layer
+        if l is None or l.module in FIXED_MODULES:
+            self.toast("Composition and audio provider are always present")
+            return
+        if sum(1 for x in self.project.layers if x.module == l.module) == 1 and l.module in ("BARS", "TEXT", "IMAGE", "PARTICLES"):
+            # the module grid always needs one layer of each type: hide it instead
+            l.set("General/Layer/Visible", False)
+            self.toast("Last %s layer hidden instead of deleted" % pretty_module(l.module))
+        else:
+            self.project.layers.remove(l)
+            self.selected_layer = None
+        self._engine_changed(l)
+        self.show("layers")
 
     # ---------------------------------------------------------------- studio
     def _page_studio(self):
@@ -613,37 +1067,190 @@ class VoocRoot(FloatLayout):
         self.studio_tab = tab
         self.studio_body.clear_widgets()
         if tab == "Properties":
-            self.property_editor = AdvancedProperties(self.s, on_change=self.preview.refresh, on_save=self._save_trigger)
+            layer, self._edit_layer = self._edit_layer, None
+            AdvancedProperties.scroll_cls = Scroll
+            self.property_editor = AdvancedProperties(self.project, scene=lambda: self.scene,
+                                                      on_change=self._engine_changed, pick_image=choose_image,
+                                                      palette=self._palette_swatches, toast=self.toast, layer=layer)
             self.studio_body.add_widget(self.property_editor)
             Clock.schedule_once(self._dump_targets, 0.8)
             return
         scroll = Scroll()
         col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=(0, 0, 0, dp(16)))
         col.bind(minimum_height=col.setter("height"))
-
-        def pick(title, key, options):
-            col.add_widget(m3.lbl(title, 12, T.on_var, size_hint_y=None, height=dp(20)))
-            col.add_widget(m3.ChipGroup(options, self.s.scene.get(key, options[0]),
-                                        lambda o, k=key: (self.s.scene.__setitem__(k, o), self.preview.refresh(),
-                                                                 self._fit_visual() if k == "ratio" else None, self._save_trigger())))
         if tab == "Scene":
-            col.add_widget(m3.section("Canvas"))
-            pick("Aspect ratio", "ratio", ["16:9", "9:16", "1:1", "4:5", "4:3"])
-            pick("Resolution", "resolution", ["720p", "1080p", "1440p", "2160p"])
-            pick("Frame rate", "fps", ["24", "30", "60"])
-            col.add_widget(m3.section("Background theme"))
-            col.add_widget(m3.SelectField("Background theme", list(THEMES), self.s.scene.get("theme", "Acid Night"), self._set_bg_theme))
+            self._scene_tab(col)
         else:
-            col.add_widget(m3.section("Video export"))
-            pick("Format", "format", ["MP4", "WEBM", "GIF"])
-            pick("Resolution", "resolution", ["720p", "1080p", "1440p", "2160p"])
-            pick("FPS", "fps", ["24", "30", "60"])
-            pick("Quality", "quality", ["Draft", "Standard", "High", "Maximum"])
-            col.add_widget(Widget(size_hint_y=None, height=dp(6)))
-            col.add_widget(m3.Button3("Render video", lambda: self.toast("Video encoder is not connected yet"), kind="filled", icon="export"))
-            col.add_widget(m3.Button3("Save project JSON", self.save, kind="outlined", icon="save"))
+            self._export_tab(col)
         scroll.add_widget(col)
         self.studio_body.add_widget(scroll)
+
+    def set_aspect(self, aspect):
+        self.s.export["aspect"] = aspect
+        w, h = frame_size("FHD 1080p", aspect)
+        comp = self.project.layer("COMPOSITION")
+        comp.set(OUT + "Resolution Width", w)
+        comp.set(OUT + "Resolution Height", h)
+        self._engine_changed(comp)
+        self._save_trigger()
+
+    def _scene_tab(self, col):
+        comp = self.project.layer("COMPOSITION")
+        col.add_widget(m3.section("Canvas", "preview = export framing"))
+        col.add_widget(m3.lbl("Aspect ratio", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        col.add_widget(m3.ChipGroup(list(ASPECTS), self.s.export.get("aspect", "16:9"), self.set_aspect))
+        c = m3.card(spacing=dp(4))
+        c.add_widget(m3.lbl("Background color", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        c.add_widget(m3.ColorField(comp.get(CANVAS + "Background Color"),
+                                   lambda v: self._setv(comp, CANVAS + "Background Color", v), default="#070906FF",
+                                   swatches=self._palette_swatches, title="Background"))
+        c.add_widget(m3.switch_row("Clear canvas every frame", bool(comp.get(CANVAS + "Clear Canvas on Frame")),
+                                   lambda on: self._setv(comp, CANVAS + "Clear Canvas on Frame", bool(on)),
+                                   "Off = motion trails"))
+        col.add_widget(c)
+        perf = self.s.perf
+        col.add_widget(m3.section("Performance", "preview only, export is always full quality"))
+        p = m3.card(spacing=dp(2))
+        self.fps_lbl = m3.lbl("Preview: %d fps" % round(self.scene.fps), 12, T.primary, size_hint_y=None, height=dp(22))
+        p.add_widget(self.fps_lbl)
+        p.add_widget(m3.lbl("Preview frame rate cap", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        p.add_widget(m3.ChipGroup(["24", "30", "45", "60"], str(perf.get("preview_fps", 60)),
+                                  lambda v: self._set_perf("preview_fps", int(v))))
+        p.add_widget(m3.lbl("Render quality", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        qmap = {"Low": 0.5, "Medium": 0.75, "High": 1.0}
+        cur = next((k for k, v in qmap.items() if abs(v - float(perf.get("render_scale", 1.0))) < 0.01), "High")
+        p.add_widget(m3.ChipGroup(list(qmap), cur, lambda v: self._set_perf("render_scale", qmap[v])))
+        p.add_widget(m3.switch_row("Heavy blur effects", bool(perf.get("heavy_blur", True)),
+                                   lambda on: self._set_perf("heavy_blur", bool(on)), "Glow and motion blur in the preview"))
+        p.add_widget(m3.SliderRow("Max bars", 16, 256, float(perf.get("max_bars", 256)),
+                                  lambda x: self._set_perf("max_bars", int(x)), step=1, fmt=lambda x: "%d" % x, default=256))
+        p.add_widget(m3.SliderRow("Max particles", 100, 5000, float(perf.get("max_particles", 2000)),
+                                  lambda x: self._set_perf("max_particles", int(x)), step=50, fmt=lambda x: "%d" % x,
+                                  default=2000))
+        col.add_widget(p)
+        col.add_widget(m3.section("Background theme (app)"))
+        col.add_widget(m3.SelectField("Background theme", list(THEMES), self.s.scene.get("theme", "Acid Night"), self._set_bg_theme))
+
+    def _set_perf(self, key, value):
+        self.s.perf[key] = value
+        self.scene.set_perf(**{key: value})
+        self._save_trigger()
+
+    def _set_bg_theme(self, name):
+        self.s.scene["theme"] = name
+        comp = self.project.layer("COMPOSITION")
+        comp.set(CANVAS + "Background Color", THEMES.get(name, "#070906") + "FF")
+        self._engine_changed(comp)
+
+    def _export_tab(self, col):
+        e = self.s.export
+        col.add_widget(m3.section("Video export", "MP4"))
+
+        def pick(title, key, options, conv=str):
+            col.add_widget(m3.lbl(title, 12, T.on_var, size_hint_y=None, height=dp(20)))
+            col.add_widget(m3.ChipGroup(options, str(e.get(key, options[0])),
+                                        lambda o, k=key: self._set_export(k, conv(o))))
+        pick("Resolution", "resolution", RESOLUTIONS)
+        pick("Frame rate", "fps", FPS_OPTIONS)
+        col.add_widget(m3.lbl("Aspect ratio", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        col.add_widget(m3.ChipGroup(list(ASPECTS), e.get("aspect", "16:9"),
+                                    lambda o: (self.set_aspect(o), self._update_plan())))
+        pick("Video codec", "codec", list(CODECS))
+        pick("Quality", "quality", list(QUALITY))
+        col.add_widget(m3.switch_row("Include audio", bool(e.get("audio", True)),
+                                     lambda on: self._set_export("audio", bool(on)), "AAC, copied or re-encoded from the track"))
+        info = m3.card(spacing=dp(4))
+        self.plan_lbl = m3.lbl("", 12, T.on_var, shorten=False, size_hint_y=None, height=dp(64), valign="top")
+        info.add_widget(self.plan_lbl)
+        self.export_bar = Progress()
+        info.add_widget(self.export_bar)
+        self.export_lbl = m3.lbl(self.export_state.get("text") or self.export_state.get("result") or "Ready", 12,
+                                 T.primary, size_hint_y=None, height=dp(22))
+        info.add_widget(self.export_lbl)
+        self.export_bar.set(self.export_state.get("progress", 0.0))
+        col.add_widget(info)
+        if self.export_state.get("running"):
+            col.add_widget(m3.Button3("Cancel export", self.cancel_export, kind="outlined", icon="close"))
+        else:
+            col.add_widget(m3.Button3("Render video", self.start_export, kind="filled", icon="export"))
+        col.add_widget(m3.lbl("The screen stays on while rendering. Files over 4 GB are avoided automatically.",
+                              11, T.on_var, shorten=False, size_hint_y=None, height=dp(34)))
+        col.add_widget(m3.Button3("Save project JSON", self.save, kind="outlined", icon="save"))
+        self._update_plan()
+
+    def _set_export(self, key, value):
+        self.s.export[key] = value
+        self._save_trigger()
+        self._update_plan()
+
+    def _update_plan(self):
+        if getattr(self, "plan_lbl", None) is None:
+            return
+        dur = getattr(self.timeline, "duration", 0.0) or self.duration
+        if not dur:
+            self.plan_lbl.text = "Load a track to see the export size."
+            return
+        plan = plan_export(self.s.export, dur)
+        text = "%dx%d  %d fps  %s  %.1f Mbps\nAbout %s for %s" % (
+            plan["width"], plan["height"], plan["fps"], plan["codec"], plan["bitrate"] / 1e6,
+            _fmt_size(plan["estimate_bytes"]), fmt_time(dur))
+        if plan["notes"]:
+            text += "\n" + "; ".join(plan["notes"])
+        self.plan_lbl.text = text
+
+    def start_export(self):
+        if self.exporter is not None and self.exporter.running:
+            return
+        if not self.track:
+            self.toast("Load a track first")
+            return
+        if self.analysis.get("state") != "ready":
+            self.toast("Wait until the track analysis is finished")
+            return
+        if self.playing:
+            self.toggle()
+        out_dir = Path(self._data_dir()) / "exports"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stem = "".join(ch if ch.isalnum() or ch in " -_" else "_" for ch in (self.meta.get("title") or Path(self.track).stem))[:40]
+        out = out_dir / ("Vooc_%s_%s.mp4" % (stem.strip() or "video", time.strftime("%Y%m%d_%H%M%S")))
+        self.scene.stop()
+        self.export_state = {"running": True, "progress": 0.0, "text": "Starting...", "result": ""}
+        self.exporter = Exporter(self.project, self.timeline, self.track, self.meta, self.s.export, str(out),
+                                 on_progress=self._export_progress, on_done=self._export_done)
+        if self.exporter.start():
+            if self.page == "studio" and self.studio_tab == "Export":
+                self._studio_tab("Export")
+        else:
+            self.scene.start()
+
+    def cancel_export(self):
+        if self.exporter is not None:
+            self.exporter.cancel()
+
+    def _export_progress(self, frac, text):
+        self.export_state.update(progress=frac, text="Rendering %d%%  -  %s" % (round(frac * 100), text))
+        if getattr(self, "export_bar", None) is not None and self.export_bar.get_root_window() is not None:
+            self.export_bar.set(frac)
+            self.export_lbl.text = self.export_state["text"]
+        if self.status_text.text != "Export %d%%" % round(frac * 100):
+            self.status_text.text = "Export %d%%" % round(frac * 100)
+
+    def _export_done(self, ok, path, message):
+        self.scene.start()
+        result = message or ""
+        if ok and path:
+            where = publish_file(path, Path(path).name, "video/mp4", "Movies")
+            if where != path:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            result = ("Saved to " + where + (("  (" + message + ")") if message else ""))
+        self.export_state = {"running": False, "progress": 1.0 if ok else 0.0, "text": "",
+                             "result": result or ("Export failed" if not ok else "Done")}
+        self.toast(self.export_state["result"][:90])
+        if self.page == "studio" and self.studio_tab == "Export":
+            self._studio_tab("Export")
 
     # ================================================================ theme / misc
     def toggle_theme(self):
@@ -657,9 +1264,9 @@ class VoocRoot(FloatLayout):
 
     def _on_key(self, _win, key, *_):
         if key == 27:
-            if self.page == "studio" and getattr(self, "property_editor", None) is not None and \
-                    self.studio_tab == "Properties" and self.property_editor.category:
-                self.property_editor._home()
+            pe = getattr(self, "property_editor", None)
+            if self.page == "studio" and pe is not None and self.studio_tab == "Properties" and pe.category:
+                pe._home()
                 return True
             if self.page != "library":
                 self.nav.select("library")
@@ -690,6 +1297,11 @@ class VoocRoot(FloatLayout):
     def load_track(self, path, autoplay=False):
         if not path:
             return
+        if not os.path.isfile(path):
+            self.toast("File not found: " + Path(path).name)
+            if path in self.s.playlist:
+                self.s.playlist.remove(path)
+            return
         try:
             self.playing = False
             if self.native is not None:
@@ -711,7 +1323,8 @@ class VoocRoot(FloatLayout):
             if path not in self.s.playlist:
                 self.s.playlist.append(path)
             self._pos, self._pos_stamp, self._end_handled = 0.0, time.monotonic(), False
-            self.preview.set_timeline(None)
+            self.timeline = None
+            self._read_meta(path)
             self.analysis = {"state": "analyzing", "progress": 0.0}
             self.loader.load(path)
             if autoplay:
@@ -722,6 +1335,16 @@ class VoocRoot(FloatLayout):
             self._save_trigger()
         except Exception as e:
             self.toast(str(e))
+
+    def _read_meta(self, path):
+        try:
+            meta = read_metadata(path, Path(self._data_dir()) / "art")
+        except Exception:
+            meta = {"title": Path(path).stem, "artist": "", "album": "", "art": ""}
+        self.meta.clear()
+        self.meta.update(meta)
+        if meta.get("art") and self.s.look.get("auto_palette", True):
+            self.palette_from_art(quiet=True)
 
     def _spectrum_ready(self, path, timeline):
         if path != self.track:
@@ -734,12 +1357,14 @@ class VoocRoot(FloatLayout):
                 self.analysis = {"state": "ready", "progress": 1.0}
             else:
                 self.analysis = {"state": "streaming", "progress": self.loader.progress}
-            self.preview.set_timeline(timeline)
+            self.timeline = timeline
         self._update_status()
 
     def _spectrum_progress(self, p):
         if self.analysis.get("state") in ("analyzing", "streaming"):
             self.analysis["progress"] = p
+            if p >= 1.0 and getattr(self.timeline, "complete", False):
+                self.analysis["state"] = "ready"
             self._update_status()
 
     def toggle(self):
@@ -791,9 +1416,6 @@ class VoocRoot(FloatLayout):
             except Exception:
                 pass
         self._pos, self._pos_stamp, self._end_handled = float(v), time.monotonic(), False
-
-    def _order(self):
-        return list(self.s.playlist)
 
     def previous(self):
         if not self.s.playlist:
@@ -893,7 +1515,11 @@ class VoocRoot(FloatLayout):
             self.seek.set_value(self._pos)
             self.pos_lbl.text = fmt_time(self._pos)
             self.dur_lbl.text = fmt_time(self.duration)
-        self._update_status()
+        lbl = getattr(self, "fps_lbl", None)
+        if lbl is not None and lbl.get_root_window() is not None:
+            lbl.text = "Preview: %d fps  -  %dx%d render" % ((round(self.scene.fps),) + tuple(self.scene.render_size()))
+        if not self.export_state.get("running"):
+            self._update_status()
 
     def _update_status(self):
         st = self.analysis.get("state")
@@ -916,10 +1542,12 @@ class VoocRoot(FloatLayout):
 
     def _update_player_ui(self):
         if self.track:
-            self.title_lbl.text = Path(self.track).stem
+            self.title_lbl.text = self.meta.get("title") or Path(self.track).stem
             n = len(self.s.playlist)
             i = self.s.playlist.index(self.track) + 1 if self.track in self.s.playlist else 1
-            self.sub_lbl.text = "Track %d of %d  -  %s" % (i, n, Path(self.track).suffix.upper().lstrip("."))
+            artist = self.meta.get("artist")
+            self.sub_lbl.text = (artist + "  -  " if artist else "") + "Track %d of %d  -  %s" % (
+                i, n, Path(self.track).suffix.upper().lstrip("."))
         self.dur_lbl.text = fmt_time(self.duration)
         self.play_btn.set_icon("pause" if self.playing else "play")
         self.shuffle_btn.active = bool(self.s.shuffle)
@@ -927,91 +1555,9 @@ class VoocRoot(FloatLayout):
         self.repeat_btn.active = self.s.repeat != "off"
         self._update_status()
 
-    # ================================================================ layers
-    def add_layer(self, k):
-        self.s.layers.append({"type": k.lower(), "name": k + " " + str(len(self.s.layers) + 1), "visible": True, "locked": False,
-                              "x": 50, "y": 50, "scale": 1.0, "opacity": 1.0, "rotation": 0})
-        self.s.selected = len(self.s.layers) - 1
-        self.preview.refresh()
-        self.show("layers")
-
-    def add_image_layer(self):
-        self.add_layer("Image")
-        self.import_layer_image()
-
-    def import_layer_image(self):
-        if not self.s.layers or self.s.layers[self.s.selected].get("type") != "image":
-            self.toast("Select an Image layer first")
-            return
-        choose_image(self._on_image_selected)
-
-    def _on_image_selected(self, path):
-        if not path:
-            return
-        layer = self.s.layers[self.s.selected]
-        layer["image_path"] = path
-        layer["name"] = Path(path).name
-        self.preview.refresh()
-        self.show("layers")
-
-    def select_layer(self, i):
-        self.s.selected = i
-        self.show("layers")
-
-    def set_layer_value(self, key, value, refresh=False):
-        if not self.s.layers:
-            return
-        layer = self.s.layers[self.s.selected]
-        if layer.get("locked", False) and key != "name":
-            self.toast("Layer is locked")
-            return
-        layer[key] = value
-        self.preview.refresh()
-        self._save_trigger()
-
-    def toggle_lock(self, i=None):
-        i = self.s.selected if i is None else i
-        if 0 <= i < len(self.s.layers):
-            self.s.layers[i]["locked"] = not self.s.layers[i].get("locked", False)
-            self.show("layers")
-
-    def toggle_visible(self, i=None):
-        i = self.s.selected if i is None else i
-        if 0 <= i < len(self.s.layers):
-            self.s.layers[i]["visible"] = not self.s.layers[i].get("visible", True)
-            self.preview.refresh()
-            self.show("layers")
-
-    def move_layer(self, direction):
-        i = self.s.selected
-        j = i + direction
-        if 0 <= i < len(self.s.layers) and 0 <= j < len(self.s.layers):
-            self.s.layers[i], self.s.layers[j] = self.s.layers[j], self.s.layers[i]
-            self.s.selected = j
-            self.preview.refresh()
-            self.show("layers")
-
-    def duplicate(self):
-        if self.s.layers:
-            x = dict(self.s.layers[self.s.selected])
-            x["name"] = x.get("name", "Layer") + " copy"
-            self.s.layers.insert(self.s.selected + 1, x)
-            self.s.selected += 1
-            self.preview.refresh()
-            self.show("layers")
-
-    def delete_layer(self):
-        if self.s.layers:
-            self.s.layers.pop(self.s.selected)
-            self.s.selected = max(0, min(self.s.selected, len(self.s.layers) - 1))
-            self.preview.refresh()
-            self.show("layers")
-
     # ================================================================ persistence
     def _project_path(self):
-        app = App.get_running_app()
-        base = app.user_data_dir if app else os.path.expanduser("~")
-        return Path(base) / "vooc_project.json"
+        return Path(self._data_dir()) / "vooc_project.json"
 
     def _autoload(self):
         try:
@@ -1022,16 +1568,23 @@ class VoocRoot(FloatLayout):
         except Exception as exc:
             print("Vooc autoload failed: %s" % exc)
 
+    def _write_project(self):
+        self.s.engine = self.project.to_dict()
+        p = self._project_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.s.data(), indent=1))
+        os.replace(tmp, p)
+
     def autosave(self):
         try:
-            self._project_path().write_text(json.dumps(self.s.data(), indent=2))
-        except Exception:
-            pass
+            self._write_project()
+        except Exception as exc:
+            print("Vooc autosave failed: %s" % exc)
 
     def save(self):
         try:
-            p = self._project_path()
-            p.write_text(json.dumps(self.s.data(), indent=2))
+            self._write_project()
             self.toast("Project saved")
         except Exception as exc:
             self.toast("Save failed: %s" % exc)
@@ -1042,6 +1595,10 @@ class VoocRoot(FloatLayout):
             self.toast("No saved project found")
             return
         self._autoload()
+        self.project = self._load_project()
+        self.scene.set_project(self.project)
+        self.hub.layer = self.project.layer("AUDIOPROVIDER")
+        self.scene.set_perf(**self.s.perf)
         if self.native is not None:
             self.native.configure_fx(self.s.audio, self.s.eq_freqs)
         T.dark = self.s.scene.get("ui_theme", "dark") != "light"
@@ -1049,9 +1606,25 @@ class VoocRoot(FloatLayout):
         self.toast("Project loaded")
 
     def on_stop(self):
+        if self.exporter is not None and self.exporter.running:
+            self.exporter.cancel()
         self.autosave()
         if self.native is not None:
             self.native.release()
+        self.hub.release()
+
+
+def _fmt_size(n):
+    if n >= 1024 ** 3:
+        return "%.2f GB" % (n / 1024.0 ** 3)
+    return "%d MB" % max(1, round(n / 1024.0 ** 2))
+
+
+def _preset_intensity(name):
+    try:
+        return float(SHADER_PRESET_TABLE[name][2])
+    except Exception:
+        return 0.5
 
 
 class VoocApp(App):

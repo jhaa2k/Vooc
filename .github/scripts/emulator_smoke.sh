@@ -60,7 +60,11 @@ sleep 12; shot start
 allow; sleep 2; shot after_permission
 # IMPORT (top transport row)
 adb shell cp /sdcard/Download/test_song.wav /sdcard/Music/test_song.wav
-adb shell content call --uri content://media --method scan_volume --arg external_primary >/dev/null 2>&1; sleep 3
+for i in $(seq 1 20); do
+  adb shell content call --uri content://media --method scan_volume --arg external_primary >/dev/null 2>&1
+  adb shell content query --uri content://media/external/file --projection _display_name 2>/dev/null | grep -q test_song && { echo "media indexed after $i"; break; }
+  sleep 3
+done
 tap 0.31 0.374; sleep 5; shot picker
 picker_up() { [ -n "$($T adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity:' | grep -i documentsui)" ]; }
 for attempt in 1 2 3 4; do

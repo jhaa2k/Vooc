@@ -40,6 +40,43 @@ def _is_resumed(sdl):
     return True
 
 
+def _activity_going_away(sdl):
+    """True while Android is destroying the activity (finish or relaunch).
+
+    SDLActivity.onDestroy() blocks the UI thread until the Python thread ends,
+    so waiting for "resumed" here would freeze the app on "Loading..." forever.
+    Returns "restart" for a configuration relaunch, "finish" for a real close.
+    """
+    try:
+        act = sdl.mSingleton
+        if act is None:
+            return None
+        if bool(act.isChangingConfigurations()):
+            return "restart"
+        if bool(act.isFinishing()) or bool(act.isDestroyed()):
+            return "finish"
+    except Exception:
+        pass
+    return None
+
+
+def _leave(reason):
+    print("Vooc boot: activity is being destroyed during startup (%s)" % reason)
+    if reason == "restart":
+        try:
+            from jnius import autoclass
+            act = autoclass("org.kivy.android.PythonActivity").mActivity
+            ctx = act.getApplicationContext()
+            Intent = autoclass("android.content.Intent")
+            intent = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName())
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            ctx.startActivity(intent)
+            time.sleep(0.2)
+        except Exception as exc:
+            print("Vooc boot: restart failed: %s" % exc)
+    os._exit(0)
+
+
 def wait_until_resumed(timeout=None):
     """Block until the Android activity is in the foreground again."""
     if not ON_ANDROID:
@@ -50,6 +87,9 @@ def wait_until_resumed(timeout=None):
         return True
     started = time.time()
     while not _is_resumed(sdl):
+        going = _activity_going_away(sdl)
+        if going:
+            _leave(going)
         if timeout is not None and time.time() - started > timeout:
             return False
         time.sleep(0.1)

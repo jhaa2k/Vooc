@@ -42,8 +42,8 @@ except Exception: sys.exit()
 pat = re.compile(sys.argv[2])
 for m in re.finditer(r'<node [^>]*>', s):
     node = m.group(0)
-    t = re.search(r' text="([^"]*)"', node); rid = re.search(r'resource-id="([^"]*)"', node)
-    if (t and pat.search(t.group(1))) or (rid and pat.search(rid.group(1))):
+    vals = [m2.group(1) for m2 in re.finditer(r' (?:text|resource-id|content-desc)="([^"]*)"', node)]
+    if any(v and pat.search(v) for v in vals):
         b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', node)
         if b:
             x1, y1, x2, y2 = map(int, b.groups()); print((x1 + x2) // 2, (y1 + y2) // 2); break
@@ -56,8 +56,11 @@ sleep 12; shot start
 allow; sleep 2; shot after_permission
 # IMPORT (top transport row)
 tap 0.31 0.374; sleep 5; shot picker
-tap_text 'test_song'; sleep 3
-tap_text '^(Downloads|Download)$'; sleep 3; tap_text 'test_song'; sleep 6
+tap_text 'test_song'; sleep 4
+if [ -n "$($T adb shell dumpsys activity activities | grep -i documentsui | grep -i resumed)" ]; then
+  tap_text '^Show roots$'; sleep 3; tap_text '^Downloads$'; sleep 4; shot picker_downloads
+  tap_text 'test_song'; sleep 6
+fi
 shot imported
 tap 0.51 0.374; sleep 6; shot playing
 for tab in "0.20 Layers" "0.33 Presets" "0.45 Audio" "0.57 Visualizer" "0.69 Properties" "0.81 Scene" "0.93 Export" "0.08 Media"; do

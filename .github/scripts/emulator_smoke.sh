@@ -51,7 +51,11 @@ PY
 }
 allow() { tap_text '^(While using the app|Allow|ALLOW|Only this time)$|permission_allow_foreground_only_button|permission_allow_button'; sleep 2; }
 
+# First launch, but leave the app during the "Loading..." screen (Home key),
+# then come back. This used to kill the app ("Could not fetch native window").
 $T adb shell am start -W -n $PKG/org.kivy.android.PythonActivity
+sleep 2; adb shell input keyevent KEYCODE_HOME; sleep 6
+$T adb shell am start -n $PKG/org.kivy.android.PythonActivity
 sleep 12; shot start
 allow; sleep 2; shot after_permission
 # IMPORT (top transport row)

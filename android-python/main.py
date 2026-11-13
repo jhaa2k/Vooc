@@ -8,6 +8,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.stencilview import StencilView
 from kivy.uix.widget import Widget
 from pathlib import Path
 import json, os, random, time
@@ -48,6 +49,32 @@ def system_insets():
 def fmt_time(sec):
     sec = max(0, int(sec or 0))
     return "%d:%02d" % (sec // 60, sec % 60)
+
+
+class ClipStage(StencilView):
+    """Clips the live visualizer to its 16:9 box; children follow pos_hint like a FloatLayout."""
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.bind(pos=self._place, size=self._place)
+
+    def add_widget(self, widget, *a, **kw):
+        super().add_widget(widget, *a, **kw)
+        widget.bind(size=self._place)
+        self._place()
+
+    def _place(self, *_):
+        for c in self.children:
+            ph = c.pos_hint or {}
+            if c.size_hint_x is not None:
+                c.width = self.width * c.size_hint_x
+            if c.size_hint_y is not None:
+                c.height = self.height * c.size_hint_y
+            x = self.x + self.width * ph["x"] if "x" in ph else (
+                self.x + self.width * ph["right"] - c.width if "right" in ph else self.x)
+            y = self.y + self.height * ph["y"] if "y" in ph else (
+                self.y + self.height * ph["top"] - c.height if "top" in ph else self.y)
+            c.pos = (x, y)
 
 
 class Scroll(ScrollView):
@@ -160,17 +187,44 @@ class VoocRoot(FloatLayout):
         bar.add_widget(m3.IconBtn("save", self.save))
         return bar
 
+    def _preview_ratio(self):
+        try:
+            a, b = str(self.s.scene.get("ratio", "16:9")).split(":")
+            return max(0.3, min(3.0, float(a) / float(b)))
+        except Exception:
+            return 16 / 9.0
+
     def _visual_card(self):
-        frame = m3.Box(bg=T.surface1, radius=dp(24), padding=dp(4), size_hint_y=None)
+        """Preview at the real export aspect ratio (16:9 by default), never stretched."""
+        pad = dp(4)
+        frame = m3.Box(bg=T.surface1, radius=dp(24), padding=pad, size_hint_y=None)
+        holder = FloatLayout()
+        stage = ClipStage(size_hint=(None, None))
+
         def fit(*_):
-            frame.height = max(dp(130), min(dp(340), (self.height or 800) * 0.28))
+            ratio = self._preview_ratio()
+            inner_w = max(dp(100), (frame.width or self.width or 360) - pad * 2)
+            limit = max(dp(120), (self.height or 800) * 0.40)
+            h = inner_w / ratio
+            w = inner_w
+            if h > limit:                 # tall ratios: letterbox inside the card
+                h = limit
+                w = h * ratio
+            frame.height = h + pad * 2
+            stage.size = (w, h)
+            stage.pos = (holder.x + (holder.width - w) / 2.0, holder.y + (holder.height - h) / 2.0)
+            chip_w = min(dp(96), w * 0.46)
+            for chip in (getattr(self, "status", None), getattr(self, "style_chip", None)):
+                if chip is not None and chip.parent is stage:
+                    chip.width = chip_w
         if getattr(self, "_fit_visual", None) is not None:
             self.unbind(height=self._fit_visual)
         self._fit_visual = fit
         self.bind(height=fit)
-        fit()
+        frame.bind(width=fit)
+        holder.bind(pos=fit, size=fit)
+        holder.add_widget(stage)
         self.visual_frame = frame
-        stage = FloatLayout()
         self.preview = Spectrum(self.s, clock_source=self.clock, size_hint=(1, 1), pos_hint={"x": 0, "y": 0})
         if self.loader is not None and self.track and self.track in self.loader._cache:
             self.preview.set_timeline(self.loader._cache[self.track])
@@ -194,7 +248,8 @@ class VoocRoot(FloatLayout):
         self.style_text = m3.lbl(self.preview.style(), 11, (1, 1, 1, .92), bold=True)
         self.style_chip.add_widget(self.style_text)
         stage.add_widget(self.style_chip)
-        frame.add_widget(stage)
+        frame.add_widget(holder)
+        fit()
         return frame
 
     def _player_card(self):
@@ -540,7 +595,8 @@ class VoocRoot(FloatLayout):
         def pick(title, key, options):
             col.add_widget(m3.lbl(title, 12, T.on_var, size_hint_y=None, height=dp(20)))
             col.add_widget(m3.ChipGroup(options, self.s.scene.get(key, options[0]),
-                                        lambda o, k=key: (self.s.scene.__setitem__(k, o), self.preview.refresh(), self._save_trigger())))
+                                        lambda o, k=key: (self.s.scene.__setitem__(k, o), self.preview.refresh(),
+                                                                 self._fit_visual() if k == "ratio" else None, self._save_trigger())))
         if tab == "Scene":
             col.add_widget(m3.section("Canvas"))
             pick("Aspect ratio", "ratio", ["16:9", "9:16", "1:1", "4:5", "4:3"])
@@ -645,12 +701,15 @@ class VoocRoot(FloatLayout):
             self.analysis = {"state": "error", "progress": 0.0}
             self.toast("Could not analyse this track: " + (self.loader.error or "unsupported")[:60])
         else:
-            self.analysis = {"state": "ready", "progress": 1.0}
+            if getattr(timeline, "complete", True):
+                self.analysis = {"state": "ready", "progress": 1.0}
+            else:
+                self.analysis = {"state": "streaming", "progress": self.loader.progress}
             self.preview.set_timeline(timeline)
         self._update_status()
 
     def _spectrum_progress(self, p):
-        if self.analysis.get("state") == "analyzing":
+        if self.analysis.get("state") in ("analyzing", "streaming"):
             self.analysis["progress"] = p
             self._update_status()
 
@@ -809,7 +868,9 @@ class VoocRoot(FloatLayout):
 
     def _update_status(self):
         st = self.analysis.get("state")
-        if st == "analyzing":
+        if st == "streaming" and self.playing:
+            text, color = "Live %d%%" % round(self.analysis.get("progress", 0) * 100), (.78, 1, 0, 1)
+        elif st in ("analyzing", "streaming"):
             text, color = "Analyzing %d%%" % round(self.analysis.get("progress", 0) * 100), (1, .8, .2, 1)
         elif st == "error":
             text, color = "No spectrum", (1, .45, .4, 1)
@@ -821,7 +882,7 @@ class VoocRoot(FloatLayout):
             text, color = "Idle", (.6, .65, .6, 1)
         if self.status_text.text != text:
             self.status_text.text = text
-        pulse = .55 + .45 * abs(((time.monotonic() * 1.6) % 2) - 1) if self.playing or st == "analyzing" else 1
+        pulse = .55 + .45 * abs(((time.monotonic() * 1.6) % 2) - 1) if self.playing or st in ("analyzing", "streaming") else 1
         self._dot_c.rgba = (color[0], color[1], color[2], pulse)
 
     def _update_player_ui(self):

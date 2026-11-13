@@ -184,10 +184,21 @@ class Spectrum(Widget):
             rms = sum(bands) / len(bands)
         else:
             self._last_t = pos if playing else None
-        if bands is None:
+        if bands is None and playing:
+            # music is playing but the spectrum for this point is not decoded
+            # (yet): animated groove at ~120 bpm so it never looks frozen
+            t = self.phase
+            kick = math.exp(-((t * 2.0) % 1.0) * 6.0)
+            bands = [min(1.0, (0.62 - 0.38 * i / 63.0) * (0.55 + 0.45 * math.sin(i * 0.37 + t * 3.1)) *
+                         (0.65 + 0.35 * math.sin(i * 0.13 - t * 1.7)) + kick * max(0.0, 0.55 - i / 40.0))
+                     for i in range(64)]
+            rms = 0.25 + 0.3 * kick
+            if kick > 0.97:
+                self.beat_pulse = max(self.beat_pulse, 0.6)
+        elif bands is None:
             # idle: gentle breathing wave so the screen never looks dead
             t = self.phase
-            amp = 0.10 if not playing else 0.18
+            amp = 0.10
             bands = [amp * (0.55 + 0.45 * math.sin(i * 0.33 + t * 1.7)) *
                      (0.6 + 0.4 * math.sin(i * 0.11 - t * 0.9)) for i in range(64)]
         n = len(bands)

@@ -61,3 +61,25 @@ class SpectrumSourceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StreamingTimelineTest(unittest.TestCase):
+    def test_append_and_finish(self):
+        from vooc.spectrum_source import SpectrumTimeline, BANDS
+        tl = SpectrumTimeline.empty()
+        self.assertEqual(tl.sample(0.0), (None, 0.0))
+        frame = bytes([128] * BANDS + [255])
+        tl.append_bytes(frame * 300)
+        self.assertEqual(tl.count, 300)
+        bands, rms = tl.sample(1.0)
+        self.assertAlmostEqual(bands[0], 128 / 255.0, places=3)
+        self.assertAlmostEqual(rms, 1.0, places=3)
+        # beyond decoded range while streaming -> no data yet
+        self.assertEqual(tl.sample(100.0), (None, 0.0))
+        tl.append_bytes(frame * 1000)
+        self.assertEqual(tl.count, 1300)
+        tl.finish()
+        self.assertTrue(tl.complete)
+        self.assertEqual(len(tl.rms), 1300)
+        bands, _ = tl.sample(100.0)
+        self.assertEqual(len(bands), BANDS)

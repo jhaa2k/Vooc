@@ -30,6 +30,10 @@ def _extension_for_mime(mime):
         "audio/wav": ".wav", "audio/x-wav": ".wav",
         "audio/ogg": ".ogg", "application/ogg": ".ogg",
         "audio/flac": ".flac", "audio/x-flac": ".flac",
+        "audio/opus": ".opus", "audio/webm": ".webm", "audio/x-matroska": ".mka",
+        "audio/amr": ".amr", "audio/3gpp": ".3gp", "audio/aiff": ".aif", "audio/x-aiff": ".aif",
+        "audio/midi": ".mid", "audio/x-midi": ".mid", "audio/x-ms-wma": ".wma",
+        "video/mp4": ".mp4", "video/webm": ".webm", "video/x-matroska": ".mkv", "video/3gpp": ".3gp",
         "image/jpeg": ".jpg", "image/png": ".png",
         "image/webp": ".webp",
     }
@@ -183,6 +187,15 @@ def _open_android_picker(callback, mime_type, request_code, title):
         intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
         intent.addCategory(Intent.CATEGORY_OPENABLE)
         intent.setType(mime_type)
+        if mime_type == "audio/*":
+            # some file managers label .opus/.mka/.webm/.mp4 music as video or ogg
+            try:
+                intent.setType("*/*")
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, ["audio/*", "application/ogg", "video/mp4", "video/webm",
+                                                          "video/x-matroska", "video/3gpp"])
+            except Exception as exc:
+                print("Vooc picker mime list unavailable: %s" % exc)
+                intent.setType(mime_type)
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         _PENDING[request_code] = callback
@@ -215,7 +228,8 @@ def choose_audio(callback):
     """Open Android's audio document picker and return a readable local path."""
     _open_picker(
         callback, "audio/*",
-        ["*.mp3", "*.wav", "*.flac", "*.ogg", "*.m4a", "*.aac", "*.opus"],
+        ["*.mp3", "*.wav", "*.flac", "*.ogg", "*.oga", "*.m4a", "*.aac", "*.opus", "*.amr",
+         "*.3gp", "*.mka", "*.webm", "*.mp4", "*.mid", "*.aif", "*.aiff", "*.wma"],
         _AUDIO_REQUEST, "Choose music"
     )
 

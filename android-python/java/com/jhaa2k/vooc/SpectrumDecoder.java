@@ -4,10 +4,11 @@ import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.util.Base64;
+import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.ShortBuffer;
+import java.io.FileInputStream;
 
 /**
  * Decodes a whole audio file (mp3, m4a, aac, ogg, flac, wav ...) with the
@@ -24,21 +25,71 @@ public class SpectrumDecoder {
     private volatile float progress = 0f;
     private volatile boolean cancelled = false;
     private volatile String error = "";
+    private volatile boolean done = false;
     private int sampleRate = 44100;
-    private int frameCount = 0;
+    private volatile int frameCount = 0;
+    private volatile int published = 0;   // frames safe to read by readFrames()
+    private volatile byte[] liveSpec = new byte[0];
+    private volatile byte[] liveRms = new byte[0];
+    private final Object lock = new Object();
 
     public float getProgress() { return progress; }
     public String getError() { return error; }
     public int getSampleRate() { return sampleRate; }
     public int getFrameCount() { return frameCount; }
+    public int getAvailableFrames() { return published; }
+    public boolean isDone() { return done; }
     public void cancel() { cancelled = true; }
+
+    /**
+     * Start decoding on a Java thread (no Python thread / class-loader issues).
+     * Poll {@link #getAvailableFrames()} and {@link #readFrames(int, int)} to
+     * stream the spectrum while it is being decoded; {@link #isDone()} ends it.
+     */
+    public void start(final String path, final int bands, final int fps) {
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                try { analyze(path, bands, fps); }
+                catch (Throwable e) { error = String.valueOf(e); Log.e("VoocSpectrum", "decode failed", e); }
+                finally { done = true; }
+            }
+        }, "VoocSpectrum");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** base64 of frames [from, to): for each frame {@code bands} spectrum bytes then one rms byte. */
+    public String readFrames(int from, int to, int bands) {
+        synchronized (lock) {
+            to = Math.min(to, published);
+            if (from < 0 || to <= from) return "";
+            byte[] out = new byte[(to - from) * (bands + 1)];
+            int o = 0;
+            for (int f = from; f < to; f++) {
+                System.arraycopy(liveSpec, f * bands, out, o, bands);
+                o += bands;
+                out[o++] = liveRms[f];
+            }
+            return Base64.encodeToString(out, Base64.NO_WRAP);
+        }
+    }
+
+    private static int intOr(MediaFormat f, String key, int def) {
+        try { return f != null && f.containsKey(key) ? f.getInteger(key) : def; } catch (Throwable t) { return def; }
+    }
 
     /** Returns base64 of [frames*bands spectrum bytes][frames rms bytes], or null. */
     public String analyze(String path, int bands, int fps) {
         MediaExtractor extractor = new MediaExtractor();
         MediaCodec codec = null;
         try {
-            extractor.setDataSource(path);
+            try {
+                extractor.setDataSource(path);
+            } catch (Throwable first) {
+                // some files are only readable through a descriptor
+                FileInputStream fis = new FileInputStream(path);
+                try { extractor.setDataSource(fis.getFD()); } finally { fis.close(); }
+            }
             int track = -1;
             MediaFormat format = null;
             for (int i = 0; i < extractor.getTrackCount(); i++) {
@@ -49,7 +100,8 @@ public class SpectrumDecoder {
             if (track < 0) { error = "no audio track"; return null; }
             extractor.selectTrack(track);
             sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
-            int channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+            int channels = intOr(format, MediaFormat.KEY_CHANNEL_COUNT, 2);
+            int encoding = 2; // AudioFormat.ENCODING_PCM_16BIT
             long durationUs = format.containsKey(MediaFormat.KEY_DURATION) ? format.getLong(MediaFormat.KEY_DURATION) : 0L;
             int hop = Math.max(64, sampleRate / Math.max(1, fps));
             int capacity = durationUs > 0 ? (int) (durationUs / 1000000.0 * fps) + 8 : fps * 600;
@@ -57,6 +109,7 @@ public class SpectrumDecoder {
 
             byte[] spec = new byte[capacity * bands];
             byte[] rms = new byte[capacity];
+            synchronized (lock) { liveSpec = spec; liveRms = rms; published = 0; }
 
             // log band edges in FFT bins
             int[] lo = new int[bands];
@@ -83,6 +136,7 @@ public class SpectrumDecoder {
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
             boolean inputDone = false, outputDone = false;
             int frames = 0;
+            int idle = 0;
             while (!outputDone && !cancelled) {
                 if (!inputDone) {
                     int inIndex = codec.dequeueInputBuffer(10000);
@@ -101,22 +155,42 @@ public class SpectrumDecoder {
                     }
                 }
                 int outIndex = codec.dequeueOutputBuffer(info, 10000);
+                if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                    // some decoders never flag EOS: give up after ~3 s without output
+                    if (inputDone && ++idle > 300) break;
+                    continue;
+                }
+                idle = 0;
                 if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     MediaFormat of = codec.getOutputFormat();
-                    if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) channels = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
-                    if (of.containsKey(MediaFormat.KEY_SAMPLE_RATE)) sampleRate = of.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+                    channels = intOr(of, MediaFormat.KEY_CHANNEL_COUNT, channels);
+                    int sr = intOr(of, MediaFormat.KEY_SAMPLE_RATE, sampleRate);
+                    if (sr != sampleRate && sr > 0) { sampleRate = sr; hop = Math.max(64, sampleRate / Math.max(1, fps)); }
+                    encoding = intOr(of, "pcm-encoding", 2);
                 } else if (outIndex >= 0) {
                     ByteBuffer out = codec.getOutputBuffer(outIndex);
                     if (out != null && info.size > 0) {
                         out.position(info.offset);
                         out.limit(info.offset + info.size);
-                        ShortBuffer sb = out.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
-                        int total = sb.remaining();
+                        out.order(ByteOrder.LITTLE_ENDIAN);
+                        // bytes per sample: 16-bit (2), float (4), 8-bit (3), 24-bit packed (21), 32-bit int (22)
+                        int bps = encoding == 4 || encoding == 22 ? 4 : encoding == 3 ? 1 : encoding == 21 ? 3 : 2;
                         int ch = Math.max(1, channels);
-                        for (int i = 0; i + ch <= total; i += ch) {
+                        int base = info.offset;
+                        int count = info.size / (bps * ch);
+                        for (int i = 0; i < count; i++) {
                             float m = 0f;
-                            for (int c = 0; c < ch; c++) m += sb.get(i + c);
-                            ring[ringPos] = m / (ch * 32768f);
+                            for (int c = 0; c < ch; c++) {
+                                int at = base + (i * ch + c) * bps;
+                                float v;
+                                if (bps == 2) v = out.getShort(at) / 32768f;
+                                else if (encoding == 4) v = out.getFloat(at);
+                                else if (bps == 4) v = out.getInt(at) / 2147483648f;
+                                else if (bps == 1) v = ((out.get(at) & 0xff) - 128) / 128f;
+                                else v = ((out.get(at) & 0xff) | ((out.get(at + 1) & 0xff) << 8) | (out.get(at + 2) << 16)) / 8388608f;
+                                m += v;
+                            }
+                            ring[ringPos] = m / ch;
                             ringPos = (ringPos + 1) % FFT;
                             if (++sinceHop >= hop) {
                                 sinceHop = 0;
@@ -126,12 +200,15 @@ public class SpectrumDecoder {
                                     System.arraycopy(spec, 0, ns, 0, spec.length);
                                     byte[] nr = new byte[newCap];
                                     System.arraycopy(rms, 0, nr, 0, rms.length);
-                                    spec = ns; rms = nr; capacity = newCap;
+                                    synchronized (lock) { spec = ns; rms = nr; liveSpec = ns; liveRms = nr; }
+                                    capacity = newCap;
                                 }
                                 analyseFrame(ring, ringPos, window, re, im, lo, hi, bands, spec, rms, frames);
                                 frames++;
+                                if ((frames & 15) == 0) published = frames;
                             }
                         }
+                        published = frames;
                     }
                     codec.releaseOutputBuffer(outIndex, false);
                     if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputDone = true;
@@ -139,6 +216,8 @@ public class SpectrumDecoder {
             }
             if (cancelled) { error = "cancelled"; return null; }
             frameCount = frames;
+            published = frames;
+            if (frames == 0) { error = "no audio decoded"; return null; }
             byte[] result = new byte[frames * bands + frames];
             System.arraycopy(spec, 0, result, 0, frames * bands);
             System.arraycopy(rms, 0, result, frames * bands, frames);
@@ -146,6 +225,7 @@ public class SpectrumDecoder {
             return Base64.encodeToString(result, Base64.NO_WRAP);
         } catch (Throwable t) {
             error = String.valueOf(t);
+            Log.e("VoocSpectrum", "analyze failed for " + path, t);
             return null;
         } finally {
             try { if (codec != null) { codec.stop(); codec.release(); } } catch (Throwable ignored) { }

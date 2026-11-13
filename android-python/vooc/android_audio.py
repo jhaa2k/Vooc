@@ -21,8 +21,13 @@ def waveform_to_float(waveform):
 
 
 class AndroidMediaPlayerSource:
-    def __init__(self, on_pcm, on_error=None, on_completion=None, on_focus_change=None):
+    def __init__(self, on_pcm, on_error=None, on_completion=None, on_focus_change=None,
+                 live_capture=False):
         self.on_pcm = on_pcm
+        # Live Visualizer capture needs RECORD_AUDIO; the spectrum timeline
+        # (spectrum_source) is used instead, so it is off by default.
+        self.live_capture = bool(live_capture)
+        self.fx = None
         self.on_error = on_error or (lambda message: None)
         self.on_completion = on_completion or (lambda: None)
         self.on_focus_change = on_focus_change or (lambda state: None)
@@ -105,7 +110,15 @@ class AndroidMediaPlayerSource:
                 self._user_paused = False
                 self._resume_after_focus = False
 
-            self._request_capture_permission()
+            try:
+                from .android_fx import AndroidAudioFx
+                if self.fx is None:
+                    self.fx = AndroidAudioFx()
+                self.fx.attach(player, getattr(self, "fx_settings", {}), getattr(self, "fx_eq_freqs", []))
+            except Exception as exc:
+                print("Vooc fx attach failed: %s" % exc)
+            if self.live_capture:
+                self._request_capture_permission()
             if autoplay:
                 return self.play()
             return True
@@ -280,6 +293,8 @@ class AndroidMediaPlayerSource:
                 self.player.start()
                 if self.visualizer is not None:
                     self.visualizer.setEnabled(True)
+                if self.fx is not None:
+                    self.fx.apply_speed(playing=True)
             self.on_focus_change("playing")
             return True
         except Exception as exc:
@@ -356,7 +371,30 @@ class AndroidMediaPlayerSource:
         except Exception:
             return False
 
+    def set_fx(self, key, value):
+        """Apply one live audio-effect value (volume, balance, eq_N, bass ...)."""
+        settings = getattr(self, "fx_settings", None)
+        if settings is None:
+            settings = self.fx_settings = {}
+        settings[key] = value
+        if self.fx is not None:
+            with self._lock:
+                self.fx.set(key, value)
+
+    def configure_fx(self, settings, eq_freqs):
+        self.fx_settings = dict(settings)
+        self.fx_eq_freqs = list(eq_freqs)
+        if self.fx is not None:
+            with self._lock:
+                self.fx.eq_freqs = list(eq_freqs)
+                self.fx.apply_all(self.fx_settings)
+
     def release(self):
+        if self.fx is not None:
+            try:
+                self.fx.release()
+            except Exception:
+                pass
         self._abandon_audio_focus()
         with self._lock:
             self._released = True

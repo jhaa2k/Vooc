@@ -1,0 +1,927 @@
+"""Material 3 components for Vooc, drawn with Kivy graphics (no image assets).
+
+Dark + light colour schemes with an acid-green primary. Every interactive
+widget gives immediate visual feedback, and value widgets (sliders, switches,
+chips, selects) report every change instantly through ``on_change``.
+"""
+import math
+
+from kivy.animation import Animation
+from kivy.clock import Clock
+from kivy.graphics import Color, Ellipse, Line, Rectangle, RoundedRectangle, Triangle
+from kivy.metrics import dp, sp
+from kivy.properties import BooleanProperty, ListProperty, NumericProperty, StringProperty
+from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.label import Label
+from kivy.uix.modalview import ModalView
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.textinput import TextInput
+from kivy.uix.widget import Widget
+
+
+def _hex(value, alpha=1.0):
+    h = value.lstrip("#")
+    return [int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)] + [alpha]
+
+
+SCHEMES = {
+    "dark": {
+        "bg": "#0C0E0A", "surface": "#12150F", "surface1": "#181C14", "surface2": "#1E2319",
+        "surface3": "#262C20", "outline": "#3A4232", "outline_var": "#2A3024",
+        "on_surface": "#E8EDE0", "on_var": "#A3AD98",
+        "primary": "#C6FF00", "on_primary": "#152000",
+        "primary_container": "#2F4400", "on_primary_container": "#DDFF8A",
+        "secondary": "#5BFFB0", "secondary_container": "#123B2A", "on_secondary_container": "#B6FFD9",
+        "error": "#FFB4AB", "scrim": "#000000",
+    },
+    "light": {
+        "bg": "#F7FAEF", "surface": "#FBFDF4", "surface1": "#F0F5E4", "surface2": "#E9F0DB",
+        "surface3": "#E1E9D1", "outline": "#76806A", "outline_var": "#C6CFB8",
+        "on_surface": "#181D13", "on_var": "#4A5440",
+        "primary": "#4C6C00", "on_primary": "#FFFFFF",
+        "primary_container": "#C6F27A", "on_primary_container": "#142000",
+        "secondary": "#006C48", "secondary_container": "#A6F4C9", "on_secondary_container": "#002114",
+        "error": "#BA1A1A", "scrim": "#000000",
+    },
+}
+
+
+class _Theme:
+    dark = True
+
+    def __getattr__(self, name):
+        scheme = SCHEMES["dark" if self.dark else "light"]
+        if name in scheme:
+            return _hex(scheme[name])
+        raise AttributeError(name)
+
+    def a(self, name, alpha):
+        c = getattr(self, name)
+        return c[:3] + [alpha]
+
+
+T = _Theme()
+
+
+def lbl(text="", size=14, color=None, bold=False, halign="left", valign="middle", shorten=True, **kw):
+    w = Label(text=text, font_size=sp(size), color=color or T.on_surface, bold=bold, halign=halign,
+              valign=valign, shorten=shorten, shorten_from="right", **kw)
+    w.bind(size=lambda o, s: setattr(o, "text_size", s))
+    return w
+
+
+class Box(BoxLayout):
+    """BoxLayout with optional rounded fill / outline."""
+    bg = ListProperty([0, 0, 0, 0])
+    line = ListProperty([0, 0, 0, 0])
+    radius = NumericProperty(0)
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        with self.canvas.before:
+            self._c = Color(*self.bg)
+            self._r = RoundedRectangle(radius=[self.radius])
+            self._lc = Color(*self.line)
+            self._l = Line(width=dp(1))
+        self.bind(pos=self._u, size=self._u, bg=self._u, line=self._u, radius=self._u)
+        self._u()
+
+    def _u(self, *_):
+        self._c.rgba = self.bg
+        self._r.pos, self._r.size, self._r.radius = self.pos, self.size, [self.radius]
+        self._lc.rgba = self.line
+        r = min(self.radius, self.height / 2.0, self.width / 2.0)
+        self._l.rounded_rectangle = (self.x + .5, self.y + .5, max(1, self.width - 1), max(1, self.height - 1), max(1, r))
+
+
+def card(**kw):
+    kw.setdefault("orientation", "vertical")
+    kw.setdefault("padding", dp(14))
+    kw.setdefault("spacing", dp(8))
+    kw.setdefault("size_hint_y", None)
+    kw.setdefault("radius", dp(20))
+    kw.setdefault("bg", T.surface1)
+    b = Box(**kw)
+    b.bind(minimum_height=b.setter("height"))
+    return b
+
+
+def section(text, hint=""):
+    row = BoxLayout(size_hint_y=None, height=dp(30), padding=(dp(4), 0))
+    row.add_widget(lbl(text, 13, T.primary, bold=True))
+    if hint:
+        row.add_widget(lbl(hint, 11, T.on_var, halign="right"))
+    return row
+
+
+# ---------------------------------------------------------------- icons
+class Icon(Widget):
+    name = StringProperty("")
+    tint = ListProperty([1, 1, 1, 1])
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.bind(pos=self.redraw, size=self.redraw, name=self.redraw, tint=self.redraw)
+        self.redraw()
+
+    def redraw(self, *_):
+        self.canvas.clear()
+        s = min(self.width, self.height) / 2.0
+        cx, cy = self.x + self.width / 2.0, self.y + self.height / 2.0
+        w = max(dp(1.4), s * 0.13)
+        n = self.name
+        with self.canvas:
+            Color(*self.tint)
+            draw = getattr(self, "_i_" + n, None)
+            if draw:
+                draw(cx, cy, s, w)
+
+    def _i_play(self, cx, cy, s, w):
+        Triangle(points=[cx - s * .32, cy - s * .48, cx - s * .32, cy + s * .48, cx + s * .5, cy])
+
+    def _i_pause(self, cx, cy, s, w):
+        RoundedRectangle(pos=(cx - s * .4, cy - s * .45), size=(s * .28, s * .9), radius=[s * .06])
+        RoundedRectangle(pos=(cx + s * .12, cy - s * .45), size=(s * .28, s * .9), radius=[s * .06])
+
+    def _i_next(self, cx, cy, s, w, k=1):
+        Triangle(points=[cx - k * s * .42, cy - s * .4, cx - k * s * .42, cy + s * .4, cx + k * s * .22, cy])
+        x = cx + k * s * .26 - (s * .14 if k > 0 else 0)
+        Rectangle(pos=(x, cy - s * .4), size=(s * .14, s * .8))
+
+    def _i_prev(self, cx, cy, s, w):
+        self._i_next(cx, cy, s, w, -1)
+
+    def _i_shuffle(self, cx, cy, s, w):
+        Line(points=[cx - s * .6, cy - s * .35, cx - s * .2, cy - s * .35, cx + s * .2, cy + s * .35, cx + s * .5, cy + s * .35], width=w, joint="round")
+        Line(points=[cx - s * .6, cy + s * .35, cx - s * .2, cy + s * .35, cx + s * .2, cy - s * .35, cx + s * .5, cy - s * .35], width=w, joint="round")
+        for y in (.35, -.35):
+            Triangle(points=[cx + s * .45, cy + s * (y + .18), cx + s * .45, cy + s * (y - .18), cx + s * .68, cy + s * y])
+
+    def _i_repeat(self, cx, cy, s, w, one=False):
+        Line(rounded_rectangle=(cx - s * .55, cy - s * .32, s * 1.1, s * .64, s * .2), width=w)
+        Triangle(points=[cx + s * .05, cy + s * .52, cx + s * .05, cy + s * .12, cx + s * .3, cy + s * .32])
+        if one:
+            Ellipse(pos=(cx - s * .13, cy - s * .13), size=(s * .26, s * .26))
+
+    def _i_repeat_one(self, cx, cy, s, w):
+        self._i_repeat(cx, cy, s, w, True)
+
+    def _i_note(self, cx, cy, s, w):
+        Ellipse(pos=(cx - s * .55, cy - s * .62), size=(s * .5, s * .4))
+        Line(points=[cx - s * .07, cy - s * .42, cx - s * .07, cy + s * .55, cx + s * .45, cy + s * .35], width=w, joint="round")
+
+    def _i_bars(self, cx, cy, s, w):
+        for i, h in enumerate((.45, .85, .6, 1.0, .35)):
+            x = cx - s * .62 + i * s * .28
+            RoundedRectangle(pos=(x, cy - s * .55), size=(s * .17, s * 1.1 * h), radius=[s * .05])
+
+    def _i_tune(self, cx, cy, s, w):
+        for i, k in enumerate((.25, -.3, .1)):
+            x = cx - s * .45 + i * s * .45
+            Line(points=[x, cy - s * .6, x, cy + s * .6], width=w * .8, cap="round")
+            Ellipse(pos=(x - s * .14, cy + s * k - s * .14), size=(s * .28, s * .28))
+
+    def _i_layers(self, cx, cy, s, w):
+        for dy in (.3, 0, -.3):
+            Line(points=[cx - s * .6, cy + s * dy, cx, cy + s * (dy + .28), cx + s * .6, cy + s * dy, cx, cy + s * (dy - .28), cx - s * .6, cy + s * dy], width=w * .8, joint="round")
+
+    def _i_studio(self, cx, cy, s, w):
+        for dx in (-1, 1):
+            for dy in (-1, 1):
+                RoundedRectangle(pos=(cx + dx * s * .3 - s * .24, cy + dy * s * .3 - s * .24), size=(s * .48, s * .48), radius=[s * .12])
+
+    def _i_plus(self, cx, cy, s, w):
+        Line(points=[cx - s * .5, cy, cx + s * .5, cy], width=w, cap="round")
+        Line(points=[cx, cy - s * .5, cx, cy + s * .5], width=w, cap="round")
+
+    def _i_close(self, cx, cy, s, w):
+        Line(points=[cx - s * .4, cy - s * .4, cx + s * .4, cy + s * .4], width=w, cap="round")
+        Line(points=[cx - s * .4, cy + s * .4, cx + s * .4, cy - s * .4], width=w, cap="round")
+
+    def _i_check(self, cx, cy, s, w):
+        Line(points=[cx - s * .45, cy, cx - s * .12, cy - s * .35, cx + s * .5, cy + s * .35], width=w * 1.1, cap="round", joint="round")
+
+    def _i_eye(self, cx, cy, s, w, off=False):
+        Line(ellipse=(cx - s * .65, cy - s * .38, s * 1.3, s * .76), width=w)
+        Ellipse(pos=(cx - s * .2, cy - s * .2), size=(s * .4, s * .4))
+        if off:
+            Line(points=[cx - s * .6, cy - s * .6, cx + s * .6, cy + s * .6], width=w * 1.1, cap="round")
+
+    def _i_eye_off(self, cx, cy, s, w):
+        self._i_eye(cx, cy, s, w, True)
+
+    def _i_lock(self, cx, cy, s, w, open_=False):
+        RoundedRectangle(pos=(cx - s * .45, cy - s * .55), size=(s * .9, s * .65), radius=[s * .12])
+        r = s * .27
+        top = cy + s * .3
+        Line(circle=(cx, top, r, -90, 90), width=w)
+        Line(points=[cx - r, top, cx - r, cy + s * .1], width=w)
+        Line(points=[cx + r, top, cx + r, cy + (s * .22 if open_ else s * .1)], width=w)
+
+    def _i_unlock(self, cx, cy, s, w):
+        self._i_lock(cx, cy, s, w, True)
+
+    def _i_up(self, cx, cy, s, w, k=1):
+        Line(points=[cx - s * .4, cy - k * s * .15, cx, cy + k * s * .25, cx + s * .4, cy - k * s * .15], width=w, cap="round", joint="round")
+
+    def _i_down(self, cx, cy, s, w):
+        self._i_up(cx, cy, s, w, -1)
+
+    def _i_delete(self, cx, cy, s, w):
+        Line(points=[cx - s * .5, cy + s * .4, cx + s * .5, cy + s * .4], width=w, cap="round")
+        Line(points=[cx - s * .15, cy + s * .55, cx + s * .15, cy + s * .55], width=w, cap="round")
+        Line(points=[cx - s * .38, cy + s * .3, cx - s * .3, cy - s * .55, cx + s * .3, cy - s * .55, cx + s * .38, cy + s * .3], width=w, joint="round")
+
+    def _i_copy(self, cx, cy, s, w):
+        Line(rounded_rectangle=(cx - s * .55, cy - s * .55, s * .75, s * .75, s * .12), width=w)
+        Line(points=[cx - s * .25, cy + s * .35, cx - s * .25, cy + s * .55, cx + s * .55, cy + s * .55, cx + s * .55, cy - s * .25, cx + s * .35, cy - s * .25], width=w, joint="round")
+
+    def _i_save(self, cx, cy, s, w):
+        Line(points=[cx, cy + s * .55, cx, cy - s * .2], width=w, cap="round")
+        Line(points=[cx - s * .3, cy + s * .1, cx, cy - s * .22, cx + s * .3, cy + s * .1], width=w, cap="round", joint="round")
+        Line(points=[cx - s * .55, cy - s * .2, cx - s * .55, cy - s * .55, cx + s * .55, cy - s * .55, cx + s * .55, cy - s * .2], width=w, joint="round")
+
+    def _i_folder(self, cx, cy, s, w):
+        Line(points=[cx - s * .6, cy + s * .4, cx - s * .15, cy + s * .4, cx, cy + s * .25, cx + s * .6, cy + s * .25,
+                     cx + s * .6, cy - s * .45, cx - s * .6, cy - s * .45, cx - s * .6, cy + s * .4], width=w, joint="round")
+
+    def _i_sun(self, cx, cy, s, w):
+        Line(circle=(cx, cy, s * .28), width=w)
+        for i in range(8):
+            a = i * math.pi / 4
+            Line(points=[cx + math.cos(a) * s * .45, cy + math.sin(a) * s * .45, cx + math.cos(a) * s * .62, cy + math.sin(a) * s * .62], width=w * .9, cap="round")
+
+    def _i_moon(self, cx, cy, s, w):
+        Line(circle=(cx, cy, s * .55), width=w)
+        Ellipse(pos=(cx - s * .55, cy - s * .55), size=(s * 1.1, s * 1.1), angle_start=180, angle_end=360)
+
+    _i_theme = _i_moon
+
+    def _i_text(self, cx, cy, s, w):
+        Line(points=[cx - s * .5, cy + s * .5, cx + s * .5, cy + s * .5], width=w * 1.1, cap="round")
+        Line(points=[cx, cy + s * .5, cx, cy - s * .55], width=w * 1.1, cap="round")
+
+    def _i_image(self, cx, cy, s, w):
+        Line(rounded_rectangle=(cx - s * .6, cy - s * .5, s * 1.2, s, s * .15), width=w)
+        Line(points=[cx - s * .45, cy - s * .3, cx - s * .1, cy + s * .1, cx + s * .1, cy - s * .1, cx + s * .25, cy + s * .05, cx + s * .45, cy - s * .3], width=w, joint="round")
+        Ellipse(pos=(cx + s * .12, cy + s * .18), size=(s * .2, s * .2))
+
+    def _i_back(self, cx, cy, s, w):
+        Line(points=[cx + s * .5, cy, cx - s * .5, cy], width=w, cap="round")
+        Line(points=[cx - s * .1, cy + s * .42, cx - s * .52, cy, cx - s * .1, cy - s * .42], width=w, cap="round", joint="round")
+
+    def _i_reset(self, cx, cy, s, w):
+        Line(circle=(cx, cy, s * .45, 60, 360), width=w)
+        Triangle(points=[cx + s * .22, cy + s * .62, cx + s * .52, cy + s * .3, cx + s * .12, cy + s * .25])
+
+    def _i_info(self, cx, cy, s, w):
+        Line(circle=(cx, cy, s * .55), width=w)
+        Ellipse(pos=(cx - w, cy + s * .22), size=(w * 2, w * 2))
+        Line(points=[cx, cy - s * .3, cx, cy + s * .05], width=w, cap="round")
+
+    def _i_sparkle(self, cx, cy, s, w):
+        for k, (dx, dy, r) in enumerate(((0, 0, .55), (.45, .45, .22), (-.45, -.4, .18))):
+            x, y, rr = cx + dx * s, cy + dy * s, r * s
+            Triangle(points=[x - rr * .25, y, x + rr * .25, y, x, y + rr])
+            Triangle(points=[x - rr * .25, y, x + rr * .25, y, x, y - rr])
+            Triangle(points=[x, y - rr * .25, x, y + rr * .25, x + rr, y])
+            Triangle(points=[x, y - rr * .25, x, y + rr * .25, x - rr, y])
+
+    def _i_export(self, cx, cy, s, w):
+        Line(points=[cx, cy - s * .2, cx, cy + s * .55], width=w, cap="round")
+        Line(points=[cx - s * .3, cy + s * .25, cx, cy + s * .57, cx + s * .3, cy + s * .25], width=w, cap="round", joint="round")
+        Line(points=[cx - s * .55, cy + s * .05, cx - s * .55, cy - s * .55, cx + s * .55, cy - s * .55, cx + s * .55, cy + s * .05], width=w, joint="round")
+
+    def _i_more(self, cx, cy, s, w):
+        for dy in (-.4, 0, .4):
+            Ellipse(pos=(cx - s * .1, cy + dy * s - s * .1), size=(s * .2, s * .2))
+
+
+# ---------------------------------------------------------------- buttons
+class Tap(ButtonBehavior, Box):
+    """Pressable rounded surface with state-layer feedback."""
+
+    def __init__(self, on_tap=None, **kw):
+        super().__init__(**kw)
+        self._base = list(self.bg)
+        with self.canvas.after:
+            self._sc = Color(1, 1, 1, 0)
+            self._sr = RoundedRectangle(radius=[self.radius])
+        self.bind(pos=self._us, size=self._us, radius=self._us)
+        self._us()
+        if on_tap:
+            self.bind(on_release=lambda *_: on_tap())
+
+    def _us(self, *_):
+        self._sr.pos, self._sr.size, self._sr.radius = self.pos, self.size, [self.radius]
+
+    def on_press(self):
+        Animation.cancel_all(self._sc)
+        c = T.on_surface
+        self._sc.rgba = (c[0], c[1], c[2], 0.12)
+
+    def on_release(self):
+        Animation(a=0, d=0.25).start(self._sc)
+
+
+class Button3(Tap):
+    """M3 button. kind: filled | tonal | outlined | text."""
+
+    def __init__(self, text, on_tap=None, kind="tonal", icon=None, height=dp(44), fs=14, **kw):
+        colors = {
+            "filled": (T.primary, T.on_primary, [0, 0, 0, 0]),
+            "tonal": (T.secondary_container, T.on_secondary_container, [0, 0, 0, 0]),
+            "outlined": ([0, 0, 0, 0], T.primary, T.outline),
+            "text": ([0, 0, 0, 0], T.primary, [0, 0, 0, 0]),
+            "surface": (T.surface3, T.on_surface, [0, 0, 0, 0]),
+        }[kind]
+        kw.setdefault("size_hint_y", None)
+        super().__init__(on_tap=on_tap, bg=colors[0], line=colors[2], radius=height / 2, height=height,
+                         padding=(dp(16), 0), spacing=dp(8), **kw)
+        self.fg = colors[1]
+        inner = BoxLayout(spacing=dp(8))
+        self.add_widget(Widget(size_hint_x=0.0001))
+        if icon:
+            self.icon = Icon(name=icon, tint=self.fg, size_hint=(None, 1), width=dp(18))
+            inner.add_widget(self.icon)
+        self.label = lbl(text, fs, self.fg, bold=True, halign="center" if not icon else "left")
+        inner.add_widget(self.label)
+        self.add_widget(inner)
+
+    @property
+    def text(self):
+        return self.label.text
+
+    @text.setter
+    def text(self, v):
+        self.label.text = v
+
+
+class IconBtn(ButtonBehavior, Widget):
+    """Circular icon button. kind: standard | tonal | filled."""
+    active = BooleanProperty(False)
+
+    def __init__(self, icon, on_tap=None, kind="standard", size=dp(44), tint=None, **kw):
+        kw.setdefault("size_hint", (None, None))
+        super().__init__(size=(size, size), **kw)
+        self.kind = kind
+        self._tint = tint
+        with self.canvas.before:
+            self._c = Color(0, 0, 0, 0)
+            self._e = Ellipse()
+            self._sc = Color(0, 0, 0, 0)
+            self._se = Ellipse()
+        self.icon = Icon(name=icon)
+        self.add_widget(self.icon)
+        self.bind(pos=self._u, size=self._u, active=self._colors)
+        self._colors()
+        if on_tap:
+            self.bind(on_release=lambda *_: on_tap())
+
+    def _colors(self, *_):
+        if self.kind == "filled" or (self.kind == "toggle" and self.active):
+            bg, fg = T.primary, T.on_primary
+        elif self.kind == "tonal":
+            bg, fg = T.surface3, T.on_surface
+        else:
+            bg, fg = [0, 0, 0, 0], (T.primary if self.active else (self._tint or T.on_var))
+        self._c.rgba = bg
+        self.icon.tint = fg
+
+    def set_icon(self, name):
+        self.icon.name = name
+
+    def _u(self, *_):
+        self._e.pos, self._e.size = self.pos, self.size
+        self._se.pos, self._se.size = self.pos, self.size
+        p = self.width * 0.27
+        self.icon.pos = (self.x + p, self.y + p)
+        self.icon.size = (self.width - 2 * p, self.height - 2 * p)
+
+    def on_press(self):
+        Animation.cancel_all(self._sc)
+        c = T.on_surface
+        self._sc.rgba = (c[0], c[1], c[2], 0.14)
+
+    def on_release(self):
+        Animation(a=0, d=0.3).start(self._sc)
+
+
+# ---------------------------------------------------------------- chips
+class Chip(Tap):
+    selected = BooleanProperty(False)
+
+    def __init__(self, text, on_tap=None, selected=False, swatch=None, **kw):
+        kw.setdefault("size_hint", (None, None))
+        kw.setdefault("height", dp(34))
+        super().__init__(on_tap=on_tap, radius=dp(10), padding=(dp(12), 0), spacing=dp(6), **kw)
+        self.swatch = swatch
+        if swatch:
+            self._sw = Widget(size_hint=(None, None), size=(dp(16), dp(16)))
+            with self._sw.canvas:
+                Color(*swatch[0])
+                self._swe = Ellipse()
+                Color(*swatch[1])
+                self._swe2 = Ellipse(angle_start=0, angle_end=180)
+            self._sw.bind(pos=self._usw)
+            self.add_widget(BoxLayout(size_hint=(None, 1), width=dp(16), padding=(0, dp(9))))
+            self.children[0].add_widget(self._sw)
+        self.check = Icon(name="check", size_hint=(None, 1), width=dp(16))
+        self.label = Label(text=text, font_size=sp(13), bold=True, size_hint=(None, 1))
+        self.label.bind(texture_size=self._fit)
+        self.add_widget(self.check)
+        self.add_widget(self.label)
+        self.bind(selected=self._style)
+        self.selected = selected
+        self._style()
+
+    def _usw(self, *_):
+        self._swe.pos, self._swe.size = self._sw.pos, self._sw.size
+        self._swe2.pos, self._swe2.size = self._sw.pos, self._sw.size
+
+    def _fit(self, *_):
+        self.label.width = self.label.texture_size[0]
+        self.width = self.label.width + dp(24) + (dp(22) if self.selected else 0) + (dp(22) if self.swatch else 0)
+
+    def _style(self, *_):
+        if self.selected:
+            self.bg, self.line = T.primary_container, [0, 0, 0, 0]
+            fg = T.on_primary_container
+            self.check.width, self.check.opacity = dp(16), 1
+        else:
+            self.bg, self.line = [0, 0, 0, 0], T.outline
+            fg = T.on_var
+            self.check.width, self.check.opacity = 0, 0
+        self.label.color = fg
+        self.check.tint = fg
+        self._fit()
+
+
+class ChipGroup(ScrollView):
+    """Horizontally scrolling single- (or multi-) select chip row."""
+
+    def __init__(self, options, value, on_change, swatches=None, wrap=False, **kw):
+        kw.setdefault("size_hint_y", None)
+        kw.setdefault("height", dp(40))
+        super().__init__(do_scroll_y=False, bar_width=0, **kw)
+        self.on_change = on_change
+        self.row = BoxLayout(size_hint_x=None, spacing=dp(8), padding=(dp(2), dp(3)))
+        self.row.bind(minimum_width=self.row.setter("width"))
+        self.chips = {}
+        for opt in options:
+            c = Chip(str(opt), selected=(str(opt) == str(value)),
+                     swatch=(swatches or {}).get(opt))
+            c.bind(on_release=lambda w, o=opt: self.select(o))
+            self.chips[str(opt)] = c
+            self.row.add_widget(c)
+        self.add_widget(self.row)
+
+    def select(self, opt, notify=True):
+        for k, c in self.chips.items():
+            c.selected = (k == str(opt))
+        if notify:
+            self.on_change(opt)
+
+
+# ---------------------------------------------------------------- slider
+class Slider3(Widget):
+    """M3 slider with live value bubble. Horizontal or vertical, optional
+    bipolar fill (from centre) for EQ / balance. ``on_change(value)`` fires on
+    every movement; ``on_commit(value)`` on release."""
+    value = NumericProperty(0.0)
+
+    def __init__(self, lo=0.0, hi=1.0, value=0.0, step=0.0, on_change=None, on_commit=None,
+                 fmt=None, vertical=False, bipolar=False, **kw):
+        if vertical:
+            kw.setdefault("size_hint_x", None)
+            kw.setdefault("width", dp(30))
+        else:
+            kw.setdefault("size_hint_y", None)
+            kw.setdefault("height", dp(36))
+        super().__init__(**kw)
+        self.lo, self.hi, self.step = float(lo), float(hi), float(step or 0)
+        self.vertical, self.bipolar = vertical, bipolar
+        self.on_change, self.on_commit = on_change, on_commit
+        self.fmt = fmt or (lambda v: ("%d" % round(v)) if self.step >= 1 else ("%.2f" % v))
+        self.dragging = False
+        self._grow = 0.0
+        with self.canvas:
+            self._ci = Color(*T.surface3)
+            self._ti = RoundedRectangle()
+            self._ca = Color(*T.primary)
+            self._ta = RoundedRectangle()
+            self._cz = Color(*T.a("on_var", 0.6))
+            self._zero = Rectangle()
+            self._ch = Color(*T.a("primary", 0.0))
+            self._halo = Ellipse()
+            self._ct = Color(*T.primary)
+            self._th = RoundedRectangle()
+        with self.canvas.after:
+            self._cb = Color(*T.a("primary", 0))
+            self._bubble = RoundedRectangle()
+            self._bt = Color(*T.a("on_primary", 0))
+            self._btxt = Rectangle()
+        self.value = max(self.lo, min(self.hi, float(value)))
+        self.bind(pos=self._draw, size=self._draw, value=self._draw)
+        self._draw()
+
+    def _frac(self):
+        return 0.0 if self.hi == self.lo else (self.value - self.lo) / (self.hi - self.lo)
+
+    def _draw(self, *_):
+        f = self._frac()
+        th = dp(6)
+        if self.vertical:
+            x = (self.x + self.width / 2.0) - th / 2
+            y0, L = self.y + dp(10), max(1, self.height - dp(20))
+            pos = y0 + f * L
+            self._ti.pos, self._ti.size, self._ti.radius = (x, y0), (th, L), [th / 2]
+            if self.bipolar:
+                mid = y0 + L * ((0 - self.lo) / (self.hi - self.lo))
+                a, b = sorted((mid, pos))
+                self._ta.pos, self._ta.size = (x, a), (th, max(0, b - a))
+                self._zero.pos, self._zero.size = (x - dp(3), mid - dp(.6)), (th + dp(6), dp(1.2))
+            else:
+                self._ta.pos, self._ta.size = (x, y0), (th, pos - y0)
+                self._zero.size = (0, 0)
+            self._ta.radius = [th / 2]
+            hw, hh = dp(20) + self._grow * dp(2), dp(4)
+            self._th.pos, self._th.size, self._th.radius = ((self.x + self.width / 2.0) - hw / 2, pos - hh / 2), (hw, hh), [hh / 2]
+            cx, cy = (self.x + self.width / 2.0), pos
+        else:
+            y = (self.y + self.height / 2.0) - th / 2
+            x0, L = self.x + dp(10), max(1, self.width - dp(20))
+            pos = x0 + f * L
+            self._ti.pos, self._ti.size, self._ti.radius = (x0, y), (L, th), [th / 2]
+            if self.bipolar:
+                mid = x0 + L * ((0 - self.lo) / (self.hi - self.lo))
+                a, b = sorted((mid, pos))
+                self._ta.pos, self._ta.size = (a, y), (max(0, b - a), th)
+                self._zero.pos, self._zero.size = (mid - dp(.6), y - dp(3)), (dp(1.2), th + dp(6))
+            else:
+                self._ta.pos, self._ta.size = (x0, y), (pos - x0, th)
+                self._zero.size = (0, 0)
+            self._ta.radius = [th / 2]
+            hw, hh = dp(4), dp(22) + self._grow * dp(2)
+            self._th.pos, self._th.size, self._th.radius = (pos - hw / 2, (self.y + self.height / 2.0) - hh / 2), (hw, hh), [hw / 2]
+            cx, cy = pos, (self.y + self.height / 2.0)
+        r = dp(16) * self._grow
+        self._halo.pos, self._halo.size = (cx - r, cy - r), (2 * r, 2 * r)
+        self._ch.a = 0.16 * self._grow
+        if self.dragging:
+            from kivy.core.text import Label as CoreLabel
+            t = CoreLabel(text=self.fmt(self.value), font_size=sp(12), bold=True)
+            t.refresh()
+            tw, tht = t.texture.size
+            bw, bh = tw + dp(16), dp(26)
+            bx = cx - bw / 2
+            by = (cy + dp(18)) if not self.vertical else (cy + dp(14))
+            if self.vertical:
+                bx = self.right + dp(4) if self.right + bw + dp(4) < (self.parent.right if self.parent else 1e9) else self.x - bw - dp(4)
+                by = cy - bh / 2
+            self._bubble.pos, self._bubble.size, self._bubble.radius = (bx, by), (bw, bh), [bh / 2]
+            self._btxt.texture = t.texture
+            self._btxt.pos, self._btxt.size = (bx + (bw - tw) / 2, by + (bh - tht) / 2), (tw, tht)
+            self._cb.a, self._bt.a = 1, 1
+        else:
+            self._cb.a, self._bt.a = 0, 0
+
+    def _set_from_touch(self, touch):
+        if self.vertical:
+            f = (touch.y - self.y - dp(10)) / max(1, self.height - dp(20))
+        else:
+            f = (touch.x - self.x - dp(10)) / max(1, self.width - dp(20))
+        v = self.lo + max(0.0, min(1.0, f)) * (self.hi - self.lo)
+        if self.step:
+            v = round((v - self.lo) / self.step) * self.step + self.lo
+        v = max(self.lo, min(self.hi, v))
+        if abs(v - self.value) > 1e-9:
+            self.value = v
+            if self.on_change:
+                self.on_change(v)
+
+    def on_touch_down(self, touch):
+        if not self.collide_point(*touch.pos):
+            return False
+        if touch.is_mouse_scrolling:
+            return False
+        touch.grab(self)
+        self.dragging = True
+        Animation.cancel_all(self, "_grow")
+        self._grow = 1.0
+        self._set_from_touch(touch)
+        self._draw()
+        return True
+
+    def on_touch_move(self, touch):
+        if touch.grab_current is self:
+            self._set_from_touch(touch)
+            return True
+        return False
+
+    def on_touch_up(self, touch):
+        if touch.grab_current is self:
+            touch.ungrab(self)
+            self.dragging = False
+            self._grow = 0.0
+            self._draw()
+            if self.on_commit:
+                self.on_commit(self.value)
+            return True
+        return False
+
+    def set_value(self, v):
+        if not self.dragging:
+            self.value = max(self.lo, min(self.hi, float(v)))
+
+
+class SliderRow(BoxLayout):
+    """Label + live value + slider. Value text updates while dragging."""
+
+    def __init__(self, title, lo, hi, value, on_change, step=0.0, unit="", fmt=None, bipolar=False,
+                 default=None, icon=None, **kw):
+        super().__init__(orientation="vertical", size_hint_y=None, height=dp(64), spacing=0, **kw)
+        self.unit = unit
+        self.fmt = fmt or (lambda v: (("%+d" if bipolar else "%d") % round(v) if (step or 0) >= 1 else
+                                      ("%+.2f" if bipolar else "%.2f") % v) + unit)
+        self.default = value if default is None else default
+        self._cb = on_change
+        head = BoxLayout(size_hint_y=None, height=dp(24), padding=(dp(10), 0))
+        if icon:
+            head.add_widget(Icon(name=icon, tint=T.on_var, size_hint_x=None, width=dp(20)))
+            head.add_widget(Widget(size_hint_x=None, width=dp(6)))
+        head.add_widget(lbl(title, 13, T.on_surface))
+        self.chip = Tap(on_tap=self.reset, bg=T.surface3, radius=dp(8), size_hint=(None, None),
+                        width=dp(74), height=dp(22), padding=(dp(6), 0))
+        self.val = lbl(self.fmt(value), 12, T.primary, bold=True, halign="center")
+        self.chip.add_widget(self.val)
+        head.add_widget(self.chip)
+        self.add_widget(head)
+        self.slider = Slider3(lo, hi, value, step, on_change=self._changed, fmt=self.fmt, bipolar=bipolar)
+        self.add_widget(self.slider)
+
+    def _changed(self, v):
+        self.val.text = self.fmt(v)
+        self._cb(v)
+
+    def reset(self):
+        """Tap the value chip to restore the default."""
+        self.slider.value = self.default
+        self._changed(self.default)
+
+    def set(self, v):
+        self.slider.set_value(v)
+        self.val.text = self.fmt(self.slider.value)
+
+
+# ---------------------------------------------------------------- switch
+class Switch3(ButtonBehavior, Widget):
+    active = BooleanProperty(False)
+
+    def __init__(self, active=False, on_change=None, **kw):
+        kw.setdefault("size_hint", (None, None))
+        super().__init__(size=(dp(52), dp(32)), **kw)
+        self.on_change = on_change
+        with self.canvas:
+            self._tc = Color()
+            self._tr = RoundedRectangle()
+            self._oc = Color()
+            self._ol = Line(width=dp(1.5))
+            self._hc = Color()
+            self._h = Ellipse()
+        self._k = 1.0 if active else 0.0
+        self.active = active
+        self.bind(pos=self._draw, size=self._draw, active=self._anim)
+        self._draw()
+
+    def _anim(self, *_):
+        Animation.cancel_all(self)
+        Animation(_k=1.0 if self.active else 0.0, d=0.16, t="out_quad").start(self)
+
+    def on__k(self, *_):
+        if hasattr(self, "_h"):
+            self._draw()
+
+    _k = NumericProperty(0.0)
+
+    def _draw(self, *_):
+        k = self._k
+        on_bg, off_bg = T.primary, T.surface3
+        self._tc.rgba = [off_bg[i] * (1 - k) + on_bg[i] * k for i in range(4)]
+        self._tr.pos, self._tr.size, self._tr.radius = self.pos, self.size, [self.height / 2]
+        self._oc.rgba = T.a("outline", 1 - k)
+        self._ol.rounded_rectangle = (self.x, self.y, self.width, self.height, self.height / 2)
+        d = dp(16) + dp(8) * k
+        cx = self.x + self.height / 2 + k * (self.width - self.height)
+        hc_on, hc_off = T.on_primary, T.outline
+        self._hc.rgba = [hc_off[i] * (1 - k) + hc_on[i] * k for i in range(4)]
+        self._h.pos, self._h.size = (cx - d / 2, (self.y + self.height / 2.0) - d / 2), (d, d)
+
+    def on_release(self):
+        self.active = not self.active
+        if self.on_change:
+            self.on_change(self.active)
+
+
+def switch_row(title, active, on_change, subtitle="", icon=None):
+    row = Tap(size_hint_y=None, height=dp(52) if not subtitle else dp(60), padding=(dp(10), 0), spacing=dp(10), radius=dp(12))
+    if icon:
+        row.add_widget(Icon(name=icon, tint=T.on_var, size_hint_x=None, width=dp(20)))
+    col = BoxLayout(orientation="vertical", padding=(0, dp(8)))
+    col.add_widget(lbl(title, 14))
+    if subtitle:
+        col.add_widget(lbl(subtitle, 11, T.on_var))
+    row.add_widget(col)
+    sw = Switch3(active, on_change)
+    holder = BoxLayout(size_hint_x=None, width=dp(56), padding=(0, (row.height - dp(32)) / 2))
+    holder.add_widget(sw)
+    row.add_widget(holder)
+    row.bind(on_release=lambda *_: sw.on_release())
+    row.switch = sw
+    return row
+
+
+# ---------------------------------------------------------------- text field / select
+def text_field(text, on_change, hint="", multiline=False, height=None):
+    ti = TextInput(text=str(text), hint_text=hint, multiline=multiline, size_hint_y=None,
+                   height=height or (dp(46) if not multiline else dp(110)),
+                   background_normal="", background_active="", background_color=T.surface3,
+                   foreground_color=T.on_surface, hint_text_color=T.on_var, cursor_color=T.primary,
+                   selection_color=T.a("primary", 0.35), font_size=sp(14),
+                   padding=(dp(14), dp(13) if not multiline else dp(10)))
+    ti.bind(text=lambda _, v: on_change(v))
+    return ti
+
+
+class Sheet(ModalView):
+    """Bottom sheet."""
+
+    def __init__(self, title, **kw):
+        super().__init__(size_hint=(1, None), pos_hint={"x": 0, "y": 0}, background="",
+                         background_color=T.a("scrim", 0.0), overlay_color=T.a("scrim", 0.5), **kw)
+        self.box = Box(orientation="vertical", bg=T.surface2, radius=dp(28), padding=(dp(16), dp(10), dp(16), dp(16)), spacing=dp(6))
+        grip = BoxLayout(size_hint_y=None, height=dp(14))
+        g = Widget()
+        with g.canvas:
+            Color(*T.a("on_var", 0.5))
+            gr = RoundedRectangle(radius=[dp(2)])
+        g.bind(pos=lambda w, *_: setattr(gr, "pos", (w.x + w.width / 2 - dp(16), w.y + w.height / 2 - dp(2))))
+        gr.size = (dp(32), dp(4))
+        grip.add_widget(g)
+        self.box.add_widget(grip)
+        self.box.add_widget(lbl(title, 18, bold=True, size_hint_y=None, height=dp(34)))
+        self.add_widget(self.box)
+
+
+def select_sheet(title, options, value, on_pick):
+    sheet = Sheet(title)
+    from kivy.core.window import Window
+    rows = len(options)
+    sheet.height = min(Window.height * 0.7, dp(80) + rows * dp(48) + dp(20))
+    scroll = ScrollView()
+    col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(2))
+    col.bind(minimum_height=col.setter("height"))
+    for opt in options:
+        sel = str(opt) == str(value)
+        r = Tap(size_hint_y=None, height=dp(46), radius=dp(23), padding=(dp(16), 0), spacing=dp(10),
+                bg=T.secondary_container if sel else [0, 0, 0, 0])
+        r.add_widget(lbl(str(opt), 14, T.on_secondary_container if sel else T.on_surface, bold=sel))
+        if sel:
+            r.add_widget(Icon(name="check", tint=T.on_secondary_container, size_hint_x=None, width=dp(20)))
+
+        def pick(*_, o=opt):
+            sheet.dismiss()
+            on_pick(o)
+        r.bind(on_release=pick)
+        col.add_widget(r)
+    scroll.add_widget(col)
+    sheet.box.add_widget(scroll)
+    sheet.open()
+    return sheet
+
+
+class SelectField(Tap):
+    """Outlined select field that opens a bottom sheet with every option."""
+
+    def __init__(self, title, options, value, on_change, **kw):
+        kw.setdefault("size_hint_y", None)
+        kw.setdefault("height", dp(46))
+        super().__init__(bg=[0, 0, 0, 0], line=T.outline, radius=dp(12), padding=(dp(14), 0), spacing=dp(6), **kw)
+        self.title, self.options, self.on_change = title, list(options), on_change
+        self.value = value
+        self.label = lbl(str(value), 14)
+        self.add_widget(self.label)
+        self.add_widget(Icon(name="down", tint=T.on_var, size_hint_x=None, width=dp(18)))
+        self.bind(on_release=lambda *_: select_sheet(self.title, self.options, self.value, self._pick))
+
+    def _pick(self, v):
+        self.value = v
+        self.label.text = str(v)
+        self.on_change(v)
+
+
+# ---------------------------------------------------------------- navigation
+class NavBar(Box):
+    def __init__(self, items, on_select, current, **kw):
+        super().__init__(size_hint_y=None, height=dp(72), bg=T.surface2, padding=(dp(4), dp(6), dp(4), dp(6)), **kw)
+        self.on_select = on_select
+        self.items = {}
+        for key, icon, title in items:
+            it = _NavItem(key, icon, title, self._tap)
+            self.items[key] = it
+            self.add_widget(it)
+        self.select(current, notify=False)
+
+    def _tap(self, key):
+        self.select(key)
+
+    def select(self, key, notify=True):
+        for k, it in self.items.items():
+            it.set_active(k == key)
+        if notify:
+            self.on_select(key)
+
+
+class _NavItem(ButtonBehavior, BoxLayout):
+    _k = NumericProperty(0.0)
+
+    def __init__(self, key, icon, title, cb, **kw):
+        super().__init__(orientation="vertical", spacing=dp(2), **kw)
+        self.key, self.cb = key, cb
+        self.pill = Widget(size_hint_y=None, height=dp(32))
+        with self.pill.canvas.before:
+            self._pc = Color(*T.secondary_container)
+            self._pr = RoundedRectangle(radius=[dp(16)])
+        self.icon = Icon(name=icon)
+        self.pill.add_widget(self.icon)
+        self.pill.bind(pos=self._u, size=self._u)
+        self.bind(_k=self._u)
+        self.title = lbl(title, 11, T.on_var, halign="center", size_hint_y=None, height=dp(18))
+        self.add_widget(self.pill)
+        self.add_widget(self.title)
+        self.bind(on_release=lambda *_: self.cb(self.key))
+
+    def _u(self, *_):
+        w = dp(56) * (0.5 + 0.5 * self._k)
+        self._pr.pos = ((self.pill.x + self.pill.width / 2.0) - w / 2, self.pill.y)
+        self._pr.size = (w, self.pill.height)
+        self._pc.a = self._k
+        s = dp(22)
+        self.icon.pos = ((self.pill.x + self.pill.width / 2.0) - s / 2, (self.pill.y + self.pill.height / 2.0) - s / 2)
+        self.icon.size = (s, s)
+
+    def set_active(self, on):
+        Animation.cancel_all(self)
+        Animation(_k=1.0 if on else 0.0, d=0.2, t="out_quad").start(self)
+        self.icon.tint = T.on_secondary_container if on else T.on_var
+        self.title.color = T.on_surface if on else T.on_var
+        self.title.bold = on
+
+
+class Segmented(Box):
+    def __init__(self, options, value, on_change, **kw):
+        super().__init__(size_hint_y=None, height=dp(42), line=T.outline, radius=dp(21), spacing=0, **kw)
+        self.on_change = on_change
+        self.btns = {}
+        for i, opt in enumerate(options):
+            b = Tap(radius=dp(20), padding=(dp(6), 0), spacing=dp(4))
+            b.icon = Icon(name="check", size_hint_x=None, width=dp(16))
+            b.label = lbl(opt, 13, bold=True, halign="center")
+            b.add_widget(b.icon)
+            b.add_widget(b.label)
+            b.bind(on_release=lambda w, o=opt: self.select(o))
+            self.btns[opt] = b
+            self.add_widget(b)
+        self.select(value, notify=False)
+
+    def select(self, opt, notify=True):
+        for k, b in self.btns.items():
+            on = k == opt
+            b.bg = T.secondary_container if on else [0, 0, 0, 0]
+            b.label.color = T.on_secondary_container if on else T.on_surface
+            b.icon.tint = T.on_secondary_container
+            b.icon.width = dp(16) if on else 0
+            b.icon.opacity = 1 if on else 0
+        if notify:
+            self.on_change(opt)
+
+
+class Snackbar:
+    _current = None
+
+    @classmethod
+    def show(cls, text, parent):
+        if cls._current is not None and cls._current.parent:
+            cls._current.parent.remove_widget(cls._current)
+        bar = Box(bg=T.on_surface, radius=dp(10), padding=(dp(16), 0), size_hint=(None, None),
+                  height=dp(48), width=parent.width - dp(32), pos=(parent.x + dp(16), parent.y + dp(84)))
+        bar.add_widget(lbl(text, 13, T.surface, shorten=True))
+        bar.opacity = 0
+        parent.add_widget(bar)
+        cls._current = bar
+        anim = Animation(opacity=1, d=0.15) + Animation(d=2.4) + Animation(opacity=0, d=0.3)
+        anim.bind(on_complete=lambda *_: bar.parent and bar.parent.remove_widget(bar))
+        anim.start(bar)

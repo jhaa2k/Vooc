@@ -58,14 +58,14 @@ sleep 2; adb shell input keyevent KEYCODE_HOME; sleep 6
 $T adb shell am start -n $PKG/org.kivy.android.PythonActivity
 sleep 12; shot start
 allow; sleep 2; shot after_permission
-# IMPORT (top transport row)
+# IMPORT AUDIO (Library page, filled button)
 adb shell cp /sdcard/Download/test_song.wav /sdcard/Music/test_song.wav
 for i in $(seq 1 20); do
   adb shell content call --uri content://media --method scan_volume --arg external_primary >/dev/null 2>&1
   adb shell content query --uri content://media/external/file --projection _display_name 2>/dev/null | grep -q test_song && { echo "media indexed after $i"; break; }
   sleep 3
 done
-tap 0.31 0.374; sleep 5; shot picker
+tap 0.29 0.464; sleep 5; shot picker
 picker_up() { [ -n "$($T adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity:' | grep -i documentsui)" ]; }
 for attempt in 1 2 3 4; do
   top=$($T adb shell dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity|ResumedActivity:' | head -1)
@@ -83,16 +83,20 @@ for attempt in 1 2 3 4; do
   else LONG=1 tap_text 'test_song'; sleep 2; tap_text '^(Select|SELECT|Open|OPEN|Done)$|action_menu_select|menu_select'; sleep 5; fi
 done
 shot imported
-tap 0.51 0.374; sleep 6; shot playing
-for tab in "0.20 Layers" "0.33 Presets" "0.45 Audio" "0.57 Visualizer" "0.69 Properties" "0.81 Scene" "0.93 Export" "0.08 Media"; do
-  set -- $tab; tap $1 0.943; sleep 3; shot "tab_$2"
+# Import autoplays; give the spectrum decoder time, then capture the live visualizer
+sleep 8; shot playing
+for tab in "0.30 Visual" "0.50 Sound" "0.70 Layers" "0.89 Studio" "0.11 Library"; do
+  set -- $tab; tap $1 0.963; sleep 3; shot "tab_$2"
 done
-# Properties tab, open first module
-tap 0.69 0.943; sleep 3; tap 0.5 0.62; sleep 3; shot properties_open
-tap 0.08 0.943; sleep 3
-# USE ANDROID NATIVE PLAYER
-tap 0.5 0.626; sleep 4; allow; sleep 4; shot native_player
-tap 0.51 0.374; sleep 6; shot native_playing
+# Visual page: cycle visualizer styles with the chip on the preview card
+tap 0.30 0.963; sleep 2
+for st in 1 2 3 4 5; do tap 0.80 0.096; sleep 2; shot "style_$st"; done
+# Studio > Properties, open first module
+tap 0.89 0.963; sleep 3; tap 0.25 0.613; sleep 3; shot properties_open
+tap 0.11 0.963; sleep 2
+# Pause / resume via the play FAB
+tap 0.50 0.385; sleep 3; shot paused
+tap 0.50 0.385; sleep 4; shot resumed_playback
 adb shell input keyevent KEYCODE_HOME; sleep 3
 $T adb shell am start -n $PKG/org.kivy.android.PythonActivity; sleep 6; shot resume
 

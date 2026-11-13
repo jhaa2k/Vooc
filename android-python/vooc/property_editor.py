@@ -11,7 +11,6 @@ from kivy.uix.slider import Slider
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.checkbox import CheckBox
-from kivy.uix.accordion import Accordion, AccordionItem
 from .property_schema import SCHEMA
 
 class AdvancedProperties(BoxLayout):
@@ -57,16 +56,39 @@ class AdvancedProperties(BoxLayout):
         top.add_widget(self._button("RESET",lambda:self._reset(category)))
         top.add_widget(self._button("INFO",lambda:self._info(category)))
         self.add_widget(top)
-        acc=Accordion(orientation="vertical",min_space=dp(42),size_hint_y=1)
+        # Collapsible list inside ONE ScrollView. Kivy's Accordion needs every
+        # header to fit on screen at once (it aborts the layout on small
+        # phones) and built every control of every section up front, which
+        # froze the app on big modules. Sections are now built on first open.
+        scroll=ScrollView(do_scroll_x=False)
+        col=BoxLayout(orientation="vertical",size_hint_y=None,spacing=dp(4),padding=dp(6))
+        col.bind(minimum_height=col.setter("height"))
         for section, groups in SCHEMA[category].items():
-            item=AccordionItem(title=section,collapse=True)
-            sc=ScrollView(); body=BoxLayout(orientation="vertical",size_hint_y=None,spacing=dp(5),padding=dp(6))
-            body.bind(minimum_height=body.setter("height"))
-            for group, fields in groups.items():
-                body.add_widget(Label(text="[b]"+group+"[/b]",markup=True,size_hint_y=None,height=dp(28),halign="left"))
-                for name,spec in fields.items(): body.add_widget(self._control(category,section,group,name,spec))
-            sc.add_widget(body); item.add_widget(sc); acc.add_widget(item)
-        self.add_widget(acc)
+            count=sum(len(f) for f in groups.values())
+            holder=BoxLayout(orientation="vertical",size_hint_y=None,height=0,spacing=dp(5))
+            holder.bind(minimum_height=holder.setter("height"))
+            header=self._button("+  "+section+"   ("+str(count)+")",lambda: None)
+            header.halign="left"; header.bind(size=lambda b,sz:setattr(b,"text_size",(sz[0]-dp(16),None)))
+            header.background_color=(.11,.12,.15,1)
+            def toggle(_btn,sec=section,grp=groups,box=holder,cnt=count):
+                if box.children:
+                    box.clear_widgets(); box.height=0
+                    _btn.text="+  "+sec+"   ("+str(cnt)+")"
+                    return
+                _btn.text="-  "+sec+"   ("+str(cnt)+")"
+                for group, fields in grp.items():
+                    lbl=Label(text="[b]"+group+"[/b]",markup=True,size_hint_y=None,height=dp(28),halign="left",valign="middle",color=(.72,.9,.2,1))
+                    lbl.bind(size=lambda obj,sz:setattr(obj,"text_size",sz))
+                    box.add_widget(lbl)
+                    for name,spec in fields.items():
+                        try:
+                            box.add_widget(self._control(category,sec,group,name,spec))
+                        except Exception as exc:
+                            box.add_widget(Label(text=name+": "+str(exc),size_hint_y=None,height=dp(30),font_size="10sp"))
+            header.bind(on_release=toggle)
+            col.add_widget(header); col.add_widget(holder)
+        scroll.add_widget(col)
+        self.add_widget(scroll)
 
     def _control(self, category, section, group, name, spec):
         path,value=self._value(category,section,group,name,spec)

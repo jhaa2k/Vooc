@@ -35,7 +35,7 @@ shot() { n=$((n+1)); f=$(printf "%02d_%s" $n "$1"); $T adb exec-out screencap -p
 tap_text() {
   $T adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
   $T adb pull /sdcard/ui.xml "$OUT/ui.xml" >/dev/null 2>&1
-  python3 - "$OUT/ui.xml" "$1" <<'PY' | while read x y; do adb shell input tap $x $y; done
+  python3 - "$OUT/ui.xml" "$1" <<'PY' | while read x y; do if [ -n "$LONG" ]; then adb shell input swipe $x $y $x $y 1200; else adb shell input tap $x $y; fi; done
 import re, sys
 try: s = open(sys.argv[1]).read()
 except Exception: sys.exit()
@@ -59,12 +59,25 @@ $T adb shell am start -n $PKG/org.kivy.android.PythonActivity
 sleep 12; shot start
 allow; sleep 2; shot after_permission
 # IMPORT (top transport row)
+adb shell cp /sdcard/Download/test_song.wav /sdcard/Music/test_song.wav
+adb shell content call --uri content://media --method scan_volume --arg external_primary >/dev/null 2>&1; sleep 3
 tap 0.31 0.374; sleep 5; shot picker
-tap_text 'test_song'; sleep 4
-if [ -n "$($T adb shell dumpsys activity activities | grep -i documentsui | grep -i resumed)" ]; then
-  tap_text '^Show roots$'; sleep 3; tap_text '^Downloads$'; sleep 4; shot picker_downloads
-  tap_text 'test_song'; sleep 6
-fi
+picker_up() { [ -n "$($T adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity:' | grep -i documentsui)" ]; }
+for attempt in 1 2 3 4; do
+  top=$($T adb shell dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity|ResumedActivity:' | head -1)
+  echo "picker attempt $attempt: $top"
+  case "$top" in
+    *documentsui*) ;;
+    *$PKG*) break ;;
+    *) adb shell input keyevent KEYCODE_BACK; sleep 3; continue ;;
+  esac
+  $T adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; $T adb pull /sdcard/ui.xml "$OUT/ui.xml" >/dev/null 2>&1
+  if ! grep -q test_song "$OUT/ui.xml"; then
+    tap_text '^Show roots$'; sleep 3; tap_text '^(Downloads|Music|Audio)$'; sleep 4; shot picker_downloads; continue
+  fi
+  if [ $attempt -le 2 ]; then tap_text 'test_song'; sleep 5
+  else LONG=1 tap_text 'test_song'; sleep 2; tap_text '^(Select|SELECT|Open|OPEN|Done)$|action_menu_select|menu_select'; sleep 5; fi
+done
 shot imported
 tap 0.51 0.374; sleep 6; shot playing
 for tab in "0.20 Layers" "0.33 Presets" "0.45 Audio" "0.57 Visualizer" "0.69 Properties" "0.81 Scene" "0.93 Export" "0.08 Media"; do

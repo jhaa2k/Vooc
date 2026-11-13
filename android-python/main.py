@@ -14,12 +14,17 @@ from kivy.uix.popup import Popup
 from kivy.core.audio import SoundLoader
 from pathlib import Path
 import json, random
-from vooc.state import ProjectState, THEMES
-from vooc.visualizer import Spectrum
-from vooc.pcm_pipeline import PCMAnalysisPipeline
-from vooc.android_audio import AndroidMediaPlayerSource
-from vooc.android_media import choose_audio, choose_image
-from vooc.property_editor import AdvancedProperties
+_STARTUP_IMPORT_ERROR = None
+try:
+    from vooc.state import ProjectState, THEMES
+    from vooc.visualizer import Spectrum
+    from vooc.pcm_pipeline import PCMAnalysisPipeline
+    from vooc.android_audio import AndroidMediaPlayerSource
+    from vooc.android_media import choose_audio, choose_image
+    from vooc.property_editor import AdvancedProperties
+except BaseException:
+    import traceback
+    _STARTUP_IMPORT_ERROR = traceback.format_exc()
 
 class B(Button):
     """Stable Kivy-native Material-toned button; avoids custom GPU canvas widgets."""
@@ -408,29 +413,40 @@ class VoocApp(App):
     def build(self):
         self.title = "Vooc"
         Window.clearcolor = (.055, .063, .078, 1)
-        try:
-            return VoocRoot()
-        except Exception:
-            import traceback
-            from kivy.uix.label import Label
-            from kivy.uix.button import Button
-            from kivy.uix.boxlayout import BoxLayout
-            details = traceback.format_exc()
+        details = _STARTUP_IMPORT_ERROR
+        if not details:
             try:
-                log_path = Path(self.user_data_dir) / "vooc_startup_error.txt"
-                log_path.write_text(details, encoding="utf-8")
-            except Exception:
-                log_path = "app-private/vooc_startup_error.txt"
-            fallback = BoxLayout(orientation="vertical", padding=dp(18), spacing=dp(12))
-            fallback.add_widget(Label(text="VOOC COULD NOT START", bold=True, font_size="18sp",
-                                      color=(1, .45, .4, 1), size_hint_y=None, height=dp(42)))
-            fallback.add_widget(Label(text="Startup error was saved to: " + str(log_path) +
-                                      "\\nPlease share this file to diagnose the exact crash.",
-                                      halign="left", valign="middle", color=(.9,.9,.92,1)))
-            retry = Button(text="CLOSE APP", size_hint_y=None, height=dp(48))
-            retry.bind(on_release=lambda *_: App.get_running_app().stop())
-            fallback.add_widget(retry)
-            return fallback
+                return VoocRoot()
+            except BaseException:
+                import traceback
+                details = traceback.format_exc()
+        try:
+            log_path = Path(self.user_data_dir) / "vooc_startup_error.txt"
+            log_path.write_text(details, encoding="utf-8")
+        except Exception:
+            log_path = "app-private/vooc_startup_error.txt"
+        from kivy.uix.label import Label
+        from kivy.uix.button import Button
+        from kivy.uix.boxlayout import BoxLayout
+        from kivy.uix.scrollview import ScrollView
+        fallback = BoxLayout(orientation="vertical", padding=dp(12), spacing=dp(8))
+        fallback.add_widget(Label(text="VOOC STARTUP DIAGNOSTIC", bold=True, font_size="17sp",
+                                  color=(1, .45, .4, 1), size_hint_y=None, height=dp(38)))
+        info = Label(text="Startup failed. Full traceback is saved at:\\n" + str(log_path),
+                     halign="left", valign="middle", color=(.9,.9,.92,1),
+                     size_hint_y=None, height=dp(58))
+        fallback.add_widget(info)
+        scroll = ScrollView()
+        error_text = Label(text=details[-7000:], size_hint_y=None, halign="left", valign="top",
+                           color=(1,.78,.72,1), font_size="10sp")
+        error_text.bind(width=lambda obj, width: setattr(obj, "text_size", (width, None)))
+        error_text.bind(texture_size=lambda obj, size: setattr(obj, "height", size[1] + dp(12)))
+        scroll.add_widget(error_text)
+        fallback.add_widget(scroll)
+        close = Button(text="CLOSE APP", size_hint_y=None, height=dp(44))
+        close.bind(on_release=lambda *_: App.get_running_app().stop())
+        fallback.add_widget(close)
+        return fallback
 
 if __name__ == "__main__":
     VoocApp().run()

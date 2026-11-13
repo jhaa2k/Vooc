@@ -26,6 +26,25 @@ except BaseException:
     _STARTUP_IMPORT_ERROR = traceback.format_exc()
 
 
+def system_insets():
+    """(top, bottom) pixels hidden behind the status / navigation bars.
+
+    Android 15+ draws apps edge-to-edge for targetSdk 35, so the SDL surface
+    extends under the system bars. Older versions lay the window out below
+    them, so nothing needs to be reserved there."""
+    try:
+        from jnius import autoclass
+        if autoclass("android.os.Build$VERSION").SDK_INT < 35:
+            return 0, 0
+        act = autoclass("org.kivy.android.PythonActivity").mActivity
+        ins = act.getWindow().getDecorView().getRootWindowInsets()
+        if ins is None:
+            return None
+        return int(ins.getSystemWindowInsetTop()), int(ins.getSystemWindowInsetBottom())
+    except Exception:
+        return 0, 0
+
+
 def fmt_time(sec):
     sec = max(0, int(sec or 0))
     return "%d:%02d" % (sec // 60, sec % 60)
@@ -79,10 +98,24 @@ class VoocRoot(FloatLayout):
         self.loader = SpectrumLoader(self._spectrum_ready, self._spectrum_progress,
                                      scheduler=lambda fn: Clock.schedule_once(lambda _dt: fn(), 0))
         self._save_trigger = Clock.create_trigger(lambda _dt: self.autosave(), 1.0)
+        self.insets = system_insets() or (0, 0)
         self.build_ui()
+        if system_insets() is None:
+            Clock.schedule_once(self._retry_insets, 0.5)
         Clock.schedule_interval(self.tick, 1 / 15.0)
         if Window is not None:
             Window.bind(on_keyboard=self._on_key)
+
+    def _retry_insets(self, _dt, tries=[0]):
+        ins = system_insets()
+        if ins is None:
+            tries[0] += 1
+            if tries[0] < 10:
+                Clock.schedule_once(self._retry_insets, 0.5)
+            return
+        if tuple(ins) != tuple(self.insets):
+            self.insets = ins
+            self.build_ui()
 
     # ================================================================ UI
     def build_ui(self):
@@ -94,7 +127,8 @@ class VoocRoot(FloatLayout):
         self.clear_widgets()
         if Window is not None:
             Window.clearcolor = T.bg
-        main = m3.Box(orientation="vertical", bg=T.bg, padding=(dp(12), dp(6), dp(12), 0), spacing=dp(10))
+        top, bottom = self.insets
+        main = m3.Box(orientation="vertical", bg=T.bg, padding=(dp(12), dp(6) + top, dp(12), 0), spacing=dp(10))
         main.add_widget(self._top_bar())
         main.add_widget(self._visual_card())
         main.add_widget(self._player_card())
@@ -103,6 +137,8 @@ class VoocRoot(FloatLayout):
         outer = BoxLayout(orientation="vertical")
         outer.add_widget(main)
         self.nav = m3.NavBar(NAV, self.show, self.page)
+        self.nav.height += bottom
+        self.nav.padding = (dp(4), dp(6), dp(4), dp(6) + bottom)
         outer.add_widget(self.nav)
         self.add_widget(outer)
         self.show(self.page)
@@ -125,7 +161,15 @@ class VoocRoot(FloatLayout):
         return bar
 
     def _visual_card(self):
-        frame = m3.Box(bg=T.surface1, radius=dp(24), padding=dp(4), size_hint_y=.36)
+        frame = m3.Box(bg=T.surface1, radius=dp(24), padding=dp(4), size_hint_y=None)
+        def fit(*_):
+            frame.height = max(dp(130), min(dp(340), (self.height or 800) * 0.28))
+        if getattr(self, "_fit_visual", None) is not None:
+            self.unbind(height=self._fit_visual)
+        self._fit_visual = fit
+        self.bind(height=fit)
+        fit()
+        self.visual_frame = frame
         stage = FloatLayout()
         self.preview = Spectrum(self.s, clock_source=self.clock, size_hint=(1, 1), pos_hint={"x": 0, "y": 0})
         if self.loader is not None and self.track and self.track in self.loader._cache:
@@ -192,6 +236,7 @@ class VoocRoot(FloatLayout):
     def show(self, page):
         self.page = page
         self.body.clear_widgets()
+        Clock.schedule_once(self._dump_targets, 0.8)
         builder = getattr(self, "_page_" + page)
         if page == "studio":
             self.body.add_widget(builder())
@@ -203,10 +248,39 @@ class VoocRoot(FloatLayout):
         scroll.add_widget(col)
         self.body.add_widget(scroll)
 
+    def _dump_targets(self, *_):
+        """Emulator smoke test hook: publish key button positions (fractions,
+        y from top) when files/smoke_targets exists. No-op for users."""
+        try:
+            app = App.get_running_app()
+            base = Path(app.user_data_dir)
+            if not (base / "smoke_targets").exists() or Window is None:
+                return
+            W, H = float(Window.width), float(Window.height)
+            out = []
+
+            def add(name, w):
+                if w is None or w.get_root_window() is None:
+                    return
+                x, y = w.to_window(w.x + w.width / 2.0, w.y + w.height / 2.0)
+                out.append("%s %.4f %.4f" % (name, x / W, 1 - y / H))
+            add("play", self.play_btn)
+            add("style", self.style_chip)
+            for k, it in self.nav.items.items():
+                add("nav_" + k, it)
+            add("import", getattr(self, "import_btn", None))
+            pe = getattr(self, "property_editor", None)
+            if pe is not None and pe.get_root_window() is not None and getattr(pe, "first_tile", None) is not None:
+                add("prop_tile", pe.first_tile)
+            (base / "ui_targets.txt").write_text("\n".join(out) + "\n")
+        except Exception as exc:
+            print("Vooc targets: %s" % exc)
+
     # ---------------------------------------------------------------- library
     def _page_library(self, col):
         actions = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
-        actions.add_widget(m3.Button3("Import audio", self.import_audio, kind="filled", icon="plus", height=dp(48)))
+        self.import_btn = m3.Button3("Import audio", self.import_audio, kind="filled", icon="plus", height=dp(48))
+        actions.add_widget(self.import_btn)
         actions.add_widget(m3.Button3("Clear", self.clear_playlist, kind="outlined", icon="delete", height=dp(48),
                                       size_hint_x=.6))
         col.add_widget(actions)
@@ -457,6 +531,7 @@ class VoocRoot(FloatLayout):
         if tab == "Properties":
             self.property_editor = AdvancedProperties(self.s, on_change=self.preview.refresh, on_save=self._save_trigger)
             self.studio_body.add_widget(self.property_editor)
+            Clock.schedule_once(self._dump_targets, 0.8)
             return
         scroll = Scroll()
         col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=(0, 0, 0, dp(16)))

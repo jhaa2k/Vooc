@@ -85,7 +85,8 @@ class Box(BoxLayout):
             self._c = Color(*self.bg)
             self._r = RoundedRectangle(radius=[self.radius])
             self._lc = Color(*self.line)
-            self._l = Line(width=dp(1))
+            # width > 1 forces Kivy's triangle path; 1px GL_LINES drop out on some GPUs
+            self._l = Line(width=max(1.05, dp(1)))
         self.bind(pos=self._u, size=self._u, bg=self._u, line=self._u, radius=self._u)
         self._u()
 

@@ -29,6 +29,12 @@ adb shell content call --uri content://media --method scan_volume --arg external
 $T adb install -r "$APK"
 adb logcat -c
 W=$($T adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1); WX=${W%x*}; WY=${W#*x}
+# The app publishes button centres to files/ui_targets.txt when files/smoke_targets exists.
+tgt() {
+  line=$($T adb shell run-as $PKG cat files/ui_targets.txt 2>/dev/null | tr -d '\r' | grep "^$1 " | head -1)
+  if [ -z "$line" ]; then echo "target $1 missing (fallback $2 $3)"; tap $2 $3; return; fi
+  set -- $line; tap $2 $3
+}
 tap() { adb shell input tap $(python3 -c "print(int($WX*$1), int($WY*$2))"); }
 n=0
 shot() { n=$((n+1)); f=$(printf "%02d_%s" $n "$1"); $T adb exec-out screencap -p > "$OUT/$f.png"; echo "[$f] pid=$($T adb shell pidof $PKG)"; }
@@ -53,6 +59,7 @@ allow() { tap_text '^(While using the app|Allow|ALLOW|Only this time)$|permissio
 
 # First launch, but leave the app during the "Loading..." screen (Home key),
 # then come back. This used to kill the app ("Could not fetch native window").
+$T adb shell run-as $PKG sh -c 'mkdir -p files && touch files/smoke_targets'
 $T adb shell am start -W -n $PKG/org.kivy.android.PythonActivity
 sleep 2; adb shell input keyevent KEYCODE_HOME; sleep 6
 $T adb shell am start -n $PKG/org.kivy.android.PythonActivity
@@ -65,7 +72,7 @@ for i in $(seq 1 20); do
   adb shell content query --uri content://media/external/file --projection _display_name 2>/dev/null | grep -q test_song && { echo "media indexed after $i"; break; }
   sleep 3
 done
-tap 0.29 0.464; sleep 5; shot picker
+tgt import 0.31 0.547; sleep 5; shot picker
 picker_up() { [ -n "$($T adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity:' | grep -i documentsui)" ]; }
 for attempt in 1 2 3 4; do
   top=$($T adb shell dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity|ResumedActivity:' | head -1)
@@ -85,23 +92,24 @@ done
 shot imported
 # Import autoplays; give the spectrum decoder time, then capture the live visualizer
 sleep 8; shot playing
-for tab in "0.30 Visual" "0.50 Sound" "0.70 Layers" "0.89 Studio" "0.11 Library"; do
-  set -- $tab; tap $1 0.963; sleep 3; shot "tab_$2"
+for tab in visual sound layers studio library; do
+  tgt nav_$tab 0.5 0.93; sleep 3; shot "tab_$tab"
 done
 # Visual page: cycle visualizer styles with the chip on the preview card
-tap 0.30 0.963; sleep 2
-for st in 1 2 3 4 5; do tap 0.80 0.096; sleep 2; shot "style_$st"; done
+tgt nav_visual 0.3 0.93; sleep 2
+for st in 1 2 3 4 5; do tgt style 0.8 0.13; sleep 2; shot "style_$st"; done
 # Studio > Properties, open first module
-tap 0.89 0.963; sleep 3; tap 0.25 0.613; sleep 3; shot properties_open
-tap 0.11 0.963; sleep 2
+tgt nav_studio 0.89 0.93; sleep 3; tgt prop_tile 0.25 0.76; sleep 3; shot properties_open
+tgt nav_library 0.11 0.93; sleep 2
 # Pause / resume via the play FAB
-tap 0.50 0.385; sleep 3; shot paused
-tap 0.50 0.385; sleep 4; shot resumed_playback
+tgt play 0.5 0.435; sleep 3; shot paused
+tgt play 0.5 0.435; sleep 4; shot resumed_playback
 adb shell input keyevent KEYCODE_HOME; sleep 3
 $T adb shell am start -n $PKG/org.kivy.android.PythonActivity; sleep 6; shot resume
 
 $T adb logcat -d > "$OUT/logcat.txt"
-$T adb shell run-as $PKG ls -la files/app > "$OUT/files.txt" 2>&1
+$T adb shell run-as $PKG ls -la files files/app > "$OUT/files.txt" 2>&1
+$T adb shell run-as $PKG cat files/ui_targets.txt > "$OUT/ui_targets.txt" 2>/dev/null
 $T adb shell run-as $PKG cat files/app/vooc_startup_error.txt > "$OUT/vooc_startup_error.txt" 2>/dev/null
 echo "================ APP LOG ================"
 grep -E " python |AndroidRuntime: (FATAL|Process)|F DEBUG|Fatal signal|has died|ANR in|ndk_translation: Undefined" "$OUT/logcat.txt" | grep -v extracting | tail -300

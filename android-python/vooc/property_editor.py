@@ -77,6 +77,7 @@ class AdvancedProperties(BoxLayout):
         scroll = ScrollView(do_scroll_x=False, bar_width=dp(3))
         grid = GridLayout(cols=2, spacing=dp(10), padding=(0, dp(2), 0, dp(12)), size_hint_y=None)
         grid.bind(minimum_height=grid.setter("height"))
+        self.first_tile = None
         for name in SCHEMA:
             tile = m3.Tap(on_tap=lambda n=name: self._details(n), orientation="vertical", bg=T.surface2,
                           radius=dp(18), padding=dp(12), spacing=dp(6), size_hint_y=None, height=dp(96))
@@ -93,6 +94,8 @@ class AdvancedProperties(BoxLayout):
             tile.add_widget(m3.lbl(_pretty(name), 14, bold=True))
             tile.add_widget(m3.lbl("%d settings" % self._count(name), 11, T.on_var))
             grid.add_widget(tile)
+            if self.first_tile is None:
+                self.first_tile = tile
         scroll.add_widget(grid)
         self.add_widget(scroll)
 

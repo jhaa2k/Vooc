@@ -382,6 +382,25 @@ class Button3(Tap):
         self.label = lbl(text, fs, self.fg, bold=True, halign="center" if not icon else "left")
         inner.add_widget(self.label)
         self.add_widget(inner)
+        self._inner = inner
+        if icon:
+            # narrow phones / large font scale: drop the icon before the text gets cut
+            self.bind(width=self._fit)
+            self.label.bind(text=self._fit)
+
+    def _fit(self, *_):
+        try:
+            need = self.label._label.get_extents(self.label.text)[0]
+        except Exception:
+            return
+        room = self.width - self.padding[0] * 2 - self.spacing - dp(6)
+        show = need + dp(18) + dp(8) <= room
+        self.icon.opacity = 1 if show else 0
+        self.icon.width = dp(18) if show else 0
+        self._inner.spacing = dp(8) if show else 0
+        self.label.halign = "left" if show else "center"
+        if not show and need > room and self.padding[0] > dp(8):
+            self.padding = (dp(8), 0)
 
     @property
     def text(self):

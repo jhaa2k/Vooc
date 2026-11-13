@@ -54,7 +54,8 @@ def _materialize_android_uri(value):
         display_name = _safe_name(display_name)
         if "." not in display_name:
             mime = resolver.getType(uri)
-            display_name += mimetypes.guess_extension(str(mime)) if mime else ".audio"
+            extension = (mimetypes.guess_extension(str(mime)) if mime else None) or ".audio"
+            display_name += extension
         target = os.path.join(str(activity.getCacheDir().getAbsolutePath()), display_name)
         base, ext = os.path.splitext(target)
         counter = 1

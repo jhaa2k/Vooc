@@ -44,6 +44,7 @@ $T adb logcat -d > "$OUT/logcat.txt"
 $T adb shell run-as $PKG ls -la files files/app > "$OUT/files.txt" 2>&1
 for f in vooc_startup_error.txt; do $T adb shell run-as $PKG cat files/app/$f > "$OUT/$f" 2>/dev/null; done
 $T adb shell run-as $PKG sh -c 'cat files/app/.kivy/logs/*' > "$OUT/kivy_log.txt" 2>/dev/null
+adb shell getprop ro.product.cpu.abilist; adb shell getprop ro.dalvik.vm.native.bridge
 echo "================ APP LOG ================"
 grep -E " python |pythonutil|AndroidRuntime|DEBUG   : |libc    : Fatal|F libc|SDL     : |crash_dump|Process com.jhaa2k.vooc|has died|ANR in" "$OUT/logcat.txt" | grep -v extracting | tail -300
 echo "================ END ================"

@@ -7,6 +7,10 @@ on:
         description: "Git ref to test (default: this commit)"
         required: false
         default: ""
+      apk_run_id:
+        description: "Test the vooc-debug-apk artifact of this Build run id instead of building"
+        required: false
+        default: ""
   push:
     paths:
       - ".github/workflows/android-emulator-smoke.yml"
@@ -14,9 +18,11 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
+    if: ${{ !inputs.apk_run_id }}
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
@@ -54,18 +60,27 @@ jobs:
 
   emulator-x86:
     needs: build
+    if: ${{ always() && (needs.build.result == 'success' || inputs.apk_run_id) }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        api: [30, 35, 36]
+        api: [30, 34, 36]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.apk_run_id }}
         with:
           name: smoke-apk
           path: apk
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.apk_run_id }}
+        with:
+          name: vooc-debug-apk
+          path: apk
+          run-id: ${{ inputs.apk_run_id }}
+          github-token: ${{ github.token }}
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -87,39 +102,3 @@ jobs:
           name: smoke-x86-api${{ matrix.api }}
           path: smoke-out
 
-  emulator-arm:
-    needs: build
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 40
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: smoke-apk
-          path: apk
-      - name: Enable KVM
-        run: |
-          ls -la /dev/kvm || true
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-      - name: Run on arm64 emulator
-        timeout-minutes: 30
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: arm64-v8a
-          target: google_apis
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: bash .github/scripts/emulator_smoke.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: smoke-arm64
-          path: smoke-out

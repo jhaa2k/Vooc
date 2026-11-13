@@ -5,12 +5,11 @@ from kivy.core.window import Window
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
-from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.uix.slider import Slider
-from kivy.uix.spinner import Spinner
-from kivy.uix.textinput import TextInput
-from kivy.uix.popup import Popup
+from vooc.material import (
+    MaterialButton as Button, MaterialLabel as Label, MaterialSlider as Slider,
+    MaterialSpinner as Spinner, MaterialTextInput as TextInput,
+    MaterialPopup as Popup, MaterialCard
+)
 from kivy.core.audio import SoundLoader
 from pathlib import Path
 import json, random
@@ -51,29 +50,40 @@ class VoocRoot(BoxLayout):
             self.feed_pcm_samples, self._native_error, self._native_completed,
             self._native_focus_changed
         )
-        top=BoxLayout(size_hint_y=None,height=dp(40))
-        top.add_widget(Label(text="[b]AUDIOVIS PRO[/b]",markup=True,halign="left"))
+        top=MaterialCard(orientation="horizontal",size_hint_y=None,height=dp(52),padding=[dp(12),dp(6)])
+        top.add_widget(Label(text="[b]VOOC[/b]",markup=True,halign="left",font_size="18sp"))
+        top.add_widget(Label(text="AUDIO VISUALIZER",halign="left",font_size="10sp",color=(.66,.68,.73,1)))
         for name,fn in [("SAVE",self.save),("LOAD",self.load)]:
-            b=B(text=name,size_hint_x=None,width=dp(58)); b.bind(on_release=lambda _,f=fn:f()); top.add_widget(b)
+            b=B(text=name,size_hint_x=None,width=dp(64),variant="outlined"); b.bind(on_release=lambda _,f=fn:f()); top.add_widget(b)
         self.add_widget(top)
-        self.preview=Spectrum(self.s,size_hint_y=.38); self.add_widget(self.preview)
+        preview_card=MaterialCard(size_hint_y=.38,padding=dp(5))
+        self.preview=Spectrum(self.s,size_hint=(1,1)); preview_card.add_widget(self.preview)
+        self.add_widget(preview_card)
         self.pcm_pipeline=PCMAnalysisPipeline(self._on_audio_analysis, scheduler=lambda callback: Clock.schedule_once(lambda _dt: callback(), 0), sample_rate=44100, fft_size=1024, band_count=64, min_interval=1/30)
         self.track_label=Label(text="No track loaded",size_hint_y=None,height=dp(25),font_size="11sp")
         self.add_widget(self.track_label)
-        transport=BoxLayout(size_hint_y=None,height=dp(42),spacing=dp(5))
+        transport_card=MaterialCard(size_hint_y=None,height=dp(54),padding=[dp(6),dp(5)])
+        transport=BoxLayout(size_hint_y=1,spacing=dp(5))
         for text,fn in [("PREV",self.previous),("IMPORT",self.import_audio),("PLAY / PAUSE",self.toggle),("STOP",self.stop),("NEXT",self.next)]:
-            b=B(text=text,font_size="10sp"); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
-        self.add_widget(transport)
+            variant="filled" if text in ("IMPORT","PLAY / PAUSE") else "tonal"
+            b=B(text=text,font_size="10sp",variant=variant); b.bind(on_release=lambda _,f=fn:f()); transport.add_widget(b)
+        transport_card.add_widget(transport)
+        self.add_widget(transport_card)
         self.seek=Slider(min=0,max=100,value=0,size_hint_y=None,height=dp(22))
         self._seek_dragging=False
         self.seek.bind(on_touch_down=self.seek_touch_down,on_touch_up=self.seek_audio); self.add_widget(self.seek)
         self._last_track_pos=0; self._end_handled=False
         self.body=BoxLayout()
         self.add_widget(self.body)
-        nav=GridLayout(cols=len(self.tabs),size_hint_y=None,height=dp(50),spacing=dp(2))
+        nav_scroll=ScrollView(size_hint_y=None,height=dp(58),do_scroll_x=True,do_scroll_y=False,bar_width=0)
+        nav=GridLayout(rows=1,cols=len(self.tabs),size_hint=(None,1),spacing=dp(5),padding=[dp(4),dp(3)])
+        nav.bind(minimum_width=nav.setter("width"))
+        self.nav_buttons={}
         for tab in self.tabs:
-            b=B(text=tab,font_size="9sp"); b.bind(on_release=lambda _,t=tab:self.show(t)); nav.add_widget(b)
-        self.add_widget(nav)
+            b=B(text=tab,font_size="11sp",size_hint_x=None,width=dp(108),variant="tonal")
+            b.bind(on_release=lambda _,t=tab:self.show(t)); nav.add_widget(b); self.nav_buttons[tab]=b
+        nav_scroll.add_widget(nav)
+        self.add_widget(nav_scroll)
         self.show("Media"); Clock.schedule_interval(self.tick,1/20)
 
     def feed_pcm_samples(self, samples, timestamp=None):
@@ -111,7 +121,10 @@ class VoocRoot(BoxLayout):
     def popup(self,msg):
         Popup(title="Vooc",content=Label(text=msg),size_hint=(.85,None),height=dp(140)).open()
     def show(self,tab):
-        self.tab=tab; self.body.clear_widgets()
+        self.tab=tab
+        for name, button in getattr(self,"nav_buttons",{}).items():
+            button.set_variant("filled" if name == tab else "tonal")
+        self.body.clear_widgets()
         if tab=="Properties":
             self.property_editor=AdvancedProperties(self.s, on_change=self.preview.refresh, on_save=self.autosave)
             self.body.add_widget(self.property_editor)

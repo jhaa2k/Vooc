@@ -5,12 +5,12 @@ from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
-from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.uix.slider import Slider
-from kivy.uix.spinner import Spinner
-from kivy.uix.textinput import TextInput
-from kivy.uix.checkbox import CheckBox
+from vooc.material import (
+    MaterialLabel as Label, MaterialButton as Button, MaterialSlider as Slider,
+    MaterialSpinner as Spinner, MaterialTextInput as TextInput,
+    MaterialCheckBox as CheckBox, MaterialPopup as Popup,
+    SURFACE_HIGH, TEXT
+)
 from kivy.uix.accordion import Accordion, AccordionItem
 from .property_schema import SCHEMA
 
@@ -35,7 +35,7 @@ class AdvancedProperties(BoxLayout):
         if self.on_save: self.on_save()
 
     def _button(self, label, callback):
-        b=Button(text=label,size_hint_y=None,height=dp(42),font_size="12sp",background_normal="",background_color=(.15,.16,.19,1))
+        b=Button(text=label,size_hint_y=None,height=dp(44),font_size="12sp",variant="tonal")
         b.bind(on_release=lambda *_:callback()); return b
 
     def _home(self):
@@ -60,7 +60,11 @@ class AdvancedProperties(BoxLayout):
         acc=Accordion(orientation="vertical",min_space=dp(42),size_hint_y=1)
         for section, groups in SCHEMA[category].items():
             item=AccordionItem(title=section,collapse=True)
-            sc=ScrollView(); body=BoxLayout(orientation="vertical",size_hint_y=None,spacing=dp(5),padding=dp(6))
+            item.background_normal=""
+            item.background_selected=""
+            item.background_color=SURFACE_HIGH
+            item.color=TEXT
+            sc=ScrollView(); body=BoxLayout(orientation="vertical",size_hint_y=None,spacing=dp(7),padding=dp(8))
             body.bind(minimum_height=body.setter("height"))
             for group, fields in groups.items():
                 body.add_widget(Label(text="[b]"+group+"[/b]",markup=True,size_hint_y=None,height=dp(28),halign="left"))
@@ -114,5 +118,4 @@ class AdvancedProperties(BoxLayout):
         self._details(category)
 
     def _info(self,category):
-        from kivy.uix.popup import Popup
-        Popup(title=category,content=Label(text="Settings are stored per property in the project JSON. Engine-dependent options are configuration-ready; rendering support is added by the corresponding engine module."),size_hint=(.88,.42)).open()
+        Popup(title=category,content=Label(text="Settings are stored per property in the project JSON. Engine-dependent options are configuration-ready; rendering support is added by the corresponding engine module.")).open()

@@ -59,7 +59,7 @@ allow() { tap_text '^(While using the app|Allow|ALLOW|Only this time)$|permissio
 
 # First launch, but leave the app during the "Loading..." screen (Home key),
 # then come back. This used to kill the app ("Could not fetch native window").
-$T adb shell run-as $PKG sh -c 'mkdir -p files && touch files/smoke_targets'
+$T adb shell run-as $PKG mkdir -p files; $T adb shell run-as $PKG touch files/smoke_targets; $T adb shell run-as $PKG ls files
 $T adb shell am start -W -n $PKG/org.kivy.android.PythonActivity
 sleep 2; adb shell input keyevent KEYCODE_HOME; sleep 6
 $T adb shell am start -n $PKG/org.kivy.android.PythonActivity
@@ -72,7 +72,7 @@ for i in $(seq 1 20); do
   adb shell content query --uri content://media/external/file --projection _display_name 2>/dev/null | grep -q test_song && { echo "media indexed after $i"; break; }
   sleep 3
 done
-tgt import 0.31 0.547; sleep 5; shot picker
+tgt import 0.31 0.714; sleep 5; shot picker
 picker_up() { [ -n "$($T adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity:' | grep -i documentsui)" ]; }
 for attempt in 1 2 3 4; do
   top=$($T adb shell dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity|ResumedActivity:' | head -1)
@@ -97,7 +97,7 @@ for tab in visual sound layers studio library; do
 done
 # Visual page: cycle visualizer styles with the chip on the preview card
 tgt nav_visual 0.3 0.93; sleep 2
-for st in 1 2 3 4 5; do tgt style 0.8 0.13; sleep 2; shot "style_$st"; done
+for st in 1 2 3 4 5; do tgt style 0.8 0.17; sleep 2; shot "style_$st"; done
 # Studio > Properties, open first module
 tgt nav_studio 0.89 0.93; sleep 3; tgt prop_tile 0.25 0.76; sleep 3; shot properties_open
 tgt nav_library 0.11 0.93; sleep 2

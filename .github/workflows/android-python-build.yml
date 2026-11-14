@@ -76,6 +76,22 @@ jobs:
           PIP_CONSTRAINT: ${{ github.workspace }}/android-python/constraints-android.txt
         run: yes | buildozer -v android debug
 
+      - name: Verify APK install package and signature
+        working-directory: android-python
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find bin -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          APKSIGNER="$(find "$HOME/.buildozer" -type f -name apksigner -print | sort -V | tail -n 1)"
+          AAPT="$(find "$HOME/.buildozer" -type f -name aapt -print | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          "$AAPT" dump badging "$APK" | tee /tmp/vooc-badging.txt
+          grep -F "package: name='com.jhaa2k.vooc' versionCode='2' versionName='1.1'" /tmp/vooc-badging.txt
+          "$AAPT" dump badging "$APK" | grep -F "sdkVersion:'24'"
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:

@@ -100,6 +100,7 @@ class AdvancedProperties(BoxLayout):
     def _home(self):
         self.clear_widgets()
         self.category = None
+        self._active_scroll = None
         head = BoxLayout(size_hint_y=None, height=dp(40), padding=(dp(4), 0))
         head.add_widget(m3.lbl("Modules", 16, bold=True))
         head.add_widget(m3.lbl("%d modules - tap to edit" % len(MODULES), 12, T.on_var, halign="right"))
@@ -118,6 +119,7 @@ class AdvancedProperties(BoxLayout):
             self._tiles(grid, names)
             page.add_widget(grid)
         scroll.add_widget(page)
+        self._active_scroll = scroll
         self.add_widget(scroll)
 
     def _tiles(self, grid, names):
@@ -152,6 +154,8 @@ class AdvancedProperties(BoxLayout):
 
     # ------------------------------------------------------------ details
     def open_layer(self, layer, open_sections=None):
+        previous_scroll = getattr(getattr(self, "_active_scroll", None), "scroll_y", 1.0)
+        self._property_scroll_y = float(previous_scroll)
         self.layer = layer
         self.category = layer.module
         module = layer.module
@@ -232,7 +236,13 @@ class AdvancedProperties(BoxLayout):
             if section in self._open_sections:
                 toggle()
         scroll.add_widget(col)
+        self._active_scroll = scroll
         self.add_widget(scroll)
+        from kivy.clock import Clock
+        scroll.bind(scroll_y=lambda _obj, value: setattr(self, "_property_scroll_y", float(value)))
+        saved = getattr(self, "_property_scroll_y", 1.0)
+        Clock.schedule_once(lambda _dt, s=scroll, v=saved: setattr(s, "scroll_y", v), 0.08)
+        Clock.schedule_once(lambda _dt, s=scroll, v=saved: setattr(s, "scroll_y", v), 0.24)
 
     def _refresh(self):
         self.open_layer(self.layer, set(self._open_sections))

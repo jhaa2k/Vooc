@@ -409,6 +409,9 @@ class VoocRoot(FloatLayout):
 
     def _remember_scroll(self):
         scroll, key = getattr(self, "_active_scroll", None), getattr(self, "_active_scroll_key", None)
+        if scroll is None and getattr(self, "page", None) == "studio" and getattr(self, "studio_tab", None) == "Properties":
+            scroll = getattr(getattr(self, "property_editor", None), "_active_scroll", None)
+            key = "studio:Properties"
         if scroll is not None and key:
             self._scroll_positions[key] = float(scroll.scroll_y)
 

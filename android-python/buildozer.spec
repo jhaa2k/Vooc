@@ -5,7 +5,8 @@ package.domain = com.jhaa2k
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,webp,kv,atlas,json,ttf
 source.exclude_dirs = tests,docs,bin,ci,.buildozer,__pycache__
-version = 1.0
+version = 1.1
+android.numeric_version = 2
 
 # Vooc brand assets used by Android's launcher and native presplash.
 icon.filename = %(source.dir)s/assets/vooc_icon.png

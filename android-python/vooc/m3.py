@@ -306,6 +306,27 @@ class Icon(Widget):
         Line(circle=(cx, cy, s * .45, 60, 360), width=w)
         Triangle(points=[cx + s * .22, cy + s * .62, cx + s * .52, cy + s * .3, cx + s * .12, cy + s * .25])
 
+    def _i_star(self, cx, cy, s, w):
+        import math
+        pts = []
+        for k in range(11):
+            r = s * (.62 if k % 2 == 0 else .26)
+            a = math.pi / 2 + k * math.pi / 5
+            pts += [cx + r * math.cos(a), cy + r * math.sin(a)]
+        Line(points=pts, width=w, joint="round")
+
+    def _i_star_on(self, cx, cy, s, w):
+        import math
+        outer = []
+        for k in range(10):
+            r = s * (.78 if k % 2 == 0 else .34)
+            a = math.pi / 2 + k * math.pi / 5
+            outer.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+        for k in range(10):
+            (x1, y1), (x2, y2) = outer[k], outer[(k + 1) % 10]
+            Triangle(points=[cx, cy, x1, y1, x2, y2])
+        Line(points=[c for p in outer + outer[:1] for c in p], width=w * .6, joint="round")
+
     def _i_eyedropper(self, cx, cy, s, w):
         Line(points=[cx - s * .55, cy - s * .55, cx + s * .15, cy + s * .15], width=w * 1.2, cap="round")
         Line(points=[cx + s * .02, cy + s * .42, cx + s * .42, cy + s * .02], width=w * 1.6, cap="round")

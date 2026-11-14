@@ -540,11 +540,13 @@ class VoocRoot(FloatLayout):
         look = self.s.look
         # templates
         col.add_widget(m3.section("Templates", "reuse a look on any track"))
+        favs = self.templates.favorites()
         names = BUILTIN_TEMPLATES + [n for n in self.templates.names() if n not in BUILTIN_TEMPLATES]
+        names = sorted(names, key=lambda n: n not in favs)
         col.add_widget(m3.ChipGroup(names, look.get("template", ""), self.apply_template_named))
         row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
-        row.add_widget(m3.Button3("Save", self.save_template, kind="tonal", icon="save"))
-        row.add_widget(m3.Button3("Import", self.import_template, kind="outlined", icon="folder"))
+        row.add_widget(m3.Button3("Browse", self.browse_templates, kind="tonal", icon="layers"))
+        row.add_widget(m3.Button3("Save", self.save_template, kind="outlined", icon="save"))
         row.add_widget(m3.Button3("Share", self.export_template, kind="outlined", icon="export"))
         col.add_widget(row)
         # colors
@@ -893,20 +895,38 @@ class VoocRoot(FloatLayout):
         nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
         self.apply_template_named(nxt)
 
+    def _thumbnail(self):
+        try:
+            from vooc.templates import make_thumbnail
+            rw, rh = self.scene.passes[-1].size
+            return make_thumbnail(self.scene.pixels(), rw, rh)
+        except Exception as exc:
+            print("Vooc thumbnail failed: %s" % exc)
+            return None
+
     def save_template(self):
         sheet = m3.Sheet("Save template")
-        sheet.height = dp(220)
+        sheet.height = dp(330)
         base = self.s.look.get("template") or "My look"
-        name = {"v": base if base not in BUILTIN_TEMPLATES else "My " + base}
-        sheet.box.add_widget(m3.text_field(name["v"], lambda v: name.__setitem__("v", v), "Template name"))
+        f = {"name": base if base not in BUILTIN_TEMPLATES else "My " + base, "desc": "", "tags": ""}
+        try:
+            old = self.templates.load(f["name"]).get("meta", {}) if f["name"] not in BUILTIN_TEMPLATES else {}
+            f["desc"], f["tags"] = old.get("description", ""), ", ".join(old.get("tags", []))
+        except Exception:
+            pass
+        sheet.box.add_widget(m3.text_field(f["name"], lambda v: f.__setitem__("name", v), "Template name"))
+        sheet.box.add_widget(m3.text_field(f["desc"], lambda v: f.__setitem__("desc", v), "Description (optional)"))
+        sheet.box.add_widget(m3.text_field(f["tags"], lambda v: f.__setitem__("tags", v), "Tags, comma separated"))
         row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
 
         def do():
-            n = name["v"].strip() or "My look"
+            n = f["name"].strip() or "My look"
             if n in BUILTIN_TEMPLATES:
                 n = "My " + n
+            meta = {"description": f["desc"].strip(), "tags": [t.strip() for t in f["tags"].split(",") if t.strip()],
+                    "aspect": self.s.export.get("aspect", "16:9")}
             try:
-                self.templates.save(self.project, n)
+                self.templates.save(self.project, n, meta=meta, thumbnail=self._thumbnail())
             except Exception as exc:
                 self.toast("Save failed: %s" % exc)
                 return
@@ -921,6 +941,112 @@ class VoocRoot(FloatLayout):
         sheet.box.add_widget(row)
         sheet.open()
 
+    def _thumb_widget(self, b64):
+        from kivy.uix.image import Image as KvImage
+        holder = m3.Box(bg=T.surface3, radius=dp(10), size_hint=(None, None), size=(dp(96), dp(54)), padding=dp(2))
+        if b64:
+            try:
+                import base64, io
+                from kivy.core.image import Image as CoreImage
+                tex = CoreImage(io.BytesIO(base64.b64decode(b64)), ext="png").texture
+                holder.add_widget(KvImage(texture=tex, fit_mode="contain"))
+                return holder
+            except Exception:
+                pass
+        holder.padding = dp(14)
+        holder.add_widget(m3.Icon(name="bars", tint=T.on_var))
+        return holder
+
+    def browse_templates(self, filt=None):
+        from kivy.core.window import Window
+        filt = filt or self.s.look.get("template_filter", "All")
+        self.s.look["template_filter"] = filt
+        sheet = m3.Sheet("Templates")
+        sheet.height = Window.height * 0.85
+        favs = self.templates.favorites()
+        mine = [n for n in self.templates.names() if n not in BUILTIN_TEMPLATES]
+        names = {"All": BUILTIN_TEMPLATES + mine, "Favorites": [n for n in BUILTIN_TEMPLATES + mine if n in favs],
+                 "Mine": mine}[filt]
+        names = sorted(names, key=lambda n: n not in favs)
+        sheet.box.add_widget(m3.Segmented(["All", "Favorites", "Mine"], filt,
+                                          lambda v: (sheet.dismiss(), self.browse_templates(v))))
+        scroll = ScrollView(do_scroll_x=False)
+        lst = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6), padding=(0, dp(6)))
+        lst.bind(minimum_height=lst.setter("height"))
+        cur = self.s.look.get("template", "")
+
+        def again():
+            sheet.dismiss()
+            Clock.schedule_once(lambda _dt: self.browse_templates(filt), 0.2)
+
+        def actions(name):
+            builtin = name in BUILTIN_TEMPLATES
+            opts = ["Apply", "Duplicate", "Share bundle (.vzb)"] + ([] if builtin else ["Rename", "Delete"])
+
+            def do(o):
+                try:
+                    if o == "Apply":
+                        sheet.dismiss()
+                        self.apply_template_named(name)
+                        return
+                    if o == "Duplicate":
+                        if builtin:
+                            self.apply_template_named(name)
+                            self.templates.save(self.project, self.templates.unique("My " + name),
+                                                thumbnail=self._thumbnail())
+                        else:
+                            self.templates.duplicate(name)
+                    elif o.startswith("Share"):
+                        self.export_template(name)
+                        return
+                    elif o == "Rename":
+                        def ok(new):
+                            if new:
+                                nn = self.templates.rename(name, new)
+                                if self.s.look.get("template") == name:
+                                    self.s.look["template"] = nn
+                                again()
+                        self._name_sheet("Rename template", name, ok)
+                        return
+                    elif o == "Delete":
+                        self.templates.delete(name)
+                        self.toast("Deleted " + name)
+                except Exception as exc:
+                    self.toast("%s failed: %s" % (o, exc))
+                again()
+            m3.select_sheet(name, opts, "Apply", do)
+
+        if not names:
+            lst.add_widget(m3.lbl("Nothing here yet. Tap the star on a template to add it to Favorites.", 13,
+                                  T.on_var, shorten=False, size_hint_y=None, height=dp(48)))
+        for name in names:
+            info = self.templates.info(name)
+            meta = info.get("meta") or {}
+            row = m3.Tap(on_tap=lambda n=name: (sheet.dismiss(), self.apply_template_named(n)), size_hint_y=None,
+                         height=dp(70), radius=dp(16), padding=(dp(8), dp(8)), spacing=dp(10),
+                         bg=T.secondary_container if name == cur else T.surface1)
+            row.add_widget(self._thumb_widget(info.get("thumbnail")))
+            col = BoxLayout(orientation="vertical")
+            col.add_widget(m3.lbl(name, 14, bold=True))
+            sub = meta.get("description") or ("Built-in" if info.get("builtin") else "My template")
+            tags = meta.get("tags") or []
+            if tags:
+                sub += "  -  " + ", ".join("#" + t for t in tags[:3])
+            col.add_widget(m3.lbl(sub, 11, T.on_var))
+            row.add_widget(col)
+            fav = name in favs
+            row.add_widget(m3.IconBtn("star_on" if fav else "star",
+                                      lambda n=name: (self.templates.toggle_favorite(n), again()), size=dp(40)))
+            row.add_widget(m3.IconBtn("more", lambda n=name: actions(n), size=dp(40)))
+            lst.add_widget(row)
+        scroll.add_widget(lst)
+        sheet.box.add_widget(scroll)
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        row.add_widget(m3.Button3("Save current", lambda: (sheet.dismiss(), self.save_template()), kind="tonal", icon="save"))
+        row.add_widget(m3.Button3("Import", lambda: (sheet.dismiss(), self.import_template()), kind="outlined", icon="folder"))
+        sheet.box.add_widget(row)
+        sheet.open()
+
     def import_template(self):
         def got(path):
             if not path:
@@ -931,21 +1057,26 @@ class VoocRoot(FloatLayout):
                 self.toast("Not a valid template: %s" % exc)
                 return
             self.apply_template_named(name)
-            self.toast("Imported " + name)
+            problems = getattr(self.templates, "last_problems", [])
+            self.toast("Imported %s%s" % (name, (" (%s)" % problems[0]) if problems else ""))
         choose_template(got)
 
-    def export_template(self):
-        name = self.s.look.get("template") or "My look"
+    def export_template(self, name=None):
+        name = name or self.s.look.get("template") or "My look"
         try:
-            if name in BUILTIN_TEMPLATES or self.templates.path(name) is None:
-                path = self.templates.save(self.project, name if name not in BUILTIN_TEMPLATES else "My " + name)
+            if name in BUILTIN_TEMPLATES and self.templates.path(name) is None:
+                data_name = name
+            elif self.templates.path(name) is None:
+                self.templates.save(self.project, name, thumbnail=self._thumbnail())
+                data_name = name
             else:
-                path = self.templates.save(self.project, name)
+                data_name = name
+            path = self.templates.export_bundle(data_name, Path(self._data_dir()) / "share")
         except Exception as exc:
             self.toast("Export failed: %s" % exc)
             return
-        where = publish_file(str(path), Path(path).name, "application/json", "Download")
-        self.toast("Template saved to " + where)
+        where = publish_file(str(path), Path(path).name, "application/octet-stream", "Download")
+        self.toast("Template bundle saved to " + where)
 
     # ---------------------------------------------------------------- sound
     def _page_sound(self, col):

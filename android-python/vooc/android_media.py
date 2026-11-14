@@ -257,7 +257,7 @@ _FILE_REQUEST = 61423
 
 def choose_template(callback):
     """Pick a Vooc template (.viz / .json) to import."""
-    _open_picker(callback, "*/*", ["*.viz", "*.json"], _FILE_REQUEST, "Import template")
+    _open_picker(callback, "*/*", ["*.viz", "*.vzb", "*.json"], _FILE_REQUEST, "Import template")
 
 
 def publish_file(path, display_name, mime, collection="Download"):

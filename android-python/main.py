@@ -24,6 +24,7 @@ try:
     from vooc.property_schema import EFFECT_MODULES, field_spec, iter_fields
     from vooc.model import ProjectModel, LayerModel
     from vooc.history import History
+    from vooc.theme_engine import MODES as TE_MODES, CONTRAST as TE_CONTRAST, VISION as TE_VISION
     from vooc.audio.timeline_hub import TimelineHub
     from vooc.engine.scene import SceneView
     from vooc.engine.shader_presets import apply_preset as apply_shader_preset, PRESETS as SHADER_PRESET_TABLE
@@ -154,7 +155,7 @@ class VoocRoot(FloatLayout):
         super().__init__(**kw)
         self.s = ProjectState()
         self._autoload()
-        T.dark = self.s.scene.get("ui_theme", "dark") != "light"
+        self._apply_ui_theme()
         self.page = "library"
         self.studio_tab = "Properties"
         self.track = ""
@@ -1334,7 +1335,35 @@ class VoocRoot(FloatLayout):
                                   lambda x: self._set_perf("max_particles", int(x)), step=50, fmt=lambda x: "%d" % x,
                                   default=2000))
         col.add_widget(p)
-        col.add_widget(m3.section("Background theme (app)"))
+        sc = self.s.scene
+        col.add_widget(m3.section("App appearance", "Material 3"))
+        a = m3.card(spacing=dp(4))
+        a.add_widget(m3.lbl("Theme", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        a.add_widget(m3.Segmented(TE_MODES, sc.get("ui_mode") or ("Light" if sc.get("ui_theme") == "light" else "Dark"),
+                                  lambda v: self.set_ui_theme(ui_mode=v)))
+        a.add_widget(m3.lbl("Seed color (generates the whole scheme)", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        seeds = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(6))
+        cur_seed = sc.get("ui_seed") or ""
+        for seed in ["", "#C6FF00", "#00E5FF", "#7C4DFF", "#FF4081", "#FF9100", "#00C853"]:
+            sel = seed == cur_seed
+            t = m3.Tap(on_tap=lambda sd=seed: self.set_ui_theme(ui_seed=sd), radius=dp(20),
+                       bg=m3._parse_hex(seed or "#C6FF00"), line=T.on_surface if sel else T.outline, padding=dp(10))
+            if sel:
+                t.add_widget(m3.Icon(name="check", tint=[0, 0, 0, 1]))
+            elif not seed:
+                t.add_widget(m3.lbl("A", 11, [0, 0, 0, 1], bold=True, halign="center"))
+            seeds.add_widget(t)
+        a.add_widget(seeds)
+        a.add_widget(m3.ColorField((cur_seed or "#C6FF00") + "FF", lambda v: self.set_ui_theme(ui_seed=v[:7]),
+                                   default="#C6FF00FF", title="Seed color"))
+        a.add_widget(m3.lbl("Contrast", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        a.add_widget(m3.Segmented(TE_CONTRAST, sc.get("ui_contrast", "Standard"),
+                                  lambda v: self.set_ui_theme(ui_contrast=v)))
+        a.add_widget(m3.lbl("Color vision", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        a.add_widget(m3.SelectField("Color vision", TE_VISION, sc.get("ui_vision", "None"),
+                                    lambda v: self.set_ui_theme(ui_vision=v)))
+        col.add_widget(a)
+        col.add_widget(m3.section("Background theme (canvas)"))
         col.add_widget(m3.SelectField("Background theme", list(THEMES), self.s.scene.get("theme", "Acid Night"), self._set_bg_theme))
 
     def _set_perf(self, key, value):
@@ -1459,11 +1488,32 @@ class VoocRoot(FloatLayout):
             self._studio_tab("Export")
 
     # ================================================================ theme / misc
-    def toggle_theme(self):
-        T.dark = not T.dark
-        self.s.scene["ui_theme"] = "dark" if T.dark else "light"
+    def _system_dark(self):
+        try:
+            from jnius import autoclass
+            act = autoclass("org.kivy.android.PythonActivity").mActivity
+            mode = act.getResources().getConfiguration().uiMode & 0x30
+            return mode != 0x10          # UI_MODE_NIGHT_NO
+        except Exception:
+            return True
+
+    def _apply_ui_theme(self):
+        sc = self.s.scene
+        mode = sc.get("ui_mode") or ("Light" if sc.get("ui_theme") == "light" else "Dark")
+        dark = self._system_dark() if mode == "System" else mode != "Light"
+        T.configure(dark=dark, seed=sc.get("ui_seed") or False, contrast=sc.get("ui_contrast", "Standard"),
+                    vision=sc.get("ui_vision", "None"))
+
+    def set_ui_theme(self, **kw):
+        self.s.scene.update(kw)
+        if "ui_mode" in kw and kw["ui_mode"] != "System":
+            self.s.scene["ui_theme"] = kw["ui_mode"].lower()
+        self._apply_ui_theme()
         self._save_trigger()
         self.build_ui()
+
+    def toggle_theme(self):
+        self.set_ui_theme(ui_mode="Light" if T.dark else "Dark")
 
     def toast(self, text):
         m3.Snackbar.show(text, self)
@@ -1887,7 +1937,7 @@ class VoocRoot(FloatLayout):
         self.scene.set_perf(**self.s.perf)
         if self.native is not None:
             self.native.configure_fx(self.s.audio, self.s.eq_freqs)
-        T.dark = self.s.scene.get("ui_theme", "dark") != "light"
+        self._apply_ui_theme()
         self.build_ui()
         self.toast("Project loaded")
 

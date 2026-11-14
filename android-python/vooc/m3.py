@@ -51,9 +51,37 @@ SCHEMES = {
 
 class _Theme:
     dark = True
+    seed = None              # "#RRGGBB" -> generated scheme, None -> built-in acid scheme
+    contrast = "Standard"
+    vision = "None"
+    _cache = None
+
+    def configure(self, dark=None, seed=None, contrast=None, vision=None):
+        if dark is not None:
+            self.dark = bool(dark)
+        self.seed = (seed or None) if seed is not False else None
+        if contrast:
+            self.contrast = contrast
+        if vision:
+            self.vision = vision
+        self._cache = None
+
+    def scheme(self):
+        key = (self.dark, self.seed, self.contrast, self.vision)
+        if self._cache is None or self._cache[0] != key:
+            from .theme_engine import build_scheme
+            base = SCHEMES["dark" if self.dark else "light"]
+            try:
+                sc = build_scheme(self.dark, base, self.seed, self.contrast, self.vision)
+            except Exception:
+                sc = base
+            self._cache = (key, sc)
+        return self._cache[1]
 
     def __getattr__(self, name):
-        scheme = SCHEMES["dark" if self.dark else "light"]
+        if name.startswith("_"):
+            raise AttributeError(name)
+        scheme = self.scheme()
         if name in scheme:
             return _hex(scheme[name])
         raise AttributeError(name)

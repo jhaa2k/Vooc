@@ -29,7 +29,7 @@ try:
     from vooc.engine.shader_presets import apply_preset as apply_shader_preset, PRESETS as SHADER_PRESET_TABLE
     from vooc.templates import (TemplateStore, apply_template, builtin as builtin_template,
                                 BUILTINS as BUILTIN_TEMPLATES)
-    from vooc.palettes import BUILTIN as PALETTE_BUILTIN, apply_palette, extract_palette
+    from vooc.palettes import BUILTIN as PALETTE_BUILTIN, METHODS as PALETTE_METHODS, apply_palette, extract_palette, extract_colors, export_palettes, import_palettes, unique_name
     from vooc.media_meta import read_metadata
     from vooc.exporter import (Exporter, plan_export, frame_size, RESOLUTIONS, FPS_OPTIONS, ASPECTS, CODECS,
                                QUALITY)
@@ -555,10 +555,25 @@ class VoocRoot(FloatLayout):
             grid.add_widget(m3.ColorField(colors[i] + "FF" if len(colors[i]) == 7 else colors[i],
                                           lambda v, i=i: self._edit_palette_color(i, v), title=name + " color"))
         pc.add_widget(grid)
+        pc.add_widget(m3.lbl("Extraction method", 12, T.on_var, size_hint_y=None, height=dp(22)))
+        pc.add_widget(m3.SelectField("Extraction method", PALETTE_METHODS, look.get("palette_method", "K-Means"),
+                                     lambda v: (look.__setitem__("palette_method", v), self._save_trigger())))
+        pc.add_widget(m3.SliderRow("Colors to extract", 3, 8, int(look.get("palette_count", 6)),
+                                   lambda x: (look.__setitem__("palette_count", int(round(x))), self._save_trigger()),
+                                   step=1, fmt=lambda x: "%d" % x, default=6))
+        found = look.get("extracted") or []
+        if found:
+            pc.add_widget(m3.lbl("Extracted - tap a color to use it", 12, T.on_var, size_hint_y=None, height=dp(22)))
+            strip = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(6))
+            for c in found[:8]:
+                strip.add_widget(m3.Tap(on_tap=lambda c=c: self._assign_extracted(c), bg=m3._parse_hex(c),
+                                        radius=dp(10), line=T.outline))
+            pc.add_widget(strip)
         row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
         row.add_widget(m3.Button3("From album art", self.palette_from_art, kind="tonal", icon="image"))
-        row.add_widget(m3.Button3("Save palette", self.save_palette, kind="outlined", icon="save"))
+        row.add_widget(m3.Button3("Save", self.save_palette, kind="outlined", icon="save"))
         pc.add_widget(row)
+        pc.add_widget(m3.Button3("Manage palettes", self.manage_palettes, kind="text", icon="tune"))
         pc.add_widget(m3.switch_row("Auto colors from album art", bool(look.get("auto_palette", True)),
                                     lambda on: (look.__setitem__("auto_palette", bool(on)), self._save_trigger()),
                                     "Recolor when a track with cover art loads"))
@@ -709,17 +724,116 @@ class VoocRoot(FloatLayout):
         apply_palette(self.project, colors)
         self._engine_changed()
 
+    def _name_sheet(self, title, value, on_ok):
+        sheet = m3.Sheet(title)
+        sheet.height = dp(220)
+        box = {"v": value}
+        sheet.box.add_widget(m3.text_field(value, lambda v: box.__setitem__("v", v), "Name"))
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        row.add_widget(m3.Button3("Cancel", sheet.dismiss, kind="outlined"))
+        row.add_widget(m3.Button3("OK", lambda: (sheet.dismiss(), on_ok(box["v"].strip())), kind="filled"))
+        sheet.box.add_widget(row)
+        sheet.open()
+
     def save_palette(self):
-        n = len(self.s.palettes) + 1
-        name = "My palette %d" % n
-        while name in self.s.palettes:
-            n += 1
-            name = "My palette %d" % n
-        self.s.palettes[name] = [c[:7] for c in self._current_palette()]
-        self.s.look["palette"] = name
-        self._save_trigger()
-        self.toast("Saved " + name)
-        self.show("visual")
+        def ok(name):
+            name = unique_name(name or "My palette", self.s.palettes)
+            self.s.palettes[name] = [c[:7] for c in self._current_palette()]
+            self.s.look["palette"] = name
+            self._save_trigger()
+            self.toast("Saved " + name)
+            self.show("visual")
+        self._name_sheet("Save palette", unique_name("My palette", self.s.palettes), ok)
+
+    def _assign_extracted(self, color):
+        roles = ["Deep", "Main", "Accent", "Highlight"]
+        m3.select_sheet("Use %s as" % color, roles, "Main",
+                        lambda role: (self._edit_palette_color(roles.index(role), color), self.show("visual")))
+
+    def manage_palettes(self):
+        from kivy.core.window import Window
+        sheet = m3.Sheet("My palettes")
+        pals = self.s.palettes
+        sheet.height = min(Window.height * 0.8, dp(170) + max(1, len(pals)) * dp(56))
+        scroll = ScrollView(do_scroll_x=False)
+        lst = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
+        lst.bind(minimum_height=lst.setter("height"))
+
+        def refresh():
+            sheet.dismiss()
+            self._save_trigger()
+            self.show("visual")
+            Clock.schedule_once(lambda _dt: self.manage_palettes(), 0.25)
+
+        def rename(old):
+            def ok(new):
+                if not new or new == old:
+                    return
+                new = unique_name(new, {k for k in pals if k != old})
+                pals[new] = pals.pop(old)
+                if self.s.look.get("palette") == old:
+                    self.s.look["palette"] = new
+                refresh()
+            self._name_sheet("Rename palette", old, ok)
+
+        def duplicate(name):
+            pals[unique_name(name + " copy", pals)] = list(pals[name])
+            refresh()
+
+        def delete(name):
+            pals.pop(name, None)
+            if self.s.look.get("palette") == name:
+                self.s.look["palette"] = ""
+            self.toast("Deleted " + name)
+            refresh()
+
+        if not pals:
+            lst.add_widget(m3.lbl("No saved palettes yet. Tap Save in Colors.", 13, T.on_var, size_hint_y=None, height=dp(40)))
+        for name, cols in list(pals.items()):
+            row = m3.Tap(on_tap=lambda n=name: (sheet.dismiss(), self.apply_palette_named(n)), size_hint_y=None,
+                         height=dp(52), radius=dp(12), padding=(dp(8), dp(6)), spacing=dp(6))
+            for c in cols[:4]:
+                row.add_widget(m3.Box(bg=m3._parse_hex(c), radius=dp(6), size_hint_x=None, width=dp(16)))
+            row.add_widget(m3.lbl(name, 14))
+            for icon, fn in (("text", rename), ("plus", duplicate), ("close", delete)):
+                row.add_widget(m3.IconBtn(icon, lambda n=name, f=fn: f(n), size=dp(40)))
+            lst.add_widget(row)
+        scroll.add_widget(lst)
+        sheet.box.add_widget(scroll)
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        row.add_widget(m3.Button3("Import", lambda: (sheet.dismiss(), self.import_palettes()), kind="tonal", icon="folder"))
+        row.add_widget(m3.Button3("Export", self.export_palettes, kind="outlined", icon="export"))
+        sheet.box.add_widget(row)
+        sheet.open()
+
+    def import_palettes(self):
+        def got(path):
+            if not path:
+                return
+            try:
+                with open(path, encoding="utf-8") as f:
+                    new = import_palettes(f.read(), existing=self.s.palettes)
+            except Exception as exc:
+                self.toast("Not a palette file: %s" % exc)
+                return
+            self.s.palettes.update(new)
+            self._save_trigger()
+            self.toast("Imported %d palette%s" % (len(new), "" if len(new) == 1 else "s"))
+            self.show("visual")
+        choose_template(got)
+
+    def export_palettes(self):
+        if not self.s.palettes:
+            self.toast("No saved palettes to export")
+            return
+        path = Path(self._data_dir()) / "vooc-palettes.json"
+        try:
+            path.write_text(export_palettes(self.s.palettes), encoding="utf-8")
+            where = publish_file(str(path), path.name, "application/json", "Download")
+        except Exception as exc:
+            self.toast("Export failed: %s" % exc)
+            return
+        self.toast("Palettes saved to " + where)
 
     def palette_from_art(self, quiet=False):
         art = self.meta.get("art")
@@ -731,7 +845,10 @@ class VoocRoot(FloatLayout):
                 self.toast("This track has no album art. Pick an image in the Image layer.")
             return
         try:
-            colors = extract_palette(art)
+            method = self.s.look.get("palette_method", "K-Means")
+            count = int(self.s.look.get("palette_count", 6))
+            colors = extract_palette(art, k=max(4, count), method=method)
+            self.s.look["extracted"] = extract_colors(art, method, count)
         except Exception as exc:
             if not quiet:
                 self.toast("Could not read colors: %s" % exc)

@@ -127,8 +127,8 @@ QUICK_EFFECTS = [
 ]
 ADDABLE = [("Text", "TEXT", "text"), ("Image", "IMAGE", "image"), ("Bars", "BARS", "bars"),
            ("Particles", "PARTICLES", "sparkle"), ("Waveform", "WAVEFORM", "tune"), ("Shape", "SHAPE", "studio"),
-           ("Glow", "BLUREFFECT", "eye"), ("Shader", "CUSTOMSHADER", "more"), ("Effect", "__EFFECT__", "plus")]
-VISIBLE_ON_ADD = ("WAVEFORM", "SHAPE")
+           ("Group", "GROUP", "layers"), ("Glow", "BLUREFFECT", "eye"), ("Shader", "CUSTOMSHADER", "more"), ("Effect", "__EFFECT__", "plus")]
+VISIBLE_ON_ADD = ("WAVEFORM", "SHAPE", "GROUP")
 FIXED_MODULES = ("COMPOSITION", "AUDIOPROVIDER")
 B = "Bars Setup/Bars/"
 CANVAS = "Render Settings/Canvas/"

@@ -36,6 +36,15 @@ class Animated:
         self.total = sum(self.delays)
         self.width, self.height = textures_[0].width, textures_[0].height
 
+    def at_mode(self, t, mode="Loop", start=0):
+        from .timing import gif_index
+        return self.frames[gif_index(self.delays, t, mode, start)]
+
+    def step(self, k, mode="Loop", start=0):
+        """Frame after k discrete steps (beat sync)."""
+        from .timing import gif_index
+        return self.frames[gif_index([1.0] * len(self.frames), float(k), mode, start)]
+
     def at(self, t):
         if len(self.frames) == 1 or self.total <= 0:
             return self.frames[0]

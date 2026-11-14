@@ -24,7 +24,7 @@ from .fx_library import LIBRARY  # noqa: E402
 
 _ICONS = {"COMPOSITION": "studio", "IMAGE": "image", "TEXT": "text", "BARS": "bars", "PARTICLES": "sparkle",
           "AUDIOPROVIDER": "tune", "BLUREFFECT": "eye", "RGBSPLITEFFECT": "layers", "MOTIONBLUREFFECT": "next",
-          "MIRROREREFFECT": "copy", "CUSTOMSHADER": "more", "WAVEFORM": "tune", "SHAPE": "studio"}
+          "MIRROREREFFECT": "copy", "CUSTOMSHADER": "more", "WAVEFORM": "tune", "SHAPE": "studio", "GROUP": "layers"}
 for _name, _fx in LIBRARY.items():
     _ICONS[_name] = _fx["icon"]
 FONTS = ["Roboto", "RobotoMono", "DejaVuSans"]

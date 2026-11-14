@@ -10,9 +10,11 @@ import os
 import random
 
 import numpy as np
-from kivy.graphics import (BindTexture, Color, InstructionGroup, Mesh, PopMatrix,
+from kivy.graphics import (BindTexture, Color, InstructionGroup, MatrixInstruction, Mesh, PopMatrix,
                            PushMatrix, Rectangle, RenderContext, Rotate, RoundedRectangle, Scale,
                            Translate)
+
+from kivy.graphics.transformation import Matrix
 
 from ..model import hex_to_rgba
 from . import shapes, textures
@@ -123,7 +125,7 @@ class BaseLayer:
     def update(self, frame):
         frame.measure.use_layer(self.values)
         self.blend.mode = self.values[G + "Layer/Blend Mode"]
-        self.opacity = float(self.values.get(G + "Layer/Opacity", 1.0))
+        self.opacity = float(self.values.get(G + "Layer/Opacity", 1.0)) * self.parent_opacity
         self._apply_opacity()
         box = self.render(frame)
         t = LayerTransform.compute(self.values, frame.measure, frame.w, frame.h, *box)
@@ -131,6 +133,7 @@ class BaseLayer:
         self.after_transform(t, frame)
 
     opacity = 1.0
+    parent_opacity = 1.0
 
     def _apply_opacity(self):
         for obj in vars(self).values():
@@ -162,8 +165,20 @@ class ImageLayer(BaseLayer):
         self.ctx.add(self.mask_bind)
         self.ctx.add(self.color)
         self.ctx.add(self.mesh)
+        # image animation / skew wrap the image and its border
+        self.anim_push, self.anim_pop = PushMatrix(), PopMatrix()
+        self.anim_t1, self.anim_t2 = Translate(), Translate()
+        self.anim_rot = Rotate(angle=0, axis=(0, 0, 1))
+        self.anim_scale = Scale(1, 1, 1)
+        self.anim_skew = MatrixInstruction()
+        for i in (self.anim_push, self.anim_t1, self.anim_rot, self.anim_scale, self.anim_skew, self.anim_t2):
+            self.content.add(i)
         self.content.add(self.ctx)
+        self.border = QuadBatch(self.content)
+        self.content.add(self.anim_pop)
         self._key = None
+        self._gif_state = {}
+        self._pts = None
         self.box = (1, 1)
 
     def _pick_texture(self, frame):
@@ -172,12 +187,65 @@ class ImageLayer(BaseLayer):
             tex = textures.load(frame.metadata.get("art", ""))
             if tex is not None:
                 return tex
-        t = frame.time * float(v.get(self.P + "GIF Speed", 1.0))
+        G_ = "Image Source/GIF Playback/"
+        speed = float(v.get(self.P + "GIF Speed", 1.0))
+        mode = v.get(G_ + "Loop Mode", "Loop")
+        start = int(v.get(G_ + "Start Frame", 0))
+        sync = v.get(G_ + "Sync", "Free")
         for path in (v[self.P + "Pick Image"], v["Generated Album Art/Album Art/Fallback Image"]):
-            tex = textures.frame(path, t)
+            anim = textures.load_animated(path)
+            if anim is not None:
+                from .timing import synced_time
+                t = synced_time(sync, frame.time, speed, anim.total, frame.snapshot, self._gif_state)
+                return anim.step(int(t), mode, start) if sync == "Beat" else anim.at_mode(t, mode, start)
+            tex = textures.load(path)
             if tex is not None:
                 return tex
         return textures.placeholder_art()
+
+    def _anim_level(self, frame, src):
+        if src == "Time":
+            return None
+        from ..fx_library import react_level
+        return react_level(frame.snapshot, frame.measure, src)
+
+    def _animate(self, frame, bw, bh):
+        v = self.values
+        A = "Image Animation/Animation/"
+        kind = v.get(A + "Animation", "None")
+        amt = v.get(A + "Animation Amount", 0.3)
+        spd = 0.2 + v.get(A + "Animation Speed", 0.5) * 4.0
+        lvl = self._anim_level(frame, v.get(A + "Animate With", "Time"))
+        t = frame.time * spd
+        wave = math.sin(t * 2 * math.pi) if lvl is None else lvl * 2 - 1
+        pos01 = (wave + 1) / 2
+        rot, sc, dx, dy = 0.0, 1.0, 0.0, 0.0
+        if kind == "Pulse":
+            sc = 1.0 + amt * 0.4 * pos01
+        elif kind == "Spin":
+            rot = (t * 360.0 * amt) if lvl is None else lvl * 360.0 * amt
+        elif kind == "Float":
+            dy = wave * amt * bh * 0.15
+        elif kind == "Shake":
+            k = (lvl if lvl is not None else 1.0) * amt * min(bw, bh) * 0.05
+            dx = math.sin(frame.time * 53.0) * k
+            dy = math.cos(frame.time * 41.0) * k
+        elif kind == "Swing":
+            rot = wave * amt * 30.0
+        self.anim_t1.xy = (bw / 2 + dx, bh / 2 + dy)
+        self.anim_rot.angle = -rot
+        self.anim_scale.x = self.anim_scale.y = sc
+        kx = math.tan(math.radians(v.get("Image Source/Layout/Skew X", 0.0) * 45.0))
+        ky = math.tan(math.radians(v.get("Image Source/Layout/Skew Y", 0.0) * 45.0))
+        m = Matrix()
+        m.set(flat=[1, ky, 0, 0, kx, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+        self.anim_skew.matrix = m
+        self.anim_t2.xy = (-bw / 2, -bh / 2)
+        if kind == "Ken Burns":
+            z = 1.0 / (1.0 + amt * 0.5 * pos01)
+            pan = (1 - z) * (0.5 + 0.5 * math.sin(t * 0.7))
+            return (pan, pan * 0.6, pan + z, pan * 0.6 + z)
+        return None
 
     def render(self, frame):
         v = self.values
@@ -186,6 +254,13 @@ class ImageLayer(BaseLayer):
         tw, th = max(1, tex.width), max(1, tex.height)
         aspect = tw / float(th)
         keep, crop = v[self.P + "Keep Aspect Ratio"], v[self.P + "Crop to Fit"]
+        fit = v.get("Image Source/Layout/Fit Mode", "Legacy")
+        if fit == "Contain":
+            keep, crop = True, False
+        elif fit == "Cover":
+            keep, crop = True, True
+        elif fit == "Stretch":
+            keep, crop = False, False
         # texture region (u0, v0, u1, v1)
         u0, v0, u1, v1 = 0.0, 0.0, 1.0, 1.0
         bw = bh = size
@@ -201,9 +276,18 @@ class ImageLayer(BaseLayer):
                 bh = size / aspect
             else:
                 bw = size * aspect
+        kb = self._animate(frame, bw, bh)
+        if kb is not None:            # Ken Burns: zoom / pan inside the crop window
+            cu, cv = u1 - u0, v1 - v0
+            u0, v0, u1, v1 = u0 + cu * kb[0], v0 + cv * kb[1], u0 + cu * kb[2], v0 + cv * kb[3]
+        if v.get("Image Source/Layout/Flip Horizontal", False):
+            u0, u1 = u1, u0
+        if v.get("Image Source/Layout/Flip Vertical", False):
+            v0, v1 = v1, v0
         shape = v[self.P + "Shape"]
         radius = float(v.get(self.P + "Corner Radius", 0.0))
-        key = (id(tex), shape, round(bw, 1), round(bh, 1), u0, v0, u1, v1, round(radius, 3))
+        key = (id(tex), shape, round(bw, 1), round(bh, 1), round(u0, 4), round(v0, 4), round(u1, 4), round(v1, 4),
+               round(radius, 3))
         if key != self._key:
             self._key = key
             if radius > 0 and shape in ("None", "Rectangle", "Square"):
@@ -225,8 +309,27 @@ class ImageLayer(BaseLayer):
             self.mesh.vertices = verts
             self.mesh.indices = list(range(len(verts) // 4))
             self.mesh.texture = tex
+            self._pts = np.asarray(pts, np.float32) * [bw, bh]
         self._apply_uniforms(tex, frame)
+        self._border(frame)
         return bw, bh
+
+    def _border(self, frame):
+        v = self.values
+        B_ = "Image Source/Border/"
+        width = v.get(B_ + "Border Width", 0.0) * min(frame.w, frame.h)
+        if width < 0.3 or self._pts is None or len(self._pts) < 3:
+            self.border.set(np.zeros((0, 4, 2), np.float32), np.zeros((0, 4), np.float32))
+            return
+        src = v.get(B_ + "Border Pulse With", "Nothing")
+        if src != "Nothing":
+            from ..fx_library import react_level
+            width *= 0.5 + 1.5 * react_level(frame.snapshot, frame.measure, src)
+        from .geometry import thick_polyline
+        q = thick_polyline(self._pts, width, closed=True)
+        col = np.asarray(hex_to_rgba(v.get(B_ + "Border Color", "#C6FF00FF")), np.float32)
+        col[3] *= float(v.get(self.P + "Opacity", 1.0))
+        self.border.set(q, np.repeat(col[None], len(q), 0))
 
     def _apply_uniforms(self, tex, frame):
         v = self.values
@@ -1129,4 +1232,50 @@ class ParticlesLayer(BaseLayer):
         return frame.w, frame.h
 
 
-RENDERERS = {"IMAGE": ImageLayer, "TEXT": TextLayer, "BARS": BarsLayer, "PARTICLES": ParticlesLayer}
+class GroupLayer(BaseLayer):
+    """Wraps member layers: they render inside this layer's transform / blend / opacity."""
+
+    def build(self):
+        super().build()
+        self.audio_scale = Scale(1, 1, 1)
+        self.spin = Rotate(angle=0, axis=(0, 0, 1))
+        self.t1, self.t2 = Translate(), Translate()
+        self.members_group = InstructionGroup()
+        for i in (self.t1, self.spin, self.audio_scale, self.t2, self.members_group):
+            self.content.add(i)
+        self.members = []
+        self._angle = 0.0
+
+    def set_members(self, renderers):
+        self.members_group.clear()
+        self.members = list(renderers)
+        for r in self.members:
+            self.members_group.add(r.group)
+
+    def render(self, frame):
+        v = self.values
+        A = "Group/Audio/"
+        src = v.get(A + "Scale With", "Nothing")
+        k = 1.0
+        if src != "Nothing":
+            from ..fx_library import react_level
+            k = 1.0 + react_level(frame.snapshot, frame.measure, src) * v.get(A + "Scale Amount", 0.2)
+        self._angle = (self._angle + v.get(A + "Spin (deg/s)", 0.0) * frame.dt) % 360.0
+        self.t1.xy = (frame.w / 2, frame.h / 2)
+        self.audio_scale.x = self.audio_scale.y = k
+        self.spin.angle = -self._angle
+        self.t2.xy = (-frame.w / 2, -frame.h / 2)
+        return frame.w, frame.h
+
+    def update(self, frame):
+        super().update(frame)
+        for r in self.members:
+            r.parent_opacity = self.opacity
+            try:
+                r.update(frame)
+            except Exception as exc:
+                from kivy.logger import Logger
+                Logger.warning("Vooc: %s layer (in group) failed: %s", r.layer.module, exc)
+
+
+RENDERERS = {"GROUP": GroupLayer, "IMAGE": ImageLayer, "TEXT": TextLayer, "BARS": BarsLayer, "PARTICLES": ParticlesLayer}

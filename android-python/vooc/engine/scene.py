@@ -173,12 +173,27 @@ class SceneView(Widget):
             return False
         if layer.module in self.HEAVY and not self.offline and not self.perf.get("heavy_blur", True):
             return False
-        return bool(layer.values.get("General/Layer/Visible", True))
+        if not layer.values.get("General/Layer/Visible", True):
+            return False
+        parent = self._parent_group(layer)
+        if parent is not None and not parent.values.get("General/Layer/Visible", True):
+            return False
+        return True
+
+    def _parent_group(self, layer):
+        name = (layer.values.get("General/Layer/Parent Group") or "").strip()
+        if not name or layer.module == "GROUP" or layer.module in EFFECT_MODULES:
+            return None
+        for g in self.project.layers:
+            if g.module == "GROUP" and (g.values.get("General/Layer/Tag") or "").strip() == name:
+                return g
+        return None
 
     def _compute_signature(self):
         comp = self.project.layer("COMPOSITION")
-        layers = tuple((l.id, l.module, l.values.get("Effect Stack/Mix/Scope")) for l in self.project.layers
-                       if self._visible(l))
+        layers = tuple((l.id, l.module, l.values.get("Effect Stack/Mix/Scope"),
+                        l.values.get("General/Layer/Parent Group"), l.values.get("General/Layer/Tag"))
+                       for l in self.project.layers if self._visible(l))
         return (layers, self.render_size(), self.perf.get("heavy_blur", True), comp.get(C + "Canvas/Clear Canvas on Frame"),
                 comp.get("General/Layer/Visible"))
 
@@ -202,6 +217,19 @@ class SceneView(Widget):
         pending = []
         comp_visible = comp.get("General/Layer/Visible")
         visible = [l for l in self.project.layers if self._visible(l)] if comp_visible else []
+        members = {}            # group layer id -> member layers (project order)
+        for l in visible:
+            g = self._parent_group(l)
+            if g is not None and g in visible:
+                members.setdefault(g.id, []).append(l)
+        in_group = {l.id for ls in members.values() for l in ls}
+        visible = [l for l in visible if l.id not in in_group]
+
+        def renderer(layer):
+            r = self.renderers.get(layer.id)
+            if r is None:
+                r = self.renderers[layer.id] = RENDERERS[layer.module](layer, self)
+            return r
 
         def flush():
             first = not self.passes
@@ -240,9 +268,9 @@ class SceneView(Widget):
                 self.passes.append(fx)
                 self.pipeline.add(fx.fbo)
             else:
-                r = self.renderers.get(layer.id)
-                if r is None:
-                    r = self.renderers[layer.id] = RENDERERS[layer.module](layer, self)
+                r = renderer(layer)
+                if layer.module == "GROUP":
+                    r.set_members([renderer(m) for m in members.get(layer.id, [])])
                 pending.append(r)
         if pending or not self.passes:
             flush()

@@ -50,7 +50,7 @@ FONT_WEIGHTS = [str(w) for w in range(100, 1000, 100)]
 VARIABLE_TYPES = ["None", "Float", "Vector2", "Vector3", "Color"]
 
 # Order of the main-menu grid (exact names requested).
-MODULES = ["COMPOSITION", "TEXT", "BARS", "PARTICLES", "IMAGE", "WAVEFORM", "SHAPE", "AUDIOPROVIDER",
+MODULES = ["COMPOSITION", "TEXT", "BARS", "PARTICLES", "IMAGE", "WAVEFORM", "SHAPE", "GROUP", "AUDIOPROVIDER",
            "BLUREFFECT", "RGBSPLITEFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT",
            "CUSTOMSHADER"]
 
@@ -116,6 +116,7 @@ def general_category(tag=""):
             ("Tag", text(tag)),
             ("Visible", check(True)),
             ("Locked", check(False, help="Locked layers cannot be edited, moved or deleted")),
+            ("Parent Group", text("", help="Tag of a Group layer; the group's transform, opacity and visibility then apply to this layer")),
             ("Opacity", slider(1.0)),
             ("Blend Mode", dropdown(BLEND, "Alpha")),
         ])),
@@ -204,6 +205,34 @@ SCHEMA["IMAGE"] = OD([
             ("Corner Radius", slider(0.0, help="Rounded crop for Rectangle / Square / None shapes")),
             ("Opacity", slider(1.0)),
             ("GIF Speed", slider(1.0, 0, 10, help="Playback speed of animated GIFs")),
+        ])),
+        ("Layout", OD([
+            ("Fit Mode", dropdown(["Legacy", "Contain", "Cover", "Stretch"], "Legacy",
+                                  help="Legacy follows Keep Aspect Ratio / Crop to Fit")),
+            ("Flip Horizontal", check(False)),
+            ("Flip Vertical", check(False)),
+            ("Skew X", slider(0.0, -1, 1, help="-1..1 = -45..45 degrees")),
+            ("Skew Y", slider(0.0, -1, 1)),
+        ])),
+        ("Border", OD([
+            ("Border Width", slider(0.0, 0, 0.05, step=0.0005)),
+            ("Border Color", color("#C6FF00FF")),
+            ("Border Pulse With", dropdown(["Nothing", "Beat", "Bass", "Mid", "Treble", "Volume", "Kick"], "Nothing")),
+        ])),
+        ("GIF Playback", OD([
+            ("Loop Mode", dropdown(["Loop", "Ping-Pong", "Once", "Reverse"], "Loop")),
+            ("Start Frame", number(0, 0, 999)),
+            ("Sync", dropdown(["Free", "Beat", "Bar", "BPM"], "Free",
+                              help="Beat = one frame per beat, BPM = one loop per bar, Bar = restart on downbeat")),
+        ])),
+    ])),
+    ("Image Animation", OD([
+        ("Animation", OD([
+            ("Animation", dropdown(["None", "Pulse", "Spin", "Float", "Shake", "Swing", "Ken Burns"], "None")),
+            ("Animate With", dropdown(["Time", "Beat", "Bass", "Mid", "Treble", "Volume", "Kick"], "Time",
+                                      help="Time = continuous, others = driven by the audio level")),
+            ("Animation Speed", slider(0.5)),
+            ("Animation Amount", slider(0.3)),
         ])),
     ])),
     ("Color Adjustments", OD([
@@ -477,6 +506,20 @@ SCHEMA["PARTICLES"] = OD([
 ])
 
 SCHEMA["PARTICLES"]["General"]["Position"]["Position Y"] = slider(0.62)
+
+SCHEMA["GROUP"] = OD([
+    ("General", general_category("Group 1")),
+    ("Group", OD([
+        ("Audio", OD([
+            ("Scale With", dropdown(["Nothing", "Beat", "Bass", "Mid", "Treble", "Volume", "Kick", "Snare", "HiHat"],
+                                    "Nothing", help="Scales the whole group with the music")),
+            ("Scale Amount", slider(0.2, 0, 2)),
+            ("Spin (deg/s)", slider(0, -360, 360, step=1)),
+        ])),
+    ])),
+])
+SCHEMA["GROUP"]["General"]["Layer"]["Visible"] = check(False)
+SCHEMA["GROUP"]["General"]["Layer"].pop("Parent Group")
 
 SHAPE_SOURCES = ["Nothing", "Beat", "Bass", "Mid", "Treble", "Volume", "Kick", "Snare", "HiHat"]
 SHAPE_TYPES = ["Rectangle", "Ellipse", "Line", "Polygon", "Star", "Path"]
@@ -847,6 +890,7 @@ MODULE_INFO = {
     **{name: FX_LIBRARY[name]["info"] + " Effect Stack: dry/wet mix, global or single-layer scope, audio reactivity."
        for name in FX_ORDER},
     "WAVEFORM": "Draws the real decoded waveform of the playing track: line, filled area, dots or bars, horizontal or vertical, mirrored, per channel, as a live oscilloscope or a scrolling envelope.",
+    "GROUP": "Groups layers: give other layers General > Layer > Parent Group = this group's Tag. The group's position, scale, rotation, opacity and visibility apply to all of them; it can also pulse and spin with the music.",
     "SHAPE": "Vector shape: rectangle (rounded), ellipse, line, polygon, star or SVG path. Solid / gradient fill, dashed stroke, spin, rotate on beat, scale with a band, morph into another shape.",
     "CUSTOMSHADER": "Your own GLSL fragment shader, compiled on the GPU and applied to the scene. Declared variables get sliders/color pickers and are sent to the shader as uniforms every frame.",
 }

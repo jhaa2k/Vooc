@@ -542,7 +542,6 @@ class VoocRoot(FloatLayout):
                 x, y = w.to_window(w.x + w.width / 2.0, w.y + w.height / 2.0)
                 out.append("%s %d %d px" % (name, int(x), int(off_top + H - y)))
             add("play", self.play_btn)
-            add("style", self.style_chip)
             for k, it in self.nav.items.items():
                 add("nav_" + k, it)
             add("import", getattr(self, "import_btn", None))
@@ -1030,7 +1029,9 @@ class VoocRoot(FloatLayout):
         self.s.look["template"] = name
         if self.s.look.get("colors") and self.s.look.get("palette") not in ("", None) and name not in BUILTIN_TEMPLATES:
             pass
-        self.style_text.text = name
+        if getattr(self, "style_text", None) is not None:
+            if getattr(self, "style_text", None) is not None:
+                self.style_text.text = name
         self.selected_layer = None
         self._edit_layer = None
         self.scene.set_perf(**self.s.perf)

@@ -23,6 +23,7 @@ try:
     from vooc.property_editor import AdvancedProperties, pretty as pretty_module, _ICONS as EDITOR_ICONS
     from vooc.property_schema import EFFECT_MODULES, field_spec, iter_fields
     from vooc.model import ProjectModel, LayerModel
+    from vooc.history import History
     from vooc.audio.timeline_hub import TimelineHub
     from vooc.engine.scene import SceneView
     from vooc.engine.shader_presets import apply_preset as apply_shader_preset, PRESETS as SHADER_PRESET_TABLE
@@ -171,6 +172,8 @@ class VoocRoot(FloatLayout):
         self.exporter = None
         self.export_state = {"running": False, "progress": 0.0, "text": "", "result": ""}
         self.project = self._load_project()
+        self.history = History(20)
+        self.history.reset(self.project.to_dict())
         self.templates = TemplateStore(Path(self._data_dir()) / "templates")
         if AndroidMediaPlayerSource.is_available():
             self.native = AndroidMediaPlayerSource(lambda *a: None, self._native_error, self._native_completed,
@@ -263,6 +266,11 @@ class VoocRoot(FloatLayout):
         col.add_widget(m3.lbl("Vooc", 20, bold=True))
         col.add_widget(m3.lbl("Audio visualizer studio", 11, T.on_var))
         bar.add_widget(col)
+        self.undo_btn = m3.IconBtn("undo", self.undo)
+        self.redo_btn = m3.IconBtn("redo", self.redo)
+        bar.add_widget(self.undo_btn)
+        bar.add_widget(self.redo_btn)
+        self._sync_history_btns()
         bar.add_widget(m3.IconBtn("theme", self.toggle_theme))
         bar.add_widget(m3.IconBtn("folder", self.load))
         bar.add_widget(m3.IconBtn("save", self.save))
@@ -1646,8 +1654,48 @@ class VoocRoot(FloatLayout):
         except Exception as exc:
             print("Vooc autoload failed: %s" % exc)
 
+    # ---------------------------------------------------------------- undo / redo
+    def _sync_history_btns(self):
+        h = self.history
+        for btn, ok in ((getattr(self, "undo_btn", None), h.can_undo), (getattr(self, "redo_btn", None), h.can_redo)):
+            if btn is not None:
+                btn.opacity = 1.0 if ok else 0.38
+                btn.disabled = not ok
+
+    def _restore(self, state, label):
+        if state is None:
+            return
+        try:
+            project = ProjectModel.from_dict(state)
+        except Exception as exc:
+            self.toast("%s failed: %s" % (label, exc))
+            return
+        sel = getattr(self.selected_layer, "id", None)
+        self.project = project
+        self.scene.set_project(project)
+        self.hub.layer = project.layer("AUDIOPROVIDER")
+        self.selected_layer = next((l for l in project.layers if l.id == sel), None)
+        self._edit_layer = None
+        if self._fit_visual:
+            self._fit_visual()
+        self._restoring = True
+        self.autosave()
+        self._restoring = False
+        self.show(self.page)
+        self._sync_history_btns()
+        self.toast(label)
+
+    def undo(self):
+        self.autosave()                 # flush a pending edit into history first
+        self._restore(self.history.undo(), "Undo")
+
+    def redo(self):
+        self._restore(self.history.redo(), "Redo")
+
     def _write_project(self):
         self.s.engine = self.project.to_dict()
+        if not getattr(self, "_restoring", False) and self.history.record(self.s.engine):
+            self._sync_history_btns()
         p = self._project_path()
         p.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.with_suffix(".tmp")
@@ -1674,6 +1722,7 @@ class VoocRoot(FloatLayout):
             return
         self._autoload()
         self.project = self._load_project()
+        self.history.reset(self.project.to_dict())
         self.scene.set_project(self.project)
         self.hub.layer = self.project.layer("AUDIOPROVIDER")
         self.scene.set_perf(**self.s.perf)

@@ -278,6 +278,14 @@ class Icon(Widget):
         Line(circle=(cx, cy, s * .45, 60, 360), width=w)
         Triangle(points=[cx + s * .22, cy + s * .62, cx + s * .52, cy + s * .3, cx + s * .12, cy + s * .25])
 
+    def _i_undo(self, cx, cy, s, w):
+        Line(circle=(cx, cy - s * .05, s * .45, -80, 160), width=w)
+        Triangle(points=[cx - s * .62, cy + s * .02, cx - s * .2, cy + s * .02, cx - s * .41, cy + s * .42])
+
+    def _i_redo(self, cx, cy, s, w):
+        Line(circle=(cx, cy - s * .05, s * .45, -160, 80), width=w)
+        Triangle(points=[cx + s * .62, cy + s * .02, cx + s * .2, cy + s * .02, cx + s * .41, cy + s * .42])
+
     def _i_info(self, cx, cy, s, w):
         Line(circle=(cx, cy, s * .55), width=w)
         Ellipse(pos=(cx - w, cy + s * .22), size=(w * 2, w * 2))

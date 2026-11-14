@@ -30,7 +30,7 @@ def label(text, size=FS_BODY, color=None, bold=False, halign="left", **kw):
 
 
 class Surface(BoxLayout):
-    """BoxLayout with a rounded background."""
+    """BoxLayout with a square background."""
     bg = ListProperty([0, 0, 0, 0])
     radius = NumericProperty(0)
     border = ListProperty([0, 0, 0, 0])
@@ -205,9 +205,9 @@ class SliderBar(Widget):
         super().__init__(**kw)
         with self.canvas:
             self._tc = Color(*T.outline)
-            self._track = RoundedRectangle(radius=[dp(2)])
+            self._track = Rectangle()
             self._fc = Color(*T.primary)
-            self._fill = RoundedRectangle(radius=[dp(2)])
+            self._fill = Rectangle()
             self._hc = Color(*T.primary_soft)
             self._halo = Ellipse()
             self._kc = Color(*T.primary)
@@ -278,7 +278,7 @@ class ToggleSwitch(ButtonBehavior, Widget):
         super().__init__(**kw)
         with self.canvas:
             self._tc = Color()
-            self._track = RoundedRectangle()
+            self._track = Rectangle()
             self._kc = Color()
             self._knob = Ellipse()
         self.bind(pos=self._upd, size=self._upd, active=self._upd)
@@ -287,7 +287,6 @@ class ToggleSwitch(ButtonBehavior, Widget):
     def _upd(self, *_):
         self._tc.rgba = T.primary if self.active else T.outline
         self._track.pos, self._track.size = self.pos, self.size
-        self._track.radius = [self.height / 2]
         r = self.height * 0.36
         x = self.right - self.height / 2 if self.active else self.x + self.height / 2
         self._kc.rgba = T.on_primary if self.active else T.muted
@@ -343,7 +342,7 @@ class Dialog(ModalView):
         super().__init__(size_hint=size_hint, auto_dismiss=True, background="",
                          background_color=[0, 0, 0, 0], overlay_color=T.scrim, **kw)
         card = Surface(orientation="vertical", bg=T.surface, padding=PAD, spacing=GAP,
-                       radius=dp(24))
+                       radius=0)
         card.add_widget(label(title, FS_TITLE, bold=True, size_hint_y=None, height=dp(36)))
         card.add_widget(body)
         if actions:
@@ -387,7 +386,7 @@ def choose(title, options, current, on_pick):
     for opt in options:
         selected = opt == current
         row = Pressable(bg=T.primary_soft if selected else T.surface_hi, size_hint_y=None,
-                        height=dp(46), padding=(dp(14), 0), radius=dp(12))
+                        height=dp(42), padding=(dp(12), 0), radius=0)
         row.add_widget(label(opt, FS_BODY, color=T.primary if selected else T.on_surface,
                              bold=selected))
 
@@ -454,8 +453,8 @@ class Snackbar(FloatLayout):
 
     def __init__(self, **kw):
         super().__init__(**kw)
-        self.card = Surface(bg=T.surface_top, size_hint=(None, None), padding=(dp(16), dp(8)),
-                            radius=dp(14), opacity=0)
+        self.card = Surface(bg=T.surface_top, size_hint=(None, None), padding=(dp(12), dp(8)),
+                            radius=0, opacity=0)
         self.lbl = Label(font_size=FS_LABEL, color=T.on_surface, halign="left", valign="middle")
         self.card.add_widget(self.lbl)
         self.add_widget(self.card)

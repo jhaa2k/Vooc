@@ -59,7 +59,7 @@ def _coerce(spec, value):
             return out[:32]
         if kind == "variables":
             return [dict(v) for v in value if isinstance(v, dict) and v.get("name")]
-        if kind in ("text", "image", "font", "code", "action"):
+        if kind in ("text", "image", "font", "code", "action", "file"):
             return "" if value is None else str(value)
     except (TypeError, ValueError):
         pass

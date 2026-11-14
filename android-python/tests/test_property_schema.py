@@ -18,7 +18,7 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(set(SCHEMA), set(MODULES))
 
     def test_full_shared_dropdown_lists(self):
-        self.assertEqual(len(BLEND), 19)
+        self.assertEqual(len(BLEND), 21)                 # 19 Avee modes + Normal + Subtract
         self.assertEqual(len(ANCHOR), 17)
         self.assertGreaterEqual(len(MEASURE), 27)      # 27 Avee modes + analyzer extras
         for m in ("Kick", "Snare", "HiHat", "Downbeat", "CustomBand8", "Amplitude"):

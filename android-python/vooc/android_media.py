@@ -21,6 +21,14 @@ def _safe_name(value):
     return name or "imported_media"
 
 
+_ANY_REQUEST = 61424
+
+
+def choose_file(callback, patterns=None, title="Choose file"):
+    """Generic document picker (fonts, lyrics, ...); returns a readable local copy."""
+    _open_picker(callback, "*/*", list(patterns or ["*"]), _ANY_REQUEST, title)
+
+
 def _extension_for_mime(mime):
     mime = str(mime or "").lower().split(";", 1)[0].strip()
     known = {
@@ -36,6 +44,8 @@ def _extension_for_mime(mime):
         "video/mp4": ".mp4", "video/webm": ".webm", "video/x-matroska": ".mkv", "video/3gpp": ".3gp",
         "image/jpeg": ".jpg", "image/png": ".png",
         "image/webp": ".webp",
+        "font/ttf": ".ttf", "font/otf": ".otf", "application/x-font-ttf": ".ttf",
+        "application/x-font-otf": ".otf", "font/sfnt": ".ttf",
     }
     return known.get(mime) or mimetypes.guess_extension(mime) or ""
 

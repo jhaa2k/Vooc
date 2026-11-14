@@ -7,7 +7,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("KIVY_NO_ARGS", "1")
 
-from vooc.engine import vector_layers as vl  # noqa: E402
+from vooc.engine import geometry as vl  # noqa: E402
 from vooc.fx_library import LIBRARY  # noqa: E402
 from vooc.property_schema import SCHEMA, defaults  # noqa: E402
 

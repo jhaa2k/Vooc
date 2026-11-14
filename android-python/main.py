@@ -19,7 +19,7 @@ try:
     from vooc.state import ProjectState, THEMES, AUDIO_DEFAULTS, VISUALIZER_DEFAULTS, EQ_PRESETS
     from vooc.spectrum_source import AnalysisConfig, SpectrumLoader
     from vooc.android_audio import AndroidMediaPlayerSource
-    from vooc.android_media import choose_audio, choose_image, choose_template, publish_file
+    from vooc.android_media import choose_audio, choose_file, choose_image, choose_template, publish_file
     from vooc.property_editor import AdvancedProperties, pretty as pretty_module, _ICONS as EDITOR_ICONS
     from vooc.property_schema import EFFECT_MODULES, field_spec, iter_fields
     from vooc.model import ProjectModel, LayerModel
@@ -960,6 +960,12 @@ class VoocRoot(FloatLayout):
                 eye.active = visible
                 eye._colors()
                 tile.add_widget(eye)
+            if layer.module not in FIXED_MODULES:
+                locked = bool(layer.values.get("General/Layer/Locked", False))
+                lk = m3.IconBtn("lock" if locked else "unlock", lambda l=layer: self.toggle_lock(l), size=dp(40))
+                lk.active = locked
+                lk._colors()
+                tile.add_widget(lk)
             tile.add_widget(m3.IconBtn("tune", lambda l=layer: self.edit_layer(l), size=dp(40)))
             col.add_widget(tile)
         l = self.selected_layer
@@ -967,6 +973,12 @@ class VoocRoot(FloatLayout):
             return
         col.add_widget(m3.section("Inspector", pretty_module(l.module)))
         card = m3.card(spacing=dp(2))
+        if l.get("General/Layer/Locked"):
+            card.add_widget(m3.lbl("This layer is locked. Unlock it to edit, move or delete.", 13, T.on_var,
+                                   size_hint_y=None, height=dp(40)))
+            card.add_widget(m3.Button3("Unlock layer", lambda: self.toggle_lock(l), kind="tonal", icon="unlock"))
+            col.add_widget(card)
+            return
         G = "General/"
         rows = [("Position X", G + "Position/Position X", 0, 1), ("Position Y", G + "Position/Position Y", 0, 1),
                 ("Scale", G + "Scale & Rotation/Scale X", 0, 4), ("Rotation", G + "Scale & Rotation/Rotation", 0, 1)]
@@ -1057,11 +1069,23 @@ class VoocRoot(FloatLayout):
         self._engine_changed(layer)
         self.show("layers")
 
+    def toggle_lock(self, layer):
+        layer.set("General/Layer/Locked", not layer.get("General/Layer/Locked"))
+        self.toast("Layer locked" if layer.get("General/Layer/Locked") else "Layer unlocked")
+        self._save_trigger()
+        self.show("layers")
+
+    def _locked(self, layer):
+        if layer is not None and layer.get("General/Layer/Locked"):
+            self.toast("Layer is locked")
+            return True
+        return False
+
     def move_layer(self, direction):
         """direction +1 = up (towards the top / drawn later)."""
         l = self.selected_layer
         layers = self.project.layers
-        if l not in layers:
+        if l not in layers or self._locked(l):
             return
         i = layers.index(l)
         j = i + direction
@@ -1086,6 +1110,8 @@ class VoocRoot(FloatLayout):
 
     def delete_layer(self):
         l = self.selected_layer
+        if self._locked(l):
+            return
         if l is None or l.module in FIXED_MODULES:
             self.toast("Composition and audio provider are always present")
             return
@@ -1121,7 +1147,8 @@ class VoocRoot(FloatLayout):
             self.property_editor = AdvancedProperties(self.project, scene=lambda: self.scene,
                                                       on_change=self._engine_changed, pick_image=choose_image,
                                                       palette=self._palette_swatches, toast=self.toast, layer=layer,
-                                                      on_action=self._engine_action)
+                                                      on_action=self._engine_action,
+                                                      pick_file=lambda cb, pat: choose_file(cb, pat, "Choose file"))
             self.studio_body.add_widget(self.property_editor)
             Clock.schedule_once(self._dump_targets, 0.8)
             return
@@ -1393,6 +1420,7 @@ class VoocRoot(FloatLayout):
             meta = {"title": Path(path).stem, "artist": "", "album": "", "art": ""}
         self.meta.clear()
         self.meta.update(meta)
+        self.meta["path"] = path
         if meta.get("art") and self.s.look.get("auto_palette", True):
             self.palette_from_art(quiet=True)
 

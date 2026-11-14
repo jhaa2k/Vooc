@@ -28,6 +28,8 @@ _BLEND = {
     "HardLight": ("DST_COLOR", "SRC_COLOR", "ADD"),
     "Difference": ("ONE", "ONE", "REVERSE_SUBTRACT"),
     "Exclusion": ("ONE_MINUS_DST_COLOR", "ONE_MINUS_SRC_COLOR", "ADD"),
+    "Normal": ("SRC_ALPHA", "ONE_MINUS_SRC_ALPHA", "ADD"),
+    "Subtract": ("SRC_ALPHA", "ONE", "REVERSE_SUBTRACT"),
 }
 
 
@@ -266,7 +268,9 @@ vec4 blend(float m, vec4 base, vec4 top) {
   else if (m < 15.5) r = set_lum(set_sat(s, sat(b)), lum(b)); // Hue
   else if (m < 16.5) r = set_lum(set_sat(b, sat(s)), lum(b)); // Saturation
   else if (m < 17.5) r = set_lum(s, lum(b));                  // Color
-  else               r = set_lum(b, lum(s));                  // Luminosity
+  else if (m < 18.5) r = set_lum(b, lum(s));                  // Luminosity
+  else if (m < 19.5) r = s;                                   // Normal
+  else               r = b - s;                               // Subtract
   r = clamp(r, 0.0, 1.0);
   float a = (m > 2.5 && m < 4.5) ? base.a : top.a;
   return vec4(mix(b, r, a), max(base.a, top.a));

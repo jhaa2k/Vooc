@@ -57,11 +57,12 @@ class AdvancedProperties(BoxLayout):
     scroll_cls = None
 
     def __init__(self, project, scene=None, on_change=None, pick_image=None, palette=None, toast=None,
-                 layer=None, on_back=None, on_action=None, **kwargs):
+                 layer=None, on_back=None, on_action=None, pick_file=None, **kwargs):
         super().__init__(orientation="vertical", spacing=dp(8), **kwargs)
         self.project, self.scene = project, scene or (lambda: None)
         self.on_change = on_change or (lambda layer: None)
         self.pick_image = pick_image
+        self.pick_file = pick_file
         self.palette = palette or (lambda: [])
         self.toast = toast or (lambda text: None)
         self.on_back = on_back
@@ -82,6 +83,9 @@ class AdvancedProperties(BoxLayout):
     def _changed(self, layer, path, value):
         if layer.set(path, value):
             self.on_change(layer)
+            if path == "General/Layer/Locked":
+                from kivy.clock import Clock
+                Clock.schedule_once(lambda _dt: self.open_layer(layer, {"General"}), 0)
 
     @staticmethod
     def _count(module):
@@ -168,7 +172,15 @@ class AdvancedProperties(BoxLayout):
         col.bind(minimum_height=col.setter("height"))
         self._open_sections = set(open_sections or [])
         first = not self._open_sections
+        locked = bool(layer.values.get("General/Layer/Locked", False))
+        if locked:
+            banner = m3.card(padding=(dp(12), dp(8)), spacing=dp(4), bg=T.secondary_container, radius=dp(16))
+            banner.add_widget(m3.lbl("Locked - only General is editable. Turn off General > Layer > Locked to edit.",
+                                     12, T.on_secondary_container, size_hint_y=None, height=dp(34)))
+            col.add_widget(banner)
         for section, groups in SCHEMA[module].items():
+            if locked and section != "General":
+                continue
             count = sum(len(f) for f in groups.values())
             sec_card = m3.card(padding=(dp(4), dp(4)), spacing=dp(2), bg=T.surface1, radius=dp(18))
             header = m3.Tap(size_hint_y=None, height=dp(48), radius=dp(16), padding=(dp(12), 0), spacing=dp(8))
@@ -271,6 +283,15 @@ class AdvancedProperties(BoxLayout):
                 line.add_widget(m3.IconBtn("close", lambda p=path: (self._changed(layer, p, ""), self._refresh()),
                                            size=dp(40)))
             row.add_widget(line)
+        elif kind == "file":
+            line = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+            line.add_widget(m3.lbl(value.split("/")[-1] if value else "None", 13, T.on_surface if value else T.on_var))
+            if value:
+                line.add_widget(m3.IconBtn("close", lambda p=path: (self._changed(layer, p, ""), self._refresh()),
+                                           size=dp(40)))
+            line.add_widget(m3.Button3("Choose", lambda p=path, pat=spec.get("patterns"): self._choose_file(layer, p, pat),
+                                       kind="tonal", icon="folder", size_hint_x=None, width=dp(110)))
+            row.add_widget(line)
         elif kind == "code":
             row.add_widget(m3.text_field(value or "", lambda v, p=path: layer.set(p, v), "GLSL",
                                          multiline=True, height=dp(240)))
@@ -302,6 +323,17 @@ class AdvancedProperties(BoxLayout):
                 self._changed(layer, path, p)
                 self._refresh()
         self.pick_image(done)
+
+    def _choose_file(self, layer, path, patterns):
+        if self.pick_file is None:
+            self.toast("File picker not available")
+            return
+
+        def done(p):
+            if p:
+                self._changed(layer, path, p)
+                self._refresh()
+        self.pick_file(done, patterns)
 
     def _compile(self, layer):
         scene = self.scene()

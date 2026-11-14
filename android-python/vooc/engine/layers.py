@@ -11,7 +11,7 @@ import random
 
 import numpy as np
 from kivy.graphics import (BindTexture, Color, InstructionGroup, Mesh, PopMatrix,
-                           PushMatrix, Rectangle, RenderContext, Rotate, Scale,
+                           PushMatrix, Rectangle, RenderContext, Rotate, RoundedRectangle, Scale,
                            Translate)
 
 from ..model import hex_to_rgba
@@ -31,6 +31,11 @@ _FILL = ("justify", "fill", "stretch")
 
 
 # ------------------------------------------------------------------ transform
+_ORIGINS = {"Center": (0.5, 0.5), "Top Left": (0.0, 1.0), "Top Right": (1.0, 1.0), "Bottom Left": (0.0, 0.0),
+            "Bottom Right": (1.0, 0.0), "Top": (0.5, 1.0), "Bottom": (0.5, 0.0), "Left": (0.0, 0.5),
+            "Right": (1.0, 0.5)}
+
+
 class LayerTransform:
     """General -> Position / Anchor / Scale & Rotation / Measure Engine.
 
@@ -78,7 +83,9 @@ class LayerTransform:
         rot = v[G + "Scale & Rotation/Rotation"] * 360.0 + measure.rotation_offset(
             v[G + "Measure Engine/Measure Rot"], v[G + "Measure Engine/Rot Amount (A)"],
             v[G + "Measure Engine/Rot Speed (B)"])
-        pvx, pvy = v[G + "Scale & Rotation/Pivot X"] * box_w, v[G + "Scale & Rotation/Pivot Y"] * box_h
+        origin = v.get(G + "Scale & Rotation/Transform Origin", "Custom")
+        px_f, py_f = _ORIGINS.get(origin, (v[G + "Scale & Rotation/Pivot X"], v[G + "Scale & Rotation/Pivot Y"]))
+        pvx, pvy = px_f * box_w, py_f * box_h
         return dict(origin=(ox, oy), box=(box_w, box_h), pivot=(pvx, pvy),
                     scale=(sx * msx, sy * msy), rotation=rot)
 
@@ -116,10 +123,20 @@ class BaseLayer:
     def update(self, frame):
         frame.measure.use_layer(self.values)
         self.blend.mode = self.values[G + "Layer/Blend Mode"]
+        self.opacity = float(self.values.get(G + "Layer/Opacity", 1.0))
+        self._apply_opacity()
         box = self.render(frame)
         t = LayerTransform.compute(self.values, frame.measure, frame.w, frame.h, *box)
         self.transform.apply(t)
         self.after_transform(t, frame)
+
+    opacity = 1.0
+
+    def _apply_opacity(self):
+        for obj in vars(self).values():
+            ctx = getattr(obj, "ctx", None) if isinstance(obj, QuadBatch) else (obj if isinstance(obj, RenderContext) else None)
+            if ctx is not None:
+                ctx["opacity"] = self.opacity
 
     def after_transform(self, t, frame):
         pass
@@ -267,27 +284,47 @@ def substitute(text, frame):
     return text
 
 
+_CASE = {"UPPERCASE": str.upper, "lowercase": str.lower, "Title Case": str.title}
+
+
 class TextLayer(BaseLayer):
     def build(self):
         super().build()
+        self.bg_group = InstructionGroup()
+        self.glow_group = InstructionGroup()
         self.shadow_group = InstructionGroup()
         self.outline_group = InstructionGroup()
         self.fill_group = InstructionGroup()
+        self.bg_color = Color(0, 0, 0, 0)
+        self.bg_rect = RoundedRectangle(pos=(0, 0), size=(0, 0), radius=[0])
+        self.bg_group.add(self.bg_color)
+        self.bg_group.add(self.bg_rect)
+        self.glow_color = Color(0, 0, 0, 0)
         self.shadow_color = Color(0, 0, 0, .5)
         self.outline_color = Color(0, 0, 0, 1)
         self.fill_color = Color(1, 1, 1, 1)
         self.anim_scale = Scale(1, 1, 1)
         self.anim_push, self.anim_pop = PushMatrix(), PopMatrix()
-        self.anim_t1, self.anim_t2 = Translate(), Translate()
-        for i in (self.anim_push, self.anim_t1, self.anim_scale, self.anim_t2,
-                  self.shadow_color, self.shadow_group, self.outline_color,
-                  self.outline_group, self.fill_color, self.fill_group, self.anim_pop):
+        self.anim_t1, self.anim_t2, self.scroll_t = Translate(), Translate(), Translate()
+        self.clip_in, self.clip_out = InstructionGroup(), InstructionGroup()
+        self.scissor = None
+        for i in (self.clip_in, self.anim_push, self.anim_t1, self.anim_scale, self.anim_t2,
+                  self.bg_group, self.scroll_t,
+                  self.glow_color, self.glow_group, self.shadow_color, self.shadow_group,
+                  self.outline_color, self.outline_group, self.fill_color, self.fill_group,
+                  self.anim_pop, self.clip_out):
             self.content.add(i)
         self._glyphs = {}
+        self._fill_items = []
         self._layout_key = None
         self._text = None
         self._anim_start = 0.0
+        self._shadow_copies = 1
+        self._glow_copies = 1
         self.box = (1, 1)
+        self.text_w = 1
+        self.lines_n = 1
+        self.current_line = 0
 
     def _glyph(self, ch, font_name, size, bold, italic, outline):
         key = (ch, font_name, size, bold, italic, outline)
@@ -305,6 +342,7 @@ class TextLayer(BaseLayer):
             except Exception:
                 kw.pop("outline_width", None)
                 kw.pop("outline_color", None)
+                kw["font_name"] = "Roboto"
                 label = CoreLabel(**kw)
                 label.refresh()
                 tex = label.texture
@@ -313,44 +351,120 @@ class TextLayer(BaseLayer):
             self._glyphs[key] = tex
         return tex
 
+    def _source_text(self, frame):
+        v = self.values
+        L = "Content/Lyrics/"
+        if v.get(L + "Source", "Text Input") != "Text Input":
+            from .. import lyrics
+            meta = frame.metadata or {}
+            path = lyrics.find_lrc(meta.get("path", ""), v.get(L + "Lyrics File", ""))
+            lines = lyrics.load(path)
+            if not lines:
+                self.current_line = 0
+                return "No synced lyrics (.lrc) found" if path == "" else "Lyrics file is empty"
+            ctx = int(v.get(L + "Context Lines", 0))
+            rows, _ = lyrics.window(lines, frame.position + v.get(L + "Lyrics Offset (s)", 0.0), ctx)
+            self.current_line = ctx
+            return "\n".join(r if r else " " for r in rows)
+        self.current_line = -1
+        raw = v["Content/Text/Text Input"]
+        return substitute(raw, frame) if v["Content/Text/Use Metadata Variables"] else raw
+
     def render(self, frame):
         v = self.values
-        raw = v["Content/Text/Text Input"]
-        text = substitute(raw, frame) if v["Content/Text/Use Metadata Variables"] else raw
+        text = self._source_text(frame)
+        case = _CASE.get(v.get("Content/Text/Text Transform", "None"))
+        if case is not None:
+            text = case(text)
         if text != self._text:
             self._text = text
             self._anim_start = frame.time
-        anim = v["Text Animation/Animation/Animation Type"]
-        duration = 0.15 + (1.0 - v["Text Animation/Animation/Animation Speed"]) * 1.6
-        progress = min(1.0, (frame.time - self._anim_start) / duration) if anim != "None" else 1.0
+        A = "Text Animation/"
+        anim = v[A + "Animation/Animation Type"]
+        duration = 0.15 + (1.0 - v[A + "Animation/Animation Speed"]) * 1.6
+        stagger = v.get(A + "Animation/Stagger", 0.0) * 0.08 if anim in ("Fade", "Slide Up", "Slide Down", "Zoom") else 0.0
+        elapsed = frame.time - self._anim_start
+        total_dur = duration + stagger * max(0, len(text) - 1)
+        progress = min(1.0, elapsed / duration) if anim != "None" else 1.0
         visible = len(text)
         if anim == "Typewriter":
             cps = max(0.5, v["Content/Text/Typewriter Speed"] * 60.0)
-            visible = int((frame.time - self._anim_start) * cps)
+            visible = int(elapsed * cps)
         font_px = max(4, int(v["Typography/Font/Font Size"] * frame.h))
         weight = int(v["Typography/Font/Font Weight"])
         style = v["Typography/Font/Style"]
         bold = weight >= 600 or "Bold" in style
         italic = "Italic" in style
         outline_px = int(round(v["Appearance/Outline/Outline Width"] * font_px * 0.25))
+        M = A + "Marquee/"
+        marquee = bool(v.get(M + "Enable Marquee", False))
         layout_key = (text, min(visible, len(text)), font_px, bold, italic, outline_px,
-                      v["Typography/Font/Font Family"], v["Typography/Font/Letter Spacing"],
+                      v["Typography/Font/Font Family"], v.get("Typography/Font/Custom Font File", ""),
+                      v["Typography/Font/Letter Spacing"],
                       v["Typography/Font/Line Height"], v["Typography/Font/Alignment"],
                       v["Appearance/Shadow/Shadow X"], v["Appearance/Shadow/Shadow Y"],
-                      v["Appearance/Shadow/Shadow Blur"])
+                      v["Appearance/Shadow/Shadow Blur"], v.get("Appearance/Glow/Glow Size", 0.0),
+                      marquee, v.get(M + "Marquee Gap", 0.15), frame.w)
         if layout_key != self._layout_key:
             self._layout_key = layout_key
-            self._layout(text, min(visible, len(text)), font_px, bold, italic, outline_px)
+            self._layout(text, min(visible, len(text)), font_px, bold, italic, outline_px,
+                         marquee, v.get(M + "Marquee Gap", 0.15) * frame.w)
         # colors + animation
-        alpha = progress if anim in ("Fade", "Slide Up", "Slide Down", "Zoom") else 1.0
+        alpha = (min(1.0, elapsed / total_dur) if stagger else progress) if anim in (
+            "Fade", "Slide Up", "Slide Down", "Zoom") else 1.0
+        alpha *= self.opacity
         fill = hex_to_rgba(v["Appearance/Fill/Text Color"])
-        self.fill_color.rgba = fill[:3] + [fill[3] * alpha]
+        grad = hex_to_rgba(v.get("Appearance/Fill/Gradient Color", "#C6FF00FF"))
+        fmode = v.get("Appearance/Fill/Fill Mode", "Solid")
+        ctx_alpha = v.get("Content/Lyrics/Context Opacity", 0.4)
+        base_alpha = progress if anim in ("Fade", "Slide Up", "Slide Down", "Zoom") and not stagger else 1.0
+        base_alpha *= self.opacity
+        self.fill_color.rgba = [1, 1, 1, 1]
+        if marquee:
+            self.current_line = -1
+        for col, tx, ty, idx, line in self._fill_items:
+            t = tx if fmode == "Horizontal Gradient" else (ty if fmode == "Vertical Gradient" else 0.0)
+            c = [fill[k] + (grad[k] - fill[k]) * t for k in range(4)] if t else fill
+            a = base_alpha
+            if stagger:
+                a *= max(0.0, min(1.0, (elapsed - idx * stagger) / duration))
+            if self.current_line >= 0 and line != self.current_line:
+                a *= ctx_alpha
+            col.rgba = (c[0], c[1], c[2], c[3] * a)
         sc = hex_to_rgba(v["Appearance/Shadow/Shadow Color"])
-        blur_n = self._shadow_copies
-        self.shadow_color.rgba = sc[:3] + [sc[3] * alpha / max(1, blur_n) ** 0.7]
+        self.shadow_color.rgba = sc[:3] + [sc[3] * alpha / max(1, self._shadow_copies) ** 0.7]
         oc = hex_to_rgba(v["Appearance/Outline/Outline/Stroke Color"])
         self.outline_color.rgba = oc[:3] + [oc[3] * alpha]
+        gc = hex_to_rgba(v.get("Appearance/Glow/Glow Color", "#C6FF00AA"))
+        pulse_src = v.get("Appearance/Glow/Glow Pulse With", "Nothing")
+        pulse = 1.0
+        if pulse_src != "Nothing":
+            from ..fx_library import react_level
+            pulse = 0.25 + 0.75 * react_level(frame.snapshot, frame.measure, pulse_src)
+        self.glow_color.rgba = gc[:3] + [gc[3] * alpha * pulse / max(1, self._glow_copies) ** 0.6]
         bw, bh = self.box
+        tw = self.text_w
+        # marquee: clipped window of Marquee Width, text scrolls through it
+        x_off = 0.0
+        if marquee:
+            bw = max(4.0, v.get(M + "Marquee Width", 0.6) * frame.w)
+            period = tw + v.get(M + "Marquee Gap", 0.15) * frame.w
+            x_off = -((frame.time * v.get(M + "Marquee Speed", 0.1) * frame.w) % max(period, 1.0))
+        self.scroll_t.xy = (x_off, 0)
+        # auto fit
+        fit_w = v.get("Typography/Font/Auto Fit Width", 0.0)
+        fit = min(1.0, fit_w * frame.w / max(bw, 1.0)) if fit_w > 0 else 1.0
+        # background box (does not scroll)
+        if v.get("Appearance/Background/Show Background", False):
+            pad = v.get("Appearance/Background/Padding", 0.35) * font_px
+            bc = hex_to_rgba(v.get("Appearance/Background/Background Color", "#00000080"))
+            self.bg_color.rgba = bc[:3] + [bc[3] * self.opacity * (alpha if anim != "None" else 1.0)]
+            self.bg_rect.pos = (-pad, -pad)
+            self.bg_rect.size = (bw + pad * 2, bh + pad * 2)
+            r = v.get("Appearance/Background/Corner Radius", 0.3) * min(bw + pad * 2, bh + pad * 2) / 2
+            self.bg_rect.radius = [r]
+        else:
+            self.bg_color.a = 0
         ease = 1 - (1 - progress) ** 3
         dy = 0.0
         if anim == "Slide Up":
@@ -358,19 +472,45 @@ class TextLayer(BaseLayer):
         elif anim == "Slide Down":
             dy = (1 - ease) * frame.h * 0.06
         z = 0.6 + 0.4 * ease if anim == "Zoom" else 1.0
-        self.anim_t1.xy = (bw / 2, bh / 2 + dy)
-        self.anim_scale.x = self.anim_scale.y = z
+        self.anim_t1.xy = (bw * fit / 2, bh * fit / 2 + dy)
+        self.anim_scale.x = self.anim_scale.y = z * fit
         self.anim_t2.xy = (-bw / 2, -bh / 2)
-        return self.box
+        self._marquee = marquee
+        self._mbox = (bw * fit, bh * fit)
+        return bw * fit, bh * fit
 
-    def _layout(self, text, visible, font_px, bold, italic, outline_px):
+    def after_transform(self, t, frame):
+        if not getattr(self, "_marquee", False):
+            if self.scissor is not None:
+                self.clip_in.clear()
+                self.clip_out.clear()
+                self.scissor = None
+            return
+        from kivy.graphics.scissor_instructions import ScissorPop, ScissorPush
+        ox, oy = t["origin"]
+        pvx, pvy = t["pivot"]
+        sx, sy = t["scale"]
+        bw, bh = self._mbox
+        x = ox + pvx * (1 - sx)
+        y = oy + pvy * (1 - sy)
+        rect = (int(x), int(y), max(1, int(bw * sx)), max(1, int(bh * sy)))
+        if self.scissor is None:
+            self.scissor = ScissorPush(x=rect[0], y=rect[1], width=rect[2], height=rect[3])
+            self.clip_in.add(self.scissor)
+            self.clip_out.add(ScissorPop())
+        else:
+            self.scissor.x, self.scissor.y, self.scissor.width, self.scissor.height = rect
+
+    def _layout(self, text, visible, font_px, bold, italic, outline_px, marquee=False, gap=0.0):
         v = self.values
-        font_name = resolve_font(v["Typography/Font/Font Family"])
+        custom = v.get("Typography/Font/Custom Font File", "")
+        font_name = custom if custom and os.path.isfile(custom) else resolve_font(v["Typography/Font/Font Family"])
         spacing = v["Typography/Font/Letter Spacing"] * font_px * 0.5
         line_h = font_px * 1.25 * (v["Typography/Font/Line Height"] * 2.0)
         align = v["Typography/Font/Alignment"]
         lines = text.split("\n")
-        # measure
+        if marquee:
+            lines = [" ".join(l for l in lines if l.strip()) or " "]
         measured = []
         for line in lines:
             glyphs = [(ch, self._glyph(ch, font_name, font_px, bold, italic, 0)) for ch in line]
@@ -379,8 +519,11 @@ class TextLayer(BaseLayer):
         max_w = max([w for _, w in measured] + [1])
         total_h = max(line_h * len(lines), 1)
         self.box = (max_w, total_h)
-        for g in (self.shadow_group, self.outline_group, self.fill_group):
+        self.text_w = max_w
+        self.lines_n = len(lines)
+        for g in (self.glow_group, self.shadow_group, self.outline_group, self.fill_group):
             g.clear()
+        self._fill_items = []
         sx = (v["Appearance/Shadow/Shadow X"] - 0.5) * font_px * 0.6
         sy = (v["Appearance/Shadow/Shadow Y"] - 0.5) * font_px * 0.6
         blur = v["Appearance/Shadow/Shadow Blur"]
@@ -388,37 +531,52 @@ class TextLayer(BaseLayer):
             (math.cos(a) * blur * font_px * 0.15, math.sin(a) * blur * font_px * 0.15)
             for a in np.linspace(0, 2 * math.pi, 6, endpoint=False)]
         self._shadow_copies = len(jitter)
-        shadow_on = True
-        drawn = 0
-        for li, (glyphs, width) in enumerate(measured):
-            y = total_h - (li + 1) * line_h + (line_h - font_px * 1.2) / 2
-            extra = 0.0
-            spaces = sum(1 for ch, _ in glyphs if ch == " ")
-            if align == "Left":
-                x = 0.0
-            elif align == "Right":
-                x = max_w - width
-            elif align == "Justify" and li < len(measured) - 1 and spaces:
-                x, extra = 0.0, (max_w - width) / spaces
-            else:
-                x = (max_w - width) / 2
-            for ch, tex in glyphs:
-                if drawn >= visible:
-                    break
-                drawn += 1
-                if ch.strip():
-                    if shadow_on:
+        gsize = v.get("Appearance/Glow/Glow Size", 0.0) * font_px * 0.35
+        glow = [] if gsize < 0.5 else [
+            (math.cos(a) * r, math.sin(a) * r)
+            for r in (gsize * 0.5, gsize) for a in np.linspace(0, 2 * math.pi, 8, endpoint=False)]
+        self._glow_copies = max(1, len(glow))
+        copies = [0.0, max_w + gap] if marquee else [0.0]
+        for base_x in copies:
+            drawn = 0
+            idx = 0
+            for li, (glyphs, width) in enumerate(measured):
+                y = total_h - (li + 1) * line_h + (line_h - font_px * 1.2) / 2
+                extra = 0.0
+                spaces = sum(1 for ch, _ in glyphs if ch == " ")
+                if marquee or align == "Left":
+                    x = 0.0
+                elif align == "Right":
+                    x = max_w - width
+                elif align == "Justify" and li < len(measured) - 1 and spaces:
+                    x, extra = 0.0, (max_w - width) / spaces
+                else:
+                    x = (max_w - width) / 2
+                x += base_x
+                for ch, tex in glyphs:
+                    if drawn >= visible:
+                        break
+                    drawn += 1
+                    if ch.strip():
+                        for gx, gy in glow:
+                            self.glow_group.add(Rectangle(texture=tex, size=tex.size, pos=(x + gx, y + gy)))
                         for jx, jy in jitter:
                             self.shadow_group.add(Rectangle(texture=tex, size=tex.size,
                                                             pos=(x + sx + jx, y + sy + jy)))
-                    if outline_px:
-                        otex = self._glyph(ch, font_name, font_px, bold, italic, outline_px)
-                        self.outline_group.add(Rectangle(
-                            texture=otex, size=otex.size,
-                            pos=(x - (otex.width - tex.width) / 2, y - (otex.height - tex.height) / 2)))
-                    self.fill_group.add(Rectangle(texture=tex, size=tex.size, pos=(x, y)))
-                x += tex.width + spacing + (extra if ch == " " else 0.0)
-            drawn += 1  # newline counts as a typed character
+                        if outline_px:
+                            otex = self._glyph(ch, font_name, font_px, bold, italic, outline_px)
+                            self.outline_group.add(Rectangle(
+                                texture=otex, size=otex.size,
+                                pos=(x - (otex.width - tex.width) / 2, y - (otex.height - tex.height) / 2)))
+                        col = Color(1, 1, 1, 1)
+                        self.fill_group.add(col)
+                        self.fill_group.add(Rectangle(texture=tex, size=tex.size, pos=(x, y)))
+                        tx = min(1.0, max(0.0, (x - base_x + tex.width / 2) / max(max_w, 1)))
+                        ty = 1.0 - min(1.0, max(0.0, (y + tex.height / 2) / max(total_h, 1)))
+                        self._fill_items.append((col, tx, ty, idx, li))
+                        idx += 1
+                    x += tex.width + spacing + (extra if ch == " " else 0.0)
+                drawn += 1  # newline counts as a typed character
 
 
 # ------------------------------------------------------------------ mesh helper
@@ -471,11 +629,30 @@ def _lerp_colors(c_from, c_to, t):
 
 
 # ------------------------------------------------------------------ BARS
+def _hsv_rgba(h, s, v, a):
+    h = (np.asarray(h, np.float32) % 1.0) * 6.0
+    i = np.floor(h).astype(np.int32) % 6
+    f = h - np.floor(h)
+    p, q, t = v * (1 - s), v * (1 - s * f), v * (1 - s * (1 - f))
+    vv = np.full_like(f, v)
+    pp, qq, tt = np.broadcast_to(p, f.shape), np.broadcast_to(q, f.shape), np.broadcast_to(t, f.shape)
+    r = np.choose(i, [vv, qq, pp, pp, tt, vv])
+    g = np.choose(i, [tt, vv, vv, qq, pp, pp])
+    b = np.choose(i, [pp, pp, tt, vv, vv, qq])
+    return np.stack([r, g, b, np.full_like(f, a)], 1).astype(np.float32)
+
+
+def _quads_between(b0, b1, half_w):
+    return np.stack([b0 - half_w, b0 + half_w, b1 + half_w, b1 - half_w], 1)
+
+
 class BarsLayer(BaseLayer):
     def build(self):
         super().build()
         self.batch = QuadBatch(self.content)
         self.values_now = np.zeros(0, np.float32)
+        self.peaks = np.zeros(0, np.float32)
+        self.peak_hold = np.zeros(0, np.float32)
 
     # engine bands are log spaced 30 Hz .. 16 kHz (see audio.analysis / timeline_hub)
     F_LO, F_HI = 30.0, 16000.0
@@ -549,9 +726,13 @@ class BarsLayer(BaseLayer):
         heights = np.clip(self.values_now * max_h, min_h, max(max_h, min_h)) * m
 
         shape = v[B + "Shape Path"]
-        all_corners, all_colors = [], []
+        Y = "Bar Style/"
+        mode = v.get(Y + "Color/Color Mode", "Segment Gradient")
+        bars = []                         # (b0, b1, half_w, n_dir, col_bottom, col_top, h, mirrored)
         offset_out = np.zeros(count, np.float32)
         offset_in = np.zeros(count, np.float32)
+        main_seg = None
+        base_line = None
         for si in (1, 2, 3):
             S = "Segment %d/Segment %d/" % (si, si)
             if not v[S + "Enable Segment"]:
@@ -562,6 +743,8 @@ class BarsLayer(BaseLayer):
             pts, nrm, closed = shapes.sample_path(path_name, count, frame.snapshot["waveform"])
             ex, ey = shapes.path_extent(path_name, v[B + "Path Size"], frame.w, frame.h)
             base = pts * [ex, ey] + [frame.w / 2, frame.h / 2]
+            if base_line is None:
+                base_line = (base, closed)
             if path_name in shapes.OPEN_SHAPES:
                 perim = 2 * (ey if path_name == "VerticalLine" else ex)
             else:
@@ -580,34 +763,155 @@ class BarsLayer(BaseLayer):
             n_dir = nrm * direction[:, None]
             b0 = base + n_dir * start[:, None]
             b1 = base + n_dir * (start + h)[:, None]
-            corners = np.stack([b0 - half_w, b0 + half_w, b1 + half_w, b1 - half_w], 1)
             t = (np.arange(count) / max(1, count - 1) + v[B + "Color Blend Offset"]) % 1.0001
             c_from, c_to = hex_to_rgba(v[S + "Color From"]), hex_to_rgba(v[S + "Color To"])
-            cols = _lerp_colors(c_from, c_to, t)
-            top = _lerp_colors(c_from, c_to, np.clip(t + 0.15, 0, 1))
-            col4 = np.stack([cols, cols, top, top], 1)
-            all_corners.append(corners)
-            all_colors.append(col4)
+            if mode == "Solid":
+                cols = np.repeat(np.asarray(c_from, np.float32)[None], count, 0)
+                top = cols
+            elif mode == "Rainbow":
+                hue = t + frame.time * v.get(Y + "Color/Rainbow Speed", 0.1)
+                sat = v.get(Y + "Color/Rainbow Saturation", 0.9)
+                cols = _hsv_rgba(hue, sat, 1.0, c_from[3])
+                top = _hsv_rgba(hue + 0.06, sat * 0.8, 1.0, c_from[3])
+            elif mode == "By Amplitude":
+                amp = np.clip(self.values_now, 0, 1)
+                cols = _lerp_colors(c_from, c_to, amp * 0.6)
+                top = _lerp_colors(c_from, c_to, amp)
+            else:
+                cols = _lerp_colors(c_from, c_to, t)
+                top = _lerp_colors(c_from, c_to, np.clip(t + 0.15, 0, 1))
+            bars.append((b0, b1, half_w, n_dir, cols, top, h, False))
+            if main_seg is None:
+                main_seg = (base, n_dir, half_w, start)
             if v[S + "Mirror"]:
                 istart = np.zeros(count, np.float32) if own_path else offset_in
                 m0 = base - n_dir * istart[:, None]
                 m1 = base - n_dir * (istart + h)[:, None]
-                all_corners.append(np.stack([m0 - half_w, m0 + half_w, m1 + half_w, m1 - half_w], 1))
-                all_colors.append(col4)
+                bars.append((m0, m1, half_w, -n_dir, cols, top, h, True))
                 if not own_path:
                     offset_in = offset_in + h
             if not own_path:
                 offset_out = offset_out + h
-        if all_corners:
-            self.batch.set(np.concatenate(all_corners), np.concatenate(all_colors))
+        corners, colors = self._style(frame, bars, main_seg, base_line, offset_out, m)
+        colors = [c if c.ndim == 3 else np.repeat(c[:, None, :], 4, axis=1) for c in colors]
+        if corners:
+            self.batch.set(np.concatenate(corners), np.concatenate(colors))
         else:
             self.batch.set(np.zeros((0, 4, 2), np.float32), np.zeros((0, 4), np.float32))
         return frame.w, frame.h
 
+    def _style(self, frame, bars, main_seg, base_line, total_h, m):
+        """Turns bar records into quads: glow, reflection, LED cells / solid bars, round caps,
+        outline, peak markers and baseline (back to front)."""
+        v = self.values
+        Y = "Bar Style/"
+        out_c, out_k = [], []
+        glow = v.get(Y + "Extras/Glow Amount", 0.0)
+        refl = v.get(Y + "Extras/Reflection Opacity", 0.0)
+        led = v.get(Y + "Shape/LED Cell Size", 0.0) * m
+        gap = v.get(Y + "Shape/LED Gap", 0.0) * m
+        round_cap = v.get(Y + "Shape/Cap Style", "Flat") == "Round"
+        outline = v.get(Y + "Extras/Outline Width", 0.0) * m
+
+        def four(bottom, top):
+            return np.stack([bottom, bottom, top, top], 1)
+
+        if glow > 0:
+            gw = v.get(Y + "Extras/Glow Width", 2.5)
+            for b0, b1, hw, nd, cb, ct, h, _ in bars:
+                ext = hw * (gw - 1.0)
+                g0 = b0 - nd * (np.linalg.norm(hw, axis=1) * (gw - 1))[:, None]
+                g1 = b1 + nd * (np.linalg.norm(hw, axis=1) * (gw - 1))[:, None]
+                cb2, ct2 = cb.copy(), ct.copy()
+                cb2[:, 3] *= glow * 0.35
+                ct2[:, 3] *= glow * 0.12
+                out_c.append(_quads_between(g0, g1, hw + ext))
+                out_k.append(four(cb2, ct2))
+        if refl > 0:
+            for b0, b1, hw, nd, cb, ct, h, mirrored in bars:
+                if mirrored:
+                    continue
+                r0 = b0
+                r1 = b0 - nd * (h * 0.6)[:, None]
+                cb2, ct2 = cb.copy(), ct.copy()
+                cb2[:, 3] *= refl * 0.5
+                ct2[:, 3] = 0.0
+                out_c.append(_quads_between(r0, r1, hw))
+                out_k.append(four(cb2, ct2))
+        for b0, b1, hw, nd, cb, ct, h, _ in bars:
+            if led > 0.5:
+                pitch = led + gap
+                hmax = float(h.max()) if len(h) else 0.0
+                cells = int(min(64, math.ceil(hmax / pitch))) if hmax > 0 else 0
+                for j in range(cells):
+                    s0 = j * pitch
+                    live = h > s0
+                    if not live.any():
+                        break
+                    s1 = np.minimum(s0 + led, h)
+                    c0 = b0[live] + nd[live] * s0
+                    c1 = b0[live] + nd[live] * s1[live][:, None]
+                    f = np.clip(s0 / max(hmax, 1e-6), 0, 1)
+                    col = cb[live] + (ct[live] - cb[live]) * f
+                    out_c.append(_quads_between(c0, c1, hw[live]))
+                    out_k.append(col)
+            else:
+                out_c.append(_quads_between(b0, b1, hw))
+                out_k.append(four(cb, ct))
+            if round_cap and led <= 0.5:
+                r = np.linalg.norm(hw, axis=1)
+                tdir = hw / np.maximum(r, 1e-6)[:, None]
+                steps = 6
+                for k in range(steps):
+                    a0, a1 = math.pi * k / steps, math.pi * (k + 1) / steps
+                    p0 = b1 + (tdir * math.cos(a0) + nd * math.sin(a0)) * r[:, None]
+                    p1 = b1 + (tdir * math.cos(a1) + nd * math.sin(a1)) * r[:, None]
+                    out_c.append(np.stack([b1, p0, p1, b1], 1))
+                    out_k.append(np.repeat(ct[:, None, :], 4, 1))
+            if outline > 0.2:
+                oc = np.asarray(hex_to_rgba(v.get(Y + "Extras/Outline Color", "#FFFFFFCC")), np.float32)
+                q = _quads_between(b0, b1, hw)
+                for e in range(4):
+                    a, b = q[:, e], q[:, (e + 1) % 4]
+                    d = b - a
+                    ln = np.maximum(np.linalg.norm(d, axis=1), 1e-6)[:, None]
+                    nrm = np.stack([-d[:, 1], d[:, 0]], 1) / ln * (outline / 2)
+                    out_c.append(np.stack([a - nrm, b - nrm, b + nrm, a + nrm], 1))
+                    out_k.append(np.repeat(oc[None], len(a), 0))
+        if v.get(Y + "Peaks/Show Peaks", False) and main_seg is not None:
+            base, nd, hw, start = main_seg
+            n = len(total_h)
+            if self.peaks.shape[0] != n:
+                self.peaks = np.zeros(n, np.float32)
+                self.peak_hold = np.zeros(n, np.float32)
+            cur = total_h - start
+            up = cur >= self.peaks
+            self.peaks = np.where(up, cur, self.peaks)
+            self.peak_hold = np.where(up, v.get(Y + "Peaks/Peak Hold (s)", 0.4), self.peak_hold - frame.dt)
+            falling = (~up) & (self.peak_hold <= 0)
+            fall = v.get(Y + "Peaks/Peak Fall Speed", 0.5) * m * v["Bars Setup/Bars/Max Height Scale"] * frame.dt
+            self.peaks = np.where(falling, np.maximum(cur, self.peaks - fall), self.peaks)
+            th = max(1.0, v.get(Y + "Peaks/Peak Thickness", 0.006) * m)
+            p0 = base + nd * (start + self.peaks + th * 0.5)[:, None]
+            p1 = p0 + nd * th
+            pc = np.asarray(hex_to_rgba(v.get(Y + "Peaks/Peak Color", "#FFFFFFFF")), np.float32)
+            out_c.append(_quads_between(p0, p1, hw))
+            out_k.append(np.repeat(pc[None], n, 0))
+        bw = v.get(Y + "Extras/Baseline Width", 0.0) * m
+        if bw > 0.2 and base_line is not None:
+            from .geometry import thick_polyline
+            pts, closed = base_line
+            q = thick_polyline(np.asarray(pts, np.float32), bw, closed=bool(closed))
+            if len(q):
+                bc = np.asarray(hex_to_rgba(v.get(Y + "Extras/Baseline Color", "#C6FF0099")), np.float32)
+                out_c.append(q)
+                out_k.append(np.repeat(bc[None], len(q), 0))
+        return out_c, out_k
+
 
 # ------------------------------------------------------------------ PARTICLES
 class ParticlesLayer(BaseLayer):
-    FIELDS = ("x", "y", "z", "vx", "vy", "vz", "age", "life", "rand", "wave_f", "wave_m", "phase")
+    FIELDS = ("x", "y", "z", "vx", "vy", "vz", "age", "life", "rand", "wave_f", "wave_m", "phase", "rot", "spin")
 
     def build(self):
         super().build()
@@ -616,7 +920,7 @@ class ParticlesLayer(BaseLayer):
         self._spawn_acc = 0.0
         self.count_warning = False
 
-    def _spawn(self, n, frame):
+    def _spawn(self, n, frame, boost=1.0):
         v = self.values
         O, D, M, W = "Overall Settings/Emitter/", "Overall Settings/Direction/", "Behaviour/Motion/", "Wave Behaviour/Side Wave/"
         w, h = frame.w, frame.h
@@ -645,15 +949,19 @@ class ParticlesLayer(BaseLayer):
         else:
             ang = np.full(n, v[D + "Vector Angle"] * 2 * math.pi)
         az = v[D + "Vector Angle Z"] * 2 * math.pi
-        speed = v[M + "Speed"] * m * 1.2 * (1.0 + (rnd(n) * 2 - 1) * v[M + "Speed Random"])
+        speed = v[M + "Speed"] * m * 1.2 * (1.0 + (rnd(n) * 2 - 1) * v[M + "Speed Random"]) * boost
         cz = math.cos(az)
         vx, vy = np.cos(ang) * speed * cz, np.sin(ang) * speed * cz
         vz = np.full(n, math.sin(az)) * speed / m
         life = np.maximum(0.05, v[M + "Lifetime"] * 10.0 * (0.75 + rnd(n) * 0.5))
         wf = v[W + "Side Sine Wave Freq"] * 10.0 * (1 + (rnd(n) * 2 - 1) * v[W + "Side Sine Wave Freq Random"])
         wm = v[W + "Side Sine Wave Mag"] * m * 0.3 * (1 + (rnd(n) * 2 - 1) * v[W + "Side Sine Wave Mag Random"])
+        R = "Physics & Bursts/Rotation/"
+        spin = math.radians(v.get(R + "Rotation Speed (deg/s)", 0.0)) * (
+            1.0 + (rnd(n) * 2 - 1) * v.get(R + "Rotation Random", 0.0) * 2)
         new = dict(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, age=np.zeros(n), life=life,
-                   rand=rnd(n), wave_f=wf, wave_m=wm, phase=rnd(n) * 2 * math.pi)
+                   rand=rnd(n), wave_f=wf, wave_m=wm, phase=rnd(n) * 2 * math.pi,
+                   rot=rnd(n) * 2 * math.pi, spin=spin)
         for k in self.FIELDS:
             self.p[k] = np.concatenate([self.p[k], np.asarray(new[k], np.float32)])
 
@@ -679,6 +987,16 @@ class ParticlesLayer(BaseLayer):
         n_new = max(0, min(n_new, limit - alive, 500))
         if n_new:
             self._spawn(n_new, frame)
+        PB = "Physics & Bursts/"
+        snap = frame.snapshot
+        burst_on = v.get(PB + "Burst/Burst On", "Nothing")
+        if burst_on != "Nothing":
+            key = {"Beat": "beat", "Downbeat": "downbeat", "Kick": "kick_hit", "Snare": "snare_hit",
+                   "HiHat": "hihat_hit"}[burst_on]
+            if snap.get(key):
+                nb = int(v.get(PB + "Burst/Burst Count", 40))     # may overshoot the limit briefly; trimmed below
+                if nb:
+                    self._spawn(nb, frame, boost=1.0 + v.get(PB + "Burst/Burst Speed Boost", 1.5))
         # integrate
         m = min(frame.w, frame.h)
         gx = (v[M + "Gravity X"] - 0.5) * 2 * m
@@ -701,6 +1019,33 @@ class ParticlesLayer(BaseLayer):
                 sign = -1.0 if field == "Attractor" else 1.0
                 p["vx"] += sign * dx / d * m * 1.2 * sdt
                 p["vy"] += sign * dy / d * m * 1.2 * sdt
+        F = PB + "Forces/"
+        gust_src = v.get(F + "Wind Gust With", "Nothing")
+        gust = 1.0
+        if gust_src != "Nothing":
+            from ..fx_library import react_level
+            gust = react_level(snap, frame.measure, gust_src) * 2.0
+        p["vx"] += v.get(F + "Wind X", 0.0) * m * gust * sdt
+        p["vy"] += v.get(F + "Wind Y", 0.0) * m * gust * sdt
+        turb = v.get(F + "Turbulence", 0.0)
+        if turb > 0 and len(p["x"]):
+            k = 6.0 / m
+            tt = frame.time * 0.7
+            p["vx"] += np.sin(p["y"] * k + tt + p["phase"]) * turb * m * sdt
+            p["vy"] += np.cos(p["x"] * k - tt + p["phase"]) * turb * m * sdt
+        att = v.get(F + "Attractor Strength", 0.0)
+        if att != 0 and len(p["x"]):
+            ax_, ay_ = v.get(F + "Attractor X", 0.5) * frame.w, v.get(F + "Attractor Y", 0.5) * frame.h
+            dx, dy = ax_ - p["x"], ay_ - p["y"]
+            d = np.maximum(np.hypot(dx, dy), m * 0.02)
+            p["vx"] += dx / d * att * m * sdt
+            p["vy"] += dy / d * att * m * sdt
+        drag = v.get(F + "Drag", 0.0)
+        if drag > 0:
+            f = math.exp(-drag * sdt)
+            p["vx"] *= f
+            p["vy"] *= f
+        p["rot"] += p["spin"] * sdt
         p["x"] += p["vx"] * sdt
         p["y"] += p["vy"] * sdt
         p["z"] += p["vz"] * sdt
@@ -759,7 +1104,9 @@ class ParticlesLayer(BaseLayer):
         if v[L + "Velocity Angle"] or trail > 0:
             ux, uy = p["vx"] / sp, p["vy"] / sp
         else:
-            ux, uy = np.ones(n, np.float32), np.zeros(n, np.float32)
+            ux, uy = np.cos(p["rot"]), np.sin(p["rot"])
+            if not p["spin"].any() and not v.get("Physics & Bursts/Rotation/Rotation Random", 0.0):
+                ux, uy = np.ones(n, np.float32), np.zeros(n, np.float32)
         ax, ay = ux * hw, uy * hw          # along
         bx, by = -uy * hh, ux * hh         # across
         corners = np.stack([

@@ -15,7 +15,7 @@ from collections import OrderedDict as OD
 BLEND = ["Alpha", "PreMulAlpha", "Screen", "Add", "AddAlpha", "Multiply",
          "Darken", "Lighten", "ColorDodge", "ColorBurn", "Overlay", "SoftLight",
          "HardLight", "Difference", "Exclusion", "Hue", "Saturation", "Color",
-         "Luminosity"]
+         "Luminosity", "Normal", "Subtract"]
 
 ANCHOR = ["unset", "start", "center", "end", "top", "bottom", "topLeft",
           "topCenter", "topRight", "bottomLeft", "bottomCenter", "bottomRight",
@@ -95,6 +95,11 @@ def font(default="Roboto", **kw):
     return dict(type="font", default=default, **kw)
 
 
+def file(default="", patterns=("*",), **kw):
+    """A file path with a Choose button (fonts, lyrics, ...)."""
+    return dict(type="file", default=default, patterns=list(patterns), **kw)
+
+
 def code(default="", **kw):
     return dict(type="code", default=default, **kw)
 
@@ -110,6 +115,8 @@ def general_category(tag=""):
         ("Layer", OD([
             ("Tag", text(tag)),
             ("Visible", check(True)),
+            ("Locked", check(False, help="Locked layers cannot be edited, moved or deleted")),
+            ("Opacity", slider(1.0)),
             ("Blend Mode", dropdown(BLEND, "Alpha")),
         ])),
         ("Position", OD([
@@ -125,6 +132,9 @@ def general_category(tag=""):
             ("Scale X", slider(1.0, 0, 10)),
             ("Scale Y", slider(1.0, 0, 10)),
             ("Rotation", slider(0.0, help="0..1 = 0..360 degrees")),
+            ("Transform Origin", dropdown(["Custom", "Center", "Top Left", "Top Right", "Bottom Left", "Bottom Right",
+                                           "Top", "Bottom", "Left", "Right"], "Custom",
+                                          help="Rotation / scale origin; Custom uses Pivot X / Y")),
             ("Pivot X", slider(0.5)),
             ("Pivot Y", slider(0.5)),
         ])),
@@ -241,22 +251,35 @@ SCHEMA["TEXT"] = OD([
             ("Text Input", text("%title%\n%artist%", multiline=True)),
             ("Use Metadata Variables", check(True, help="%title% %artist% %album% %time% %duration% %remaining% {ArtistOrTitle}")),
             ("Typewriter Speed", slider(0.5, help="Characters per second x 60")),
+            ("Text Transform", dropdown(["None", "UPPERCASE", "lowercase", "Title Case"], "None")),
+        ])),
+        ("Lyrics", OD([
+            ("Source", dropdown(["Text Input", "Synced Lyrics (.lrc)"], "Text Input",
+                                help="Synced Lyrics reads the chosen .lrc, or <track name>.lrc next to the audio file")),
+            ("Lyrics File", file("", ("*.lrc", "*.txt"), help="Optional; empty = look next to the track")),
+            ("Context Lines", slider(0, 0, 3, step=1, help="Lines shown before and after the current one")),
+            ("Context Opacity", slider(0.4)),
+            ("Lyrics Offset (s)", slider(0.0, -5, 5, step=0.05)),
         ])),
     ])),
     ("Typography", OD([
         ("Font", OD([
             ("Font Family", font("Roboto")),
+            ("Custom Font File", file("", ("*.ttf", "*.otf"), help="A .ttf / .otf file overrides Font Family")),
             ("Font Size", slider(0.035, help="Relative to canvas height")),
             ("Font Weight", dropdown(FONT_WEIGHTS, "700")),
             ("Style", dropdown(["Normal", "Italic", "Bold", "Bold-Italic"], "Normal")),
             ("Letter Spacing", slider(0.0)),
             ("Line Height", slider(0.5, help="0.5 = 1.0x, 1 = 2.0x")),
             ("Alignment", dropdown(["Left", "Center", "Right", "Justify"], "Center")),
+            ("Auto Fit Width", slider(0.0, help="0 = off; otherwise shrink the text to fit this fraction of the canvas width")),
         ])),
     ])),
     ("Appearance", OD([
         ("Fill", OD([
             ("Text Color", color("#FFFFFFFF")),
+            ("Fill Mode", dropdown(["Solid", "Horizontal Gradient", "Vertical Gradient"], "Solid")),
+            ("Gradient Color", color("#C6FF00FF")),
         ])),
         ("Shadow", OD([
             ("Shadow Color", color("#00000099")),
@@ -268,11 +291,30 @@ SCHEMA["TEXT"] = OD([
             ("Outline/Stroke Color", color("#000000FF")),
             ("Outline Width", slider(0.0)),
         ])),
+        ("Glow", OD([
+            ("Glow Color", color("#C6FF00AA")),
+            ("Glow Size", slider(0.0)),
+            ("Glow Pulse With", dropdown(["Nothing", "Beat", "Bass", "Mid", "Treble", "Volume", "Kick", "Snare", "HiHat"],
+                                         "Nothing")),
+        ])),
+        ("Background", OD([
+            ("Show Background", check(False)),
+            ("Background Color", color("#00000080")),
+            ("Padding", slider(0.35, 0, 2, help="In font heights")),
+            ("Corner Radius", slider(0.3)),
+        ])),
     ])),
     ("Text Animation", OD([
         ("Animation", OD([
             ("Animation Type", dropdown(["None", "Fade", "Slide Up", "Slide Down", "Zoom", "Typewriter"], "Fade")),
             ("Animation Speed", slider(0.5)),
+            ("Stagger", slider(0.0, help="Per-character delay for Fade / Slide / Zoom")),
+        ])),
+        ("Marquee", OD([
+            ("Enable Marquee", check(False, help="Scrolls the text inside a clipped window")),
+            ("Marquee Speed", slider(0.1, -1, 1, help="Canvas widths per second; negative scrolls right")),
+            ("Marquee Width", slider(0.6, 0.05, 1)),
+            ("Marquee Gap", slider(0.15, 0, 1)),
         ])),
     ])),
 ])
@@ -292,6 +334,35 @@ SCHEMA["BARS"] = OD([
             ("Bar Count", slider(64, 4, 256, step=1)),
             ("Bar Spacing", slider(0.3)),
             ("Bar Width", slider(0.7)),
+        ])),
+    ])),
+    ("Bar Style", OD([
+        ("Color", OD([
+            ("Color Mode", dropdown(["Segment Gradient", "Solid", "Rainbow", "By Amplitude"], "Segment Gradient",
+                                    help="Solid = Color From only, Rainbow = hue across bars, By Amplitude = From (quiet) to To (loud)")),
+            ("Rainbow Speed", slider(0.1, 0, 2, help="Hue rotation, turns per second")),
+            ("Rainbow Saturation", slider(0.9)),
+        ])),
+        ("Shape", OD([
+            ("Cap Style", dropdown(["Flat", "Round"], "Flat")),
+            ("LED Cell Size", slider(0.0, 0, 0.05, step=0.001, help="0 = solid bars; above 0 splits bars into LED cells")),
+            ("LED Gap", slider(0.004, 0, 0.03, step=0.001)),
+        ])),
+        ("Peaks", OD([
+            ("Show Peaks", check(False)),
+            ("Peak Hold (s)", slider(0.4, 0, 3)),
+            ("Peak Fall Speed", slider(0.5, 0.01, 3, help="Full bar heights per second")),
+            ("Peak Thickness", slider(0.006, 0.001, 0.05, step=0.001)),
+            ("Peak Color", color("#FFFFFFFF")),
+        ])),
+        ("Extras", OD([
+            ("Glow Amount", slider(0.0)),
+            ("Glow Width", slider(2.5, 1, 6)),
+            ("Reflection Opacity", slider(0.0, help="Faded mirror copy under the bars")),
+            ("Outline Width", slider(0.0, 0, 0.02, step=0.0005)),
+            ("Outline Color", color("#FFFFFFCC")),
+            ("Baseline Width", slider(0.0, 0, 0.02, step=0.0005)),
+            ("Baseline Color", color("#C6FF0099")),
         ])),
     ])),
     ("Segment 1", OD([("Segment 1", segment(1, True, "#C6FF00FF", "#5BFFB0FF", 1.0))])),
@@ -378,6 +449,29 @@ SCHEMA["PARTICLES"] = OD([
             ("Side Sine Wave Freq Random", slider(0.0)),
             ("Side Sine Wave Mag", slider(0.0)),
             ("Side Sine Wave Mag Random", slider(0.0)),
+        ])),
+    ])),
+    ("Physics & Bursts", OD([
+        ("Burst", OD([
+            ("Burst On", dropdown(["Nothing", "Beat", "Downbeat", "Kick", "Snare", "HiHat"], "Nothing",
+                                  help="Emit a burst of particles on every detected hit")),
+            ("Burst Count", slider(40, 1, 500, step=1)),
+            ("Burst Speed Boost", slider(1.5, 0, 5, help="Burst particles start this many times faster")),
+        ])),
+        ("Forces", OD([
+            ("Drag", slider(0.0, 0, 5, help="Air resistance, 1/s")),
+            ("Wind X", slider(0.0, -1, 1)),
+            ("Wind Y", slider(0.0, -1, 1)),
+            ("Wind Gust With", dropdown(["Nothing", "Beat", "Bass", "Mid", "Treble", "Volume", "Kick", "Snare", "HiHat"],
+                                        "Nothing", help="Audio level multiplies the wind")),
+            ("Turbulence", slider(0.0, 0, 2)),
+            ("Attractor X", slider(0.5)),
+            ("Attractor Y", slider(0.5)),
+            ("Attractor Strength", slider(0.0, -2, 2, help="Positive pulls toward the point, negative pushes away")),
+        ])),
+        ("Rotation", OD([
+            ("Rotation Speed (deg/s)", slider(0, -720, 720, step=1)),
+            ("Rotation Random", slider(0.0, help="Per-particle spread of the rotation speed")),
         ])),
     ])),
 ])

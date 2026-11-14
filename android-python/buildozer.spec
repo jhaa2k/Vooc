@@ -7,6 +7,11 @@ source.include_exts = py,png,jpg,jpeg,webp,kv,atlas,json,ttf
 source.exclude_dirs = tests,docs,bin,ci,.buildozer,__pycache__
 version = 1.0
 
+# Vooc brand assets used by Android's launcher and native presplash.
+icon.filename = %(source.dir)s/assets/vooc_icon.png
+presplash.filename = %(source.dir)s/assets/vooc_splash.png
+android.presplash_color = #050506
+
 # Only libraries that have python-for-android recipes or are pure Python.
 # On Android audio is played by MediaPlayer and analysed through the Visualizer
 # API (pyjnius); sounddevice/miniaudio are optional desktop-only backends.
@@ -34,4 +39,4 @@ p4a.commit = d2ee8c54d9d42375a95f18159e950a119671cf63
 log_level = 2
 warn_on_root = 1
 
-# Build trigger: no application settings changed.
+# Build trigger: branding assets only; app runtime and audio engine unchanged.

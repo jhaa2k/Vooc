@@ -187,7 +187,7 @@ class AdvancedProperties(BoxLayout):
                 continue
             count = sum(len(f) for f in groups.values())
             sec_card = m3.card(padding=(dp(3), dp(3)), spacing=dp(1), bg=T.surface1, radius=0)
-            header = m3.Tap(size_hint_y=None, height=dp(36), radius=0, padding=(dp(9), 0), spacing=dp(6))
+            header = m3.Tap(size_hint_y=None, height=dp(44), radius=0, padding=(dp(12), 0), spacing=dp(8))
             header.add_widget(m3.lbl(section, 14, bold=True))
             header.add_widget(m3.lbl(str(count), 12, T.on_var, halign="right", size_hint_x=None, width=dp(36)))
             arrow = m3.Icon(name="down", tint=T.on_var, size_hint_x=None, width=dp(18))

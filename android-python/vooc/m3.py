@@ -390,31 +390,42 @@ class Icon(Widget):
 
 # ---------------------------------------------------------------- touch guard
 class TouchGuard:
-    """Mixin for ButtonBehavior widgets: a press that slides more than a few dp
-    (scrolling, swiping) is cancelled instead of firing, so brushing past a
-    button never triggers it."""
-    GUARD_DIST = dp(10)
+    """Cancel button presses that turn into scroll/swipe gestures.
+
+    Touch state is namespaced per widget so nested controls cannot contaminate
+    one another. When a drag crosses the threshold, release the button grab
+    so the parent ScrollView can continue processing the gesture.
+    """
+    GUARD_DIST = dp(14)
+
+    def _guard_key(self, part):
+        return "_vooc_touchguard_%s_%s" % (id(self), part)
 
     def on_touch_down(self, touch):
         if self.collide_point(*touch.pos):
-            touch.ud.setdefault("guard_start", touch.pos)
+            touch.ud[self._guard_key("start")] = touch.pos
+            touch.ud[self._guard_key("cancel")] = False
         return super().on_touch_down(touch)
 
     def on_touch_move(self, touch):
         if touch.grab_current is self:
-            sx, sy = touch.ud.get("guard_start", touch.pos)
+            sx, sy = touch.ud.get(self._guard_key("start"), touch.pos)
             if abs(touch.x - sx) > self.GUARD_DIST or abs(touch.y - sy) > self.GUARD_DIST:
-                touch.ud["guard_cancel"] = True
+                touch.ud[self._guard_key("cancel")] = True
+                touch.ungrab(self)
+                self.state = "normal"
+                try:
+                    Animation(a=0, d=0.12).start(self._sc)
+                except Exception:
+                    pass
+                return True
         return super().on_touch_move(touch)
 
     def on_touch_up(self, touch):
-        if touch.grab_current is self and touch.ud.get("guard_cancel"):
-            touch.ungrab(self)
+        if touch.ud.get(self._guard_key("cancel")):
+            if touch.grab_current is self:
+                touch.ungrab(self)
             self.state = "normal"
-            try:
-                Animation(a=0, d=0.2).start(self._sc)
-            except Exception:
-                pass
             return True
         return super().on_touch_up(touch)
 
@@ -1230,7 +1241,7 @@ def select_sheet(title, options, value, on_pick):
     col.bind(minimum_height=col.setter("height"))
     for opt in options:
         sel = str(opt) == str(value)
-        r = Tap(size_hint_y=None, height=dp(40), radius=0, padding=(dp(12), 0), spacing=dp(8),
+        r = Tap(size_hint_y=None, height=dp(48), radius=0, padding=(dp(12), 0), spacing=dp(8),
                 bg=T.secondary_container if sel else [0, 0, 0, 0])
         r.add_widget(lbl(str(opt), 14, T.on_secondary_container if sel else T.on_surface, bold=sel))
         if sel:
@@ -1253,7 +1264,7 @@ class SelectField(Tap):
     def __init__(self, title, options, value, on_change, **kw):
         kw.setdefault("size_hint_y", None)
         kw.setdefault("height", dp(40))
-        super().__init__(bg=[0, 0, 0, 0], line=T.outline, radius=dp(12), padding=(dp(14), 0), spacing=dp(6), **kw)
+        super().__init__(bg=[0, 0, 0, 0], line=T.outline, radius=dp(10), padding=(dp(14), 0), spacing=dp(6), **kw)
         self.title, self.options, self.on_change = title, list(options), on_change
         self.value = value
         self.label = lbl(str(value), 14)

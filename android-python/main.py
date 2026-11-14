@@ -331,9 +331,9 @@ class VoocRoot(FloatLayout):
             stage.size = (w, h)
             stage.pos = (holder.x + (holder.width - w) / 2.0, holder.y + (holder.height - h) / 2.0)
             chip_w = min(dp(118), w * 0.46)
-            for chip in (getattr(self, "status", None), getattr(self, "style_chip", None)):
-                if chip is not None and chip.parent is stage:
-                    chip.width = chip_w
+            status = getattr(self, "status", None)
+            if status is not None and status.parent is stage:
+                status.width = chip_w
         if getattr(self, "_fit_visual", None) is not None:
             self.unbind(height=self._fit_visual)
         self._fit_visual = fit
@@ -364,12 +364,6 @@ class VoocRoot(FloatLayout):
         self.status_text = m3.lbl("Idle", 11, (1, 1, 1, .92), bold=True)
         self.status.add_widget(self.status_text)
         stage.add_widget(self.status)
-        self.style_chip = m3.Tap(on_tap=self.cycle_style, bg=T.a("scrim", .55), radius=dp(13), size_hint=(None, None),
-                                 height=dp(26), width=dp(96), pos_hint={"right": .98, "top": .96}, padding=(dp(10), 0), spacing=dp(4))
-        self.style_chip.add_widget(m3.Icon(name="sparkle", tint=(.78, 1, .2, 1), size_hint_x=None, width=dp(14)))
-        self.style_text = m3.lbl(self.s.look.get("template", "Template"), 11, (1, 1, 1, .92), bold=True)
-        self.style_chip.add_widget(self.style_text)
-        stage.add_widget(self.style_chip)
         frame.add_widget(holder)
         fit()
         return frame
@@ -450,8 +444,9 @@ class VoocRoot(FloatLayout):
                 continue
             title, hint = source._vooc_section_title, source._vooc_section_hint
             panel = BoxLayout(orientation="vertical", size_hint_y=None, spacing=0)
-            header = m3.Tap(bg=T.surface2, line=T.outline, radius=0, size_hint_y=None,
-                            height=dp(36), padding=(dp(9), 0), spacing=dp(6))
+            header = m3.Tap(on_tap=lambda *_args, k=title, pk=page_key: self._toggle_accordion(pk, k),
+                            bg=T.surface2, line=T.outline, radius=0, size_hint_y=None,
+                            height=dp(44), padding=(dp(12), 0), spacing=dp(8))
             header.add_widget(m3.lbl(title, 12, T.primary, bold=True))
             if hint:
                 header.add_widget(m3.lbl(hint, 10, T.on_var, halign="right"))
@@ -472,7 +467,6 @@ class VoocRoot(FloatLayout):
             panel.add_widget(body)
             self._accordion_widgets[page_key][title] = (panel, body, header, arrow)
             update()
-            header.bind(on_release=lambda *_args, k=title, pk=page_key: self._toggle_accordion(pk, k))
             col.add_widget(panel)
 
     def _toggle_accordion(self, page_key, key):

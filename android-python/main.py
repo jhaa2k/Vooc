@@ -97,8 +97,9 @@ class Scroll(ScrollView):
 
     def __init__(self, **kw):
         kw.setdefault("do_scroll_x", False)
-        kw.setdefault("bar_width", dp(3))
-        kw.setdefault("scroll_type", ["bars", "content"])
+        # Scroll remains available; only the visual scrollbar is hidden.
+        kw.setdefault("bar_width", 0)
+        kw.setdefault("scroll_type", ["content"])
         super().__init__(**kw)
 
     def on_touch_down(self, touch):
@@ -160,6 +161,11 @@ class VoocRoot(FloatLayout):
         self._apply_ui_theme()
         self.page = "library"
         self.studio_tab = "Properties"
+        self._accordion_state = {}
+        self._scroll_positions = {}
+        self._active_scroll = None
+        self._active_scroll_key = "library"
+        self._last_media_update = 0.0
         self.track = ""
         self.playing = False
         self.duration = 0.0
@@ -182,6 +188,12 @@ class VoocRoot(FloatLayout):
             self.native = AndroidMediaPlayerSource(lambda *a: None, self._native_error, self._native_completed,
                                                    self._native_focus_changed)
             self.native.configure_fx(self.s.audio, self.s.eq_freqs)
+            try:
+                from jnius import autoclass
+                autoclass("com.jhaa2k.vooc.VoocMediaSession").init(
+                    autoclass("org.kivy.android.PythonActivity").mActivity)
+            except Exception as exc:
+                print("Vooc media session init failed: %s" % exc)
         self.hub = TimelineHub(self.project.layer("AUDIOPROVIDER"), timeline=lambda: self.timeline,
                                position=lambda: self.clock()[0], playing=lambda: self.clock()[1],
                                duration=lambda: self.duration, on_error=self._native_error)
@@ -395,7 +407,68 @@ class VoocRoot(FloatLayout):
         c.add_widget(seek_row)
         return c
 
+    def _remember_scroll(self):
+        scroll, key = getattr(self, "_active_scroll", None), getattr(self, "_active_scroll_key", None)
+        if scroll is not None and key:
+            self._scroll_positions[key] = float(scroll.scroll_y)
+
+    def _compact_sections(self, col, page_key):
+        """Compact single-open accordion for every top-level editor category."""
+        original = list(reversed(col.children))
+        groups, current = [], None
+        for widget in original:
+            title = getattr(widget, "_vooc_section_title", None)
+            if title is not None:
+                if current is not None:
+                    groups.append(current)
+                current = [widget, []]
+            elif current is not None:
+                current[1].append(widget)
+            else:
+                groups.append([None, [widget]])
+        if current is not None:
+            groups.append(current)
+        col.clear_widgets()
+        for source, children in groups:
+            if source is None:
+                for child in children:
+                    col.add_widget(child)
+                continue
+            title, hint = source._vooc_section_title, source._vooc_section_hint
+            panel = BoxLayout(orientation="vertical", size_hint_y=None, spacing=0)
+            header = m3.Tap(bg=T.surface2, line=T.outline, radius=0, size_hint_y=None,
+                            height=dp(36), padding=(dp(9), 0), spacing=dp(6))
+            header.add_widget(m3.lbl(title, 12, T.primary, bold=True))
+            if hint:
+                header.add_widget(m3.lbl(hint, 10, T.on_var, halign="right"))
+            arrow = m3.Icon(name="down", tint=T.on_var, size_hint_x=None, width=dp(16))
+            header.add_widget(arrow)
+            body = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(5),
+                             padding=(dp(4), dp(4), dp(4), dp(5)))
+            for child in children:
+                body.add_widget(child)
+            def update(*_args, p=panel, b=body, h=header, a=arrow, k=title):
+                opened = self._accordion_state.get(page_key) == k
+                b.height = b.minimum_height if opened else 0
+                b.opacity = 1 if opened else 0
+                p.height = h.height + b.height
+                a.name = "up" if opened else "down"
+            body.bind(minimum_height=update)
+            panel.add_widget(header)
+            panel.add_widget(body)
+            update()
+            header.bind(on_release=lambda *_args, k=title, pk=page_key: self._toggle_accordion(pk, k))
+            col.add_widget(panel)
+
+    def _toggle_accordion(self, page_key, key):
+        self._accordion_state[page_key] = None if self._accordion_state.get(page_key) == key else key
+        if page_key.startswith("studio:"):
+            self._studio_tab(page_key.split(":", 1)[1])
+        else:
+            self.show(page_key)
+
     def show(self, page):
+        self._remember_scroll()
         self.page = page
         self.body.clear_widgets()
         Clock.schedule_once(self._dump_targets, 0.8)
@@ -404,11 +477,14 @@ class VoocRoot(FloatLayout):
             self.body.add_widget(builder())
             return
         scroll = Scroll()
-        col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(10), padding=(0, 0, 0, dp(16)))
+        col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6), padding=(0, 0, 0, dp(12)))
         col.bind(minimum_height=col.setter("height"))
         builder(col)
+        self._compact_sections(col, page)
+        self._active_scroll, self._active_scroll_key = scroll, page
         scroll.add_widget(col)
         self.body.add_widget(scroll)
+        Clock.schedule_once(lambda _dt, s=scroll, k=page: setattr(s, "scroll_y", self._scroll_positions.get(k, 1.0)), 0)
 
     def _smoke_autoload(self, *_):
         """Emulator smoke test hook: play files/smoke_track.* directly (the
@@ -1257,12 +1333,14 @@ class VoocRoot(FloatLayout):
 
     def _page_layers(self, col):
         col.add_widget(m3.section("Add layer"))
-        add = GridLayout(cols=3, spacing=dp(8), size_hint_y=None)
-        add.bind(minimum_height=add.setter("height"))
-        for title, module, icon in ADDABLE:
-            act = self._pick_effect if module == "__EFFECT__" else (lambda m=module: self.add_layer(m))
-            add.add_widget(m3.Button3(title, act, kind="tonal", icon=icon, height=dp(44)))
-        col.add_widget(add)
+        choices = [title for title, _module, _icon in ADDABLE]
+        def add_selected(title):
+            entry = next((item for item in ADDABLE if item[0] == title), None)
+            if entry is None:
+                return
+            _title, module, _icon = entry
+            self._pick_effect() if module == "__EFFECT__" else self.add_layer(module)
+        col.add_widget(m3.SelectField("Add layer", choices, "Choose layer type", add_selected, height=dp(38)))
         col.add_widget(m3.section("Layer stack", "top draws last"))
         layers = self.project.layers
         if self.selected_layer not in layers:
@@ -1270,25 +1348,25 @@ class VoocRoot(FloatLayout):
         for layer in reversed(layers):           # top of the stack first
             sel = layer is self.selected_layer
             visible = bool(layer.values.get("General/Layer/Visible", True))
-            tile = m3.Tap(on_tap=lambda l=layer: self.select_layer(l), size_hint_y=None, height=dp(54), radius=dp(16),
-                          bg=T.secondary_container if sel else T.surface1, padding=(dp(12), 0), spacing=dp(8))
+            tile = m3.Tap(on_tap=lambda l=layer: self.select_layer(l), size_hint_y=None, height=dp(42), radius=0,
+                          bg=T.secondary_container if sel else T.surface1, padding=(dp(8), 0), spacing=dp(5))
             tile.add_widget(m3.Icon(name=EDITOR_ICONS.get(layer.module, "layers"),
                                     tint=T.on_secondary_container if sel else (T.on_var if visible else T.outline),
                                     size_hint_x=None, width=dp(22)))
             tile.add_widget(m3.lbl(self._layer_title(layer), 14,
                                    T.on_secondary_container if sel else (T.on_surface if visible else T.on_var), bold=sel))
             if layer.module not in FIXED_MODULES:
-                eye = m3.IconBtn("eye" if visible else "eye_off", lambda l=layer: self.toggle_visible(l), size=dp(40))
+                eye = m3.IconBtn("eye" if visible else "eye_off", lambda l=layer: self.toggle_visible(l), size=dp(34))
                 eye.active = visible
                 eye._colors()
                 tile.add_widget(eye)
             if layer.module not in FIXED_MODULES:
                 locked = bool(layer.values.get("General/Layer/Locked", False))
-                lk = m3.IconBtn("lock" if locked else "unlock", lambda l=layer: self.toggle_lock(l), size=dp(40))
+                lk = m3.IconBtn("lock" if locked else "unlock", lambda l=layer: self.toggle_lock(l), size=dp(34))
                 lk.active = locked
                 lk._colors()
                 tile.add_widget(lk)
-            tile.add_widget(m3.IconBtn("tune", lambda l=layer: self.edit_layer(l), size=dp(40)))
+            tile.add_widget(m3.IconBtn("tune", lambda l=layer: self.edit_layer(l), size=dp(34)))
             col.add_widget(tile)
         l = self.selected_layer
         if l is None:
@@ -1453,7 +1531,7 @@ class VoocRoot(FloatLayout):
 
     # ---------------------------------------------------------------- studio
     def _page_studio(self):
-        box = BoxLayout(orientation="vertical", spacing=dp(10))
+        box = BoxLayout(orientation="vertical", spacing=dp(5))
         self.studio_seg = m3.Segmented(["Properties", "Scene", "Export"], self.studio_tab, self._studio_tab)
         box.add_widget(self.studio_seg)
         self.studio_body = BoxLayout()
@@ -1466,6 +1544,7 @@ class VoocRoot(FloatLayout):
         seg = getattr(self, "studio_seg", None)
         if seg is not None:
             seg.select(tab, notify=False)       # keep the segmented control in sync for programmatic switches
+        self._remember_scroll()
         self.studio_body.clear_widgets()
         if tab == "Properties":
             layer, self._edit_layer = self._edit_layer, None
@@ -1475,18 +1554,24 @@ class VoocRoot(FloatLayout):
                                                       palette=self._palette_swatches, toast=self.toast, layer=layer,
                                                       on_action=self._engine_action,
                                                       pick_file=lambda cb, pat: choose_file(cb, pat, "Choose file"))
+            self._active_scroll = None
+            self._active_scroll_key = "studio:Properties"
             self.studio_body.add_widget(self.property_editor)
             Clock.schedule_once(self._dump_targets, 0.8)
             return
         scroll = Scroll()
-        col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=(0, 0, 0, dp(16)))
+        col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(5), padding=(0, 0, 0, dp(10)))
         col.bind(minimum_height=col.setter("height"))
         if tab == "Scene":
             self._scene_tab(col)
         else:
             self._export_tab(col)
+        key = "studio:" + tab
+        self._compact_sections(col, key)
+        self._active_scroll, self._active_scroll_key = scroll, key
         scroll.add_widget(col)
         self.studio_body.add_widget(scroll)
+        Clock.schedule_once(lambda _dt, s=scroll, k=key: setattr(s, "scroll_y", self._scroll_positions.get(k, 1.0)), 0)
 
     def set_aspect(self, aspect):
         self.s.export["aspect"] = aspect
@@ -2029,6 +2114,7 @@ class VoocRoot(FloatLayout):
             if autoplay:
                 self.toggle()
             self._update_player_ui()
+            self._update_media_notification()
             if self.page == "library":
                 self.show("library")
             self._save_trigger()
@@ -2082,6 +2168,7 @@ class VoocRoot(FloatLayout):
             self.playing = False
         else:
             if self.native is not None:
+                request_notification_permission()
                 self.playing = bool(self.native.play())
             elif self.sound:
                 self.sound.play()
@@ -2194,6 +2281,33 @@ class VoocRoot(FloatLayout):
             self._save_trigger()
         self.toast("Cleared %d tracks" % len(old), "Undo", restore)
 
+    def _update_media_notification(self):
+        if self.native is None or not self.track:
+            return
+        try:
+            from jnius import autoclass
+            bridge = autoclass("com.jhaa2k.vooc.VoocMediaSession")
+            bridge.update(str(self.meta.get("title") or Path(self.track).stem),
+                          str(self.meta.get("artist") or "Vooc Music Visualizer"),
+                          bool(self.playing), int(self.duration * 1000), int(self._read_pos() * 1000))
+        except Exception as exc:
+            print("Vooc media notification update failed: %s" % exc)
+
+    def _handle_media_session_action(self):
+        try:
+            from jnius import autoclass
+            action = str(autoclass("com.jhaa2k.vooc.VoocMediaSession").consumeAction() or "")
+            if action == "play" and self.track and not self.playing:
+                self.toggle()
+            elif action == "pause" and self.playing:
+                self.toggle()
+            elif action == "next":
+                self.next()
+            elif action == "previous":
+                self.previous()
+        except Exception:
+            pass
+
     def _native_error(self, message):
         Clock.schedule_once(lambda _dt: self.toast(message), 0)
 
@@ -2219,6 +2333,7 @@ class VoocRoot(FloatLayout):
         self.next(auto=True)
 
     def tick(self, dt):
+        self._handle_media_session_action()
         if self.playing:
             self._pos = self._read_pos()
             self._pos_stamp = time.monotonic()
@@ -2238,6 +2353,10 @@ class VoocRoot(FloatLayout):
         lbl = getattr(self, "fps_lbl", None)
         if lbl is not None and lbl.get_root_window() is not None:
             lbl.text = "Preview: %d fps  -  %dx%d render" % ((round(self.scene.fps),) + tuple(self.scene.render_size()))
+        now = time.monotonic()
+        if self.native is not None and self.track and now - self._last_media_update >= 2.0:
+            self._last_media_update = now
+            self._update_media_notification()
         if not self.export_state.get("running"):
             self._update_status()
 
@@ -2274,6 +2393,7 @@ class VoocRoot(FloatLayout):
         self.repeat_btn.set_icon("repeat_one" if self.s.repeat == "one" else "repeat")
         self.repeat_btn.active = self.s.repeat != "off"
         self._update_status()
+        self._update_media_notification()
 
     # ================================================================ persistence
     def _project_path(self):
@@ -2410,6 +2530,11 @@ class VoocRoot(FloatLayout):
         self.autosave()
         if self.native is not None:
             self.native.release()
+        try:
+            from jnius import autoclass
+            autoclass("com.jhaa2k.vooc.VoocMediaSession").release()
+        except Exception:
+            pass
         self.hub.release()
 
 

@@ -142,6 +142,8 @@ def section(text, hint=""):
     row.add_widget(lbl(text, 13, T.primary, bold=True))
     if hint:
         row.add_widget(lbl(hint, 11, T.on_var, halign="right"))
+    row._vooc_section_title = str(text)
+    row._vooc_section_hint = str(hint or "")
     return row
 
 
@@ -733,10 +735,13 @@ class Slider3(Widget):
             self._cb.a, self._bt.a = 0, 0
 
     def _set_from_touch(self, touch):
+        # Touch coordinates arrive in window space; convert before comparing
+        # against widget coordinates (especially important inside ScrollViews).
+        tx, ty = self.to_widget(*touch.pos)
         if self.vertical:
-            f = (touch.y - self.y - dp(10)) / max(1, self.height - dp(20))
+            f = (ty - self.y - dp(10)) / max(1, self.height - dp(20))
         else:
-            f = (touch.x - self.x - dp(10)) / max(1, self.width - dp(20))
+            f = (tx - self.x - dp(10)) / max(1, self.width - dp(20))
         self._apply(self.lo + max(0.0, min(1.0, f)) * (self.hi - self.lo))
 
     def _apply(self, v):
@@ -861,7 +866,7 @@ class SliderRow(BoxLayout):
 
     def __init__(self, title, lo, hi, value, on_change, step=0.0, unit="", fmt=None, bipolar=False,
                  default=None, icon=None, **kw):
-        super().__init__(orientation="vertical", size_hint_y=None, height=dp(54), spacing=0, **kw)
+        super().__init__(orientation="vertical", size_hint_y=None, height=dp(48), spacing=0, **kw)
         self.unit = unit
         self.lo, self.hi, self.step = float(lo), float(hi), float(step or 0)
         self.title = title
@@ -869,7 +874,7 @@ class SliderRow(BoxLayout):
                                       (("%+.3f" if bipolar else "%.3f") % v)) + unit)
         self.default = value if default is None else default
         self._cb = on_change
-        head = BoxLayout(size_hint_y=None, height=dp(24), padding=(dp(10), 0))
+        head = BoxLayout(size_hint_y=None, height=dp(20), padding=(dp(8), 0))
         if icon:
             head.add_widget(Icon(name=icon, tint=T.on_var, size_hint_x=None, width=dp(20)))
             head.add_widget(Widget(size_hint_x=None, width=dp(6)))
@@ -881,7 +886,7 @@ class SliderRow(BoxLayout):
         head.add_widget(self.chip)
         self.add_widget(head)
         self.slider = Slider3(lo, hi, value, step, on_change=self._changed, fmt=self.fmt, bipolar=bipolar,
-                              default=self.default)
+                              default=self.default, height=dp(28))
         self.add_widget(self.slider)
 
     def _changed(self, v):

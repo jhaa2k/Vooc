@@ -18,7 +18,9 @@ class SchemaTests(unittest.TestCase):
     def test_full_shared_dropdown_lists(self):
         self.assertEqual(len(BLEND), 19)
         self.assertEqual(len(ANCHOR), 17)
-        self.assertEqual(len(MEASURE), 27)
+        self.assertGreaterEqual(len(MEASURE), 27)      # 27 Avee modes + analyzer extras
+        for m in ("Kick", "Snare", "HiHat", "Downbeat", "CustomBand8", "Amplitude"):
+            self.assertIn(m, MEASURE)
         self.assertEqual(len(SHAPES), 17)
         spec = field_spec("BARS", "General/Measure Engine/Measure Pos")
         self.assertEqual(spec["options"], MEASURE)

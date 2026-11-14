@@ -30,7 +30,9 @@ MEASURE = ["Nothing", "Beat", "TotalTime", "TotalTimeBackward",
            "ConstantSlowRotate", "ConstantOrbitMove", "ConstantLinearScroll",
            "TrackProgressPercentage", "TrackRemainingTime",
            "TrackIntroOutroTrigger", "VolumeLevelResponsive",
-           "PitchFrequencyResponsive"]
+           "PitchFrequencyResponsive", "Frequency", "Amplitude", "Kick", "Snare",
+           "HiHat", "Downbeat", "BeatProgress", "BarProgress", "LowBand", "MidBand",
+           "HighBand"] + ["CustomBand%d" % i for i in range(1, 9)]
 
 SHAPES = ["None", "Circle", "SidedPolygon", "Line", "HorizontalLine",
           "VerticalLine", "Rectangle", "Square", "Triangle", "Star", "Heart",
@@ -38,6 +40,11 @@ SHAPES = ["None", "Circle", "SidedPolygon", "Line", "HorizontalLine",
 
 SHADER_PRESETS = ["Custom", "Zoom Blur", "Twirl", "Kaleidoscope", "Reflection", "3D Box",
                   "Color Correction", "Vignette", "Film Grain"]
+
+FFT_SIZES = ["Auto", "512", "1024", "2048", "4096", "8192"]
+WINDOWS = ["Hann", "Hamming", "Blackman", "Rectangular", "Blackman-Harris"]
+CHANNELS = ["Mono", "Left", "Right", "Stereo", "Mid", "Side"]
+REACTIVITY = ["Inherit", "Beat", "Frequency", "Amplitude", "Nothing"]
 
 FONT_WEIGHTS = [str(w) for w in range(100, 1000, 100)]
 VARIABLE_TYPES = ["None", "Float", "Vector2", "Vector3", "Color"]
@@ -131,6 +138,13 @@ def general_category(tag=""):
             ("Measure Rot", dropdown(MEASURE, "Nothing")),
             ("Rot Amount (A)", slider(0.1, 0, 10)),
             ("Rot Speed (B)", slider(1.0, 0, 10)),
+        ])),
+        ("Reactivity", OD([
+            ("Reactivity Mode", dropdown(REACTIVITY, "Inherit",
+                                         help="Per-layer override: Beat / Frequency / Amplitude / Nothing replaces every Measure mode of this layer")),
+            ("Band Weight Low", slider(1.0, 0, 2, help="Frequency mode: weight of the low band")),
+            ("Band Weight Mid", slider(0.5, 0, 2)),
+            ("Band Weight High", slider(0.25, 0, 2)),
         ])),
     ])
 
@@ -291,11 +305,11 @@ SCHEMA["BARS"] = OD([
         ])),
         ("Audio", OD([
             ("Audio Provider Index", number(0, 0, 8)),
-            ("Audio Channel", dropdown(["Mono", "Left", "Right", "Stereo"], "Mono")),
+            ("Audio Channel", dropdown(CHANNELS, "Mono", help="Left / Right / Side need Analyzer > Channel Mode = Stereo or Mid-Side")),
             ("Frequency Min (Hz)", number(30, 20, 20000)),
             ("Frequency Max (Hz)", number(8000, 40, 20000)),
-            ("Measure What", dropdown(["Frequency", "Beat", "Nothing"], "Frequency",
-                                       help="Frequency = live spectrum, Beat = all bars jump on beats, Nothing = static")),
+            ("Measure What", dropdown(["Frequency", "Beat", "Amplitude", "Nothing"], "Frequency",
+                                       help="Frequency = live spectrum, Beat = all bars jump on beats, Amplitude = loudness, Nothing = static")),
         ])),
     ])),
 ])
@@ -374,11 +388,91 @@ SCHEMA["AUDIOPROVIDER"] = OD([
     ("General", OD([
         ("Routing", OD([
             ("Visible", check(True)),
-            ("Audio Source", dropdown(["File", "Microphone", "System Audio"], "File")),
+            ("Audio Source", dropdown(["File"], "File",
+                                      help="In-app playback only: the file you play is analysed. No microphone, no AudioRecord.")),
             ("Volume", slider(0.8)),
             ("Balance", slider(0.5, help="0 = left, 0.5 = center, 1 = right")),
             ("Preamp", slider(1.0, 0, 10, help="Gain applied to the analysis signal")),
-            ("Measure Source", dropdown(["Bass", "Mid", "Treble", "Volume", "Peak"], "Bass")),
+            ("Measure Source", dropdown(["Bass", "Mid", "Treble", "Volume", "Peak"], "Bass",
+                                        help="Used for beats while the track is still being analysed")),
+        ])),
+    ])),
+    ("Analyzer", OD([
+        ("FFT", OD([
+            ("FFT Size", dropdown(FFT_SIZES, "1024", help="Bigger = finer bass detail, smaller = faster reaction. Auto picks 2048. Re-analyses the track.")),
+            ("Window", dropdown(WINDOWS, "Hann", help="Window function applied before the FFT. Re-analyses the track.")),
+            ("Overlap", dropdown(["0%", "25%", "50%", "75%"], "50%", help="Hop = FFT x (1 - overlap), kept between 20 and 120 frames per second")),
+            ("Analysis Bands", dropdown(["32", "64", "96", "128"], "64", help="Log bands stored per frame (30 Hz - 16 kHz)")),
+            ("Re-analyse Track", action("Re-analyse Track")),
+        ])),
+        ("Channels", OD([
+            ("Channel Mode", dropdown(["Mono", "Stereo", "Mid-Side"], "Mono",
+                                      help="Mono = (L+R)/2. Stereo / Mid-Side also analyse Left, Right and Side so every layer can pick its channel.")),
+        ])),
+        ("Smoothing", OD([
+            ("Smoothing", slider(0.0, 0, 0.95, help="Exponential smoothing alpha (0 = raw)")),
+            ("Attack (ms)", slider(0, 0, 500, step=1, help="Rise time constant")),
+            ("Release (ms)", slider(0, 0, 2000, step=1, help="Fall time constant")),
+        ])),
+        ("Scale", OD([
+            ("Frequency Mapping", dropdown(["Logarithmic", "Linear"], "Logarithmic",
+                                           help="Default spacing of bars across frequencies")),
+            ("Interpolation", dropdown(["Linear", "Cubic", "Nearest"], "Linear")),
+            ("Amplitude Scale", dropdown(["dB", "Linear"], "dB")),
+            ("dB Floor", slider(-66, -120, -20, step=1, help="Level shown as 0")),
+            ("dB Ceiling", slider(-6, -40, 0, step=1, help="Level shown as full height")),
+            ("Spectral Tilt (dB/oct)", slider(2.65, 0, 6, step=0.05, help="Lifts treble (music falls ~3 dB/oct)")),
+            ("Normalization", dropdown(["None", "Peak", "RMS"], "None",
+                                       help="Peak = loudest part of the track reaches the ceiling; RMS = average loudness")),
+        ])),
+        ("Debug", OD([
+            ("Show Analyzer Overlay", check(False, help="Draws bands, beats, BPM and bar counter over the preview")),
+        ])),
+    ])),
+    ("Beat Detection", OD([
+        ("Detector", OD([
+            ("Algorithm", dropdown(["Energy", "Spectral Flux", "Comb Filter"], "Spectral Flux")),
+            ("Beat Trigger", dropdown(["All Beats", "Downbeats Only", "Kick", "Snare", "Hi-Hat"], "All Beats",
+                                      help="Which onsets fire Beat measure modes")),
+            ("Sensitivity", slider(0.5)),
+            ("Cooldown (ms)", slider(180, 50, 500, step=1, help="Minimum time between beats")),
+            ("Threshold (x)", slider(1.5, 1, 5, step=0.05, help="Onset must exceed the local average by this factor")),
+            ("History (s)", slider(1.0, 0.5, 5, step=0.05, help="Window of the local average")),
+        ])),
+        ("Pulse", OD([
+            ("Decay Curve", dropdown(["Exponential", "Linear", "Ease-Out", "Ease-In", "Step (Hold)"], "Exponential")),
+            ("Pulse Duration (ms)", slider(1000, 50, 3000, step=1, help="How long a beat pulse lasts (scaled by each layer's Speed B)")),
+        ])),
+    ])),
+    ("Tempo & Bars", OD([
+        ("Tempo", OD([
+            ("BPM Mode", dropdown(["Auto", "Manual"], "Auto")),
+            ("Manual BPM", slider(120, 40, 240, step=0.1)),
+            ("BPM Range Min", slider(60, 40, 200, step=1)),
+            ("BPM Range Max", slider(200, 80, 240, step=1)),
+            ("Tempo Multiplier", dropdown(["x1", "x0.5 (Half)", "x2 (Double)"], "x1")),
+            ("Tap Tempo", action("Tap Tempo")),
+        ])),
+        ("Bars", OD([
+            ("Time Signature", dropdown(["4/4", "3/4", "6/8", "2/4", "5/4", "7/8", "12/8"], "4/4")),
+            ("Downbeat Offset", number(0, 0, 11, help="Shift which beat counts as 1")),
+        ])),
+    ])),
+    ("Frequency Bands", OD([
+        ("3-Band Split", OD([
+            ("Low-Mid Cut (Hz)", slider(250, 40, 1000, step=1)),
+            ("Mid-High Cut (Hz)", slider(4000, 1000, 12000, step=10)),
+            ("Low Gain", slider(1.0, 0, 4)),
+            ("Mid Gain", slider(1.0, 0, 4)),
+            ("High Gain", slider(1.0, 0, 4)),
+            ("Band Attack (ms)", slider(0, 0, 500, step=1)),
+            ("Band Release (ms)", slider(0, 0, 2000, step=1)),
+            ("Band AGC", check(False, help="Automatic gain: each band adapts to its own recent maximum")),
+        ])),
+        ("Custom Bands", OD([
+            ("Crossover Slope", dropdown(["6 dB/oct", "12 dB/oct", "24 dB/oct", "48 dB/oct"], "24 dB/oct")),
+            ("Add Band", action("Add Band")),
+            ("Bands", dict(type="bands", default=[])),
         ])),
     ])),
     ("Sync & Offset", OD([

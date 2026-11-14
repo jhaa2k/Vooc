@@ -42,6 +42,21 @@ def _coerce(spec, value):
             return value if value in spec["options"] else spec["default"]
         if kind == "color":
             return normalize_hex(value, spec["default"])
+        if kind == "bands":
+            out = []
+            for b in value or []:
+                if not isinstance(b, dict):
+                    continue
+                lo = max(10.0, min(20000.0, float(b.get("lo", 100))))
+                hi = max(lo + 1.0, min(22000.0, float(b.get("hi", 1000))))
+                out.append({"label": str(b.get("label", "Band %d" % (len(out) + 1)))[:24],
+                            "lo": lo, "hi": hi,
+                            "gain": max(0.0, min(8.0, float(b.get("gain", 1.0)))),
+                            "smoothing": max(0.0, min(0.95, float(b.get("smoothing", 0.0)))),
+                            "attack": max(0.0, min(1000.0, float(b.get("attack", 0.0)))),
+                            "release": max(0.0, min(3000.0, float(b.get("release", 0.0)))),
+                            "agc": bool(b.get("agc", False))})
+            return out[:32]
         if kind == "variables":
             return [dict(v) for v in value if isinstance(v, dict) and v.get("name")]
         if kind in ("text", "image", "font", "code", "action"):

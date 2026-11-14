@@ -114,6 +114,7 @@ class BaseLayer:
         self.group.add(self.blend.end)
 
     def update(self, frame):
+        frame.measure.use_layer(self.values)
         self.blend.mode = self.values[G + "Layer/Blend Mode"]
         box = self.render(frame)
         t = LayerTransform.compute(self.values, frame.measure, frame.w, frame.h, *box)
@@ -479,10 +480,10 @@ class BarsLayer(BaseLayer):
     # engine bands are log spaced 30 Hz .. 16 kHz (see audio.analysis / timeline_hub)
     F_LO, F_HI = 30.0, 16000.0
 
-    def _band_positions(self, n_bands, count, f_lo, f_hi):
+    def _band_positions(self, n_bands, count, f_lo, f_hi, linear=False):
         f_lo = max(self.F_LO, min(f_lo, self.F_HI - 1))
         f_hi = max(f_lo + 1, min(f_hi, self.F_HI))
-        hz = np.geomspace(f_lo, f_hi, count)
+        hz = np.linspace(f_lo, f_hi, count) if linear else np.geomspace(f_lo, f_hi, count)
         return np.log(hz / self.F_LO) / math.log(self.F_HI / self.F_LO) * n_bands - 0.5
 
     def _input(self, frame, count):
@@ -498,16 +499,24 @@ class BarsLayer(BaseLayer):
         if what == "Beat":
             level = frame.measure.pulse(3.0) * 0.85 + snap["rms"] * 0.25
             return np.full(count, level, np.float32)
+        if what == "Amplitude":
+            wave = snap.get("waveform")
+            wave = np.abs(np.asarray(wave if wave is not None and len(wave) else [0.0], np.float32))
+            pos = np.linspace(0, len(wave) - 1, count)
+            return np.clip(np.interp(pos, np.arange(len(wave)), wave) * 1.6, 0, 1).astype(np.float32)
+        linear = snap.get("mapping") == "Linear"
 
         def pick(bands, n):
             src = np.asarray(bands, np.float32)
-            pos = self._band_positions(len(src), n, f_lo, f_hi)
+            pos = self._band_positions(len(src), n, f_lo, f_hi, linear)
             return np.interp(pos, np.arange(len(src)), src)
         if channel == "Stereo":
             half = max(1, count // 2)
             out = np.concatenate([pick(snap["bands_left"], half)[::-1], pick(snap["bands_right"], count - half)])
         else:
-            bands = {"Left": snap["bands_left"], "Right": snap["bands_right"]}.get(channel, snap["bands"])
+            bands = {"Left": snap["bands_left"], "Right": snap["bands_right"],
+                     "Mid": snap.get("bands_mid", snap["bands"]),
+                     "Side": snap.get("bands_side", snap["bands"])}.get(channel, snap["bands"])
             out = pick(bands, count)
         if v["Bars Setup/Bars/Flip Input"]:
             out = out[::-1]

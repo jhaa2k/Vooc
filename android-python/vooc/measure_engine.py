@@ -10,6 +10,8 @@ back with speed B. "Constant*" modes run continuously from playback time.
 """
 import math
 
+from .audio.beats import decay as _decay
+
 
 def _hash_noise(x):
     """Deterministic pseudo-random value in [-1, 1] for shake modes."""
@@ -30,9 +32,30 @@ class MeasureEngine:
         self.peak = 0.0
         self.dominant_hz = 0.0
         self.playing = False
+        self.snap = {}
+        self.decay_curve = "Exponential"
+        self.decay_s = 1.0
+        self.last_downbeat_time = -100.0
+        self.override = None            # per-layer Reactivity Mode (Beat / Frequency / Amplitude / Nothing)
+        self.weights = (1.0, 0.5, 0.25)
+
+    def use_layer(self, values):
+        """Set the per-layer reactivity context before a layer evaluates its modes."""
+        mode = values.get("General/Reactivity/Reactivity Mode", "Inherit")
+        self.override = None if mode in (None, "Inherit") else mode
+        self.weights = (values.get("General/Reactivity/Band Weight Low", 1.0),
+                        values.get("General/Reactivity/Band Weight Mid", 0.5),
+                        values.get("General/Reactivity/Band Weight High", 0.25))
+
+    def frequency_level(self):
+        s = self.snap
+        wl, wm, wh = self.weights
+        total = max(1e-6, wl + wm + wh)
+        return max(0.0, min(1.0, (wl * s.get("bass", 0.0) + wm * s.get("mid", 0.0)
+                                  + wh * s.get("treble", 0.0)) / total))
 
     def update(self, dt, beat=False, rms=0.0, peak=0.0, track_position=None,
-               track_duration=None, dominant_hz=0.0, playing=None):
+               track_duration=None, dominant_hz=0.0, playing=None, snapshot=None):
         dt = max(0.0, min(0.25, float(dt)))
         self.time += dt
         if playing is not None:
@@ -44,6 +67,12 @@ class MeasureEngine:
             self.beat_pulse = 1.0
             self.last_beat_time = self.time
             self.beat_count += 1
+        if snapshot is not None:
+            self.snap = snapshot
+            self.decay_curve = snapshot.get("decay_curve", self.decay_curve)
+            self.decay_s = float(snapshot.get("decay_s", self.decay_s))
+            if snapshot.get("downbeat"):
+                self.last_downbeat_time = self.time
         self.rms = max(0.0, min(1.0, float(rms)))
         self.peak = max(0.0, min(1.0, float(peak)))
         self.dominant_hz = max(0.0, float(dominant_hz))
@@ -56,7 +85,9 @@ class MeasureEngine:
     def pulse(self, speed=1.0):
         """1.0 on the beat, exponential decay; B (speed) controls decay rate."""
         since = self.time - self.last_beat_time
-        return math.exp(-since * 4.0 * max(0.05, speed)) if since >= 0 else 0.0
+        if since < 0:
+            return 0.0
+        return _decay(self.decay_curve, since * max(0.05, speed), self.decay_s)
 
     def volume_level(self):
         if self.rms <= 1e-5:
@@ -72,7 +103,10 @@ class MeasureEngine:
         t = self.time if now is None else float(now)
         a = max(-1000.0, min(1000.0, float(amount)))
         b = max(-100.0, min(100.0, float(speed)))
+        if self.override is not None and mode not in (None, "", "Nothing"):
+            mode = {"Beat": "Beat", "Frequency": "Frequency", "Amplitude": "Amplitude"}.get(self.override, "Nothing")
         p = self.pulse(abs(b) if b else 1.0)
+        s = self.snap
         progress = self.track_position / self.track_duration if self.track_duration > 0 else 0.0
         if mode in (None, "", "Nothing"):
             d = 0.0
@@ -110,6 +144,26 @@ class MeasureEngine:
             d = a * self.volume_level()
         elif mode == "PitchFrequencyResponsive":
             d = a * self.pitch_level()
+        elif mode == "Frequency":
+            d = a * self.frequency_level()
+        elif mode == "Amplitude":
+            d = a * self.volume_level()
+        elif mode in ("Kick", "Snare", "HiHat"):
+            d = a * float(s.get({"HiHat": "hihat"}.get(mode, mode.lower()), 0.0))
+        elif mode == "Downbeat":
+            since = self.time - self.last_downbeat_time
+            d = a * (_decay(self.decay_curve, since * max(0.05, abs(b) or 1.0), self.decay_s) if since >= 0 else 0.0)
+        elif mode == "BeatProgress":
+            d = a * float(s.get("beat_phase", 0.0))
+        elif mode == "BarProgress":
+            n = max(1, int(s.get("beats_per_bar", 4)))
+            d = a * ((max(1, int(s.get("beat_in_bar", 1))) - 1 + float(s.get("beat_phase", 0.0))) / n)
+        elif mode in ("LowBand", "MidBand", "HighBand"):
+            d = a * float(s.get({"LowBand": "bass", "MidBand": "mid", "HighBand": "treble"}[mode], 0.0))
+        elif mode.startswith("CustomBand"):
+            vals = s.get("custom_bands") or []
+            k = int(mode[10:] or 1) - 1
+            d = a * (float(vals[k]) if 0 <= k < len(vals) else 0.0)
         else:
             d = 0.0
         result = float(base) + d
@@ -122,6 +176,8 @@ class MeasureEngine:
     def position_offset(self, mode, amount, speed):
         """(dx, dy) in canvas-relative units for the Measure Pos dropdown."""
         if mode in (None, "", "Nothing"):
+            return 0.0, 0.0
+        if self.override == "Nothing":
             return 0.0, 0.0
         t = self.time
         a, b = float(amount), float(speed)

@@ -318,6 +318,7 @@ class Exporter:
                           playing=lambda: True, duration=lambda: plan["duration"])
         hub.metadata.update(self.metadata)
         hub.fallback = False
+        hub.fixed_dt = 1.0 / plan["fps"]
         self.scene = SceneView(project, hub, offline=True, size_override=(plan["width"], plan["height"]))
         self.scene.size = (plan["width"], plan["height"])
         self.scene.rebuild()

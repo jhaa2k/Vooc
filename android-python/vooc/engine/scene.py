@@ -265,7 +265,7 @@ class SceneView(Widget):
             frame.playing, beat = False, False
         snap = frame.snapshot
         self.measure.update(dt, beat, snap["rms"], snap["peak"], frame.position, frame.duration,
-                            snap["dominant_hz"], frame.playing)
+                            snap["dominant_hz"], frame.playing, snapshot=snap)
         frame.measure = self.measure
         self._update_composition(frame)
         for p in self.passes:
@@ -291,6 +291,7 @@ class SceneView(Widget):
         comp = self.project.layer("COMPOSITION")
         bg = hex_to_rgba(comp.get(C + "Canvas/Background Color"))
         clear_each = comp.get(C + "Canvas/Clear Canvas on Frame")
+        self.measure.use_layer(comp.values)
         t = LayerTransform.compute(comp.values, self.measure, frame.w, frame.h, frame.w, frame.h)
         for i, p in enumerate(self.passes):
             if not isinstance(p, LayersPass):

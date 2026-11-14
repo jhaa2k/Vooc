@@ -42,13 +42,14 @@ class SpectrumSourceTests(unittest.TestCase):
 
     def test_decoder_byte_format(self):
         n = 5
-        raw = bytes([128] * (n * BANDS)) + bytes([255] * n)
+        raw = (bytes([153] * BANDS) + bytes([255, 128])) * n     # 153 -> -40 dB
         tl = _from_bytes(raw)
         self.assertEqual(tl.count, n)
         self.assertAlmostEqual(tl.duration, n / FPS)
-        bands, rms = tl.sample(0.01)
-        self.assertAlmostEqual(bands[0], 128 / 255.0, places=3)
+        db, rms, peak = tl.sample_db(0.01)
+        self.assertAlmostEqual(float(db[0]), -40.0, delta=0.3)
         self.assertAlmostEqual(rms, 1.0, places=3)
+        self.assertAlmostEqual(peak, 128 / 255.0, places=3)
 
     def test_eq_interpolation(self):
         freqs = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
@@ -68,11 +69,11 @@ class StreamingTimelineTest(unittest.TestCase):
         from vooc.spectrum_source import SpectrumTimeline, BANDS
         tl = SpectrumTimeline.empty()
         self.assertEqual(tl.sample(0.0), (None, 0.0))
-        frame = bytes([128] * BANDS + [255])
+        frame = bytes([153] * BANDS + [255, 0])
         tl.append_bytes(frame * 300)
         self.assertEqual(tl.count, 300)
-        bands, rms = tl.sample(1.0)
-        self.assertAlmostEqual(bands[0], 128 / 255.0, places=3)
+        db, rms, _ = tl.sample_db(1.0)
+        self.assertAlmostEqual(float(db[0]), -40.0, delta=0.3)
         self.assertAlmostEqual(rms, 1.0, places=3)
         # beyond decoded range while streaming -> no data yet
         self.assertEqual(tl.sample(100.0), (None, 0.0))

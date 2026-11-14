@@ -86,6 +86,7 @@ class EffectPass:
 
     def update(self, frame):
         f = self.fbo
+        frame.measure.use_layer(self.values)
         t = self.transform_uniforms(frame)
         f["resolution"] = tuple(float(s) for s in self.size)
         f["time"] = float(frame.time)

@@ -17,7 +17,7 @@ try:
     from vooc import m3
     from vooc.m3 import T
     from vooc.state import ProjectState, THEMES, AUDIO_DEFAULTS, VISUALIZER_DEFAULTS, EQ_PRESETS
-    from vooc.spectrum_source import SpectrumLoader
+    from vooc.spectrum_source import AnalysisConfig, SpectrumLoader
     from vooc.android_audio import AndroidMediaPlayerSource
     from vooc.android_media import choose_audio, choose_image, choose_template, publish_file
     from vooc.property_editor import AdvancedProperties, pretty as pretty_module, _ICONS as EDITOR_ICONS
@@ -186,6 +186,7 @@ class VoocRoot(FloatLayout):
         self.loader = SpectrumLoader(self._spectrum_ready, self._spectrum_progress,
                                      scheduler=lambda fn: Clock.schedule_once(lambda _dt: fn(), 0))
         self._save_trigger = Clock.create_trigger(lambda _dt: self.autosave(), 1.0)
+        self._reanalyse_trigger = Clock.create_trigger(lambda _dt: self.reanalyse(), 0.8)
         self.insets = system_insets() or (0, 0)
         self.build_ui()
         if system_insets() is None:
@@ -309,6 +310,13 @@ class VoocRoot(FloatLayout):
         if self.scene.parent is not None:
             self.scene.parent.remove_widget(self.scene)
         stage.add_widget(self.scene)
+        from vooc.analyzer_overlay import AnalyzerOverlay
+        if getattr(self, "analyzer_overlay", None) is not None:
+            self.analyzer_overlay.stop()
+        self.analyzer_overlay = AnalyzerOverlay(
+            self.hub, lambda: bool(self.project.layer("AUDIOPROVIDER").get("Analyzer/Debug/Show Analyzer Overlay")),
+            size_hint=(1, 1), pos_hint={"x": 0, "y": 0})
+        stage.add_widget(self.analyzer_overlay)
         self.status = m3.Box(bg=T.a("scrim", .55), radius=dp(12), size_hint=(None, None), height=dp(26), width=dp(96),
                              pos_hint={"x": .02, "top": .96}, padding=(dp(10), 0), spacing=dp(6))
         self.status_dot = Widget(size_hint=(None, 1), width=dp(8))
@@ -476,7 +484,39 @@ class VoocRoot(FloatLayout):
     def _engine_changed(self, layer=None):
         if layer is not None and layer.module == "COMPOSITION" and self._fit_visual:
             self._fit_visual()
+        if layer is not None and layer.module == "AUDIOPROVIDER" and self.track:
+            if self._analysis_config().key != getattr(self.loader.config, "key", None):
+                self._reanalyse_trigger()
         self._save_trigger()
+
+    def _analysis_config(self):
+        return AnalysisConfig.from_layer(self.project.layer("AUDIOPROVIDER"))
+
+    def reanalyse(self, force=False):
+        """Re-run the decoder/FFT with the current Analyzer settings (FFT size, window, overlap, bands, channels)."""
+        if not self.track:
+            self.toast("Load a track first")
+            return
+        if force:
+            self.loader.forget(self.track)
+        self.analysis = {"state": "analyzing", "progress": 0.0}
+        self.loader.load(self.track, self._analysis_config())
+        cfg = self.loader.config
+        self.toast("Analysing: FFT %d, %s, %d%% overlap%s" % (cfg.fft, cfg.window, cfg.overlap,
+                                                             ", stereo" if cfg.stereo else ""))
+        self._update_status()
+
+    def _engine_action(self, layer, path):
+        """Actions from the property editor that need the app (audio, analyser)."""
+        if path.endswith("Re-analyse Track"):
+            self.reanalyse(force=True)
+            return False
+        if path.endswith("Tap Tempo"):
+            bpm = self.hub.tap()
+            self.toast("Tap tempo: %.1f BPM" % bpm if bpm > 0 else "Keep tapping on the beat")
+            self._save_trigger()
+            return False
+        return False
 
     def _setv(self, layer, path, value):
         if layer.set(path, value):
@@ -1071,7 +1111,8 @@ class VoocRoot(FloatLayout):
             AdvancedProperties.scroll_cls = Scroll
             self.property_editor = AdvancedProperties(self.project, scene=lambda: self.scene,
                                                       on_change=self._engine_changed, pick_image=choose_image,
-                                                      palette=self._palette_swatches, toast=self.toast, layer=layer)
+                                                      palette=self._palette_swatches, toast=self.toast, layer=layer,
+                                                      on_action=self._engine_action)
             self.studio_body.add_widget(self.property_editor)
             Clock.schedule_once(self._dump_targets, 0.8)
             return
@@ -1326,7 +1367,7 @@ class VoocRoot(FloatLayout):
             self.timeline = None
             self._read_meta(path)
             self.analysis = {"state": "analyzing", "progress": 0.0}
-            self.loader.load(path)
+            self.loader.load(path, self._analysis_config())
             if autoplay:
                 self.toggle()
             self._update_player_ui()

@@ -25,6 +25,17 @@ _ICONS = {"COMPOSITION": "studio", "IMAGE": "image", "TEXT": "text", "BARS": "ba
           "MIRROREREFFECT": "copy", "CUSTOMSHADER": "more"}
 FONTS = ["Roboto", "RobotoMono", "DejaVuSans"]
 VARS = "Variables/Variable Mappings/Mappings"
+BANDS = "Frequency Bands/Custom Bands/Bands"
+
+
+def _action_icon(path):
+    if "Compile" in path:
+        return "check"
+    if "Re-analyse" in path:
+        return "reset"
+    if "Tap" in path:
+        return "play"
+    return "plus"
 
 
 def pretty(name):
@@ -40,7 +51,7 @@ class AdvancedProperties(BoxLayout):
     scroll_cls = None
 
     def __init__(self, project, scene=None, on_change=None, pick_image=None, palette=None, toast=None,
-                 layer=None, on_back=None, **kwargs):
+                 layer=None, on_back=None, on_action=None, **kwargs):
         super().__init__(orientation="vertical", spacing=dp(8), **kwargs)
         self.project, self.scene = project, scene or (lambda: None)
         self.on_change = on_change or (lambda layer: None)
@@ -48,6 +59,7 @@ class AdvancedProperties(BoxLayout):
         self.palette = palette or (lambda: [])
         self.toast = toast or (lambda text: None)
         self.on_back = on_back
+        self.on_action = on_action or (lambda layer, path: False)
         self.category = None
         self.first_tile = None
         if layer is not None:
@@ -208,6 +220,8 @@ class AdvancedProperties(BoxLayout):
             return m3.switch_row(name, bool(value), lambda v, p=path: self._changed(layer, p, bool(v)))
         if kind == "variables":
             return self._variables(layer, path, value)
+        if kind == "bands":
+            return self._bands(layer, path, value)
         row = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
         row.bind(minimum_height=row.setter("height"))
         if kind != "action":
@@ -221,7 +235,7 @@ class AdvancedProperties(BoxLayout):
             row.add_widget(m3.SelectField(name, options, str(value), lambda v, p=path: self._changed(layer, p, v)))
         elif kind == "action":
             row.add_widget(m3.Button3(str(spec.get("label", value)), lambda p=path: self._action(layer, p),
-                                      kind="tonal", icon="check" if "Compile" in path else "plus"))
+                                      kind="tonal", icon=_action_icon(path)))
             if "Compile" in path:
                 err = (getattr(self.scene(), "shader_errors", {}) or {}).get(layer.id, "")
                 status = ("Shader error: " + err[:400]) if err else "Shader compiled OK"
@@ -303,6 +317,68 @@ class AdvancedProperties(BoxLayout):
             mappings.append({"name": name, "type": kind, "value": default})
             layer.set(VARS, mappings)
             self._compile(layer)
+            self.on_change(layer)
+            self._refresh()
+        elif path.endswith("Custom Bands/Add Band"):
+            bands = [dict(b) for b in (layer.get(BANDS) or [])]
+            if len(bands) >= 8:
+                self.toast("Up to 8 custom bands (CustomBand1-8 measure modes)")
+                return
+            presets = [(20, 60, "Sub"), (60, 250, "Bass"), (250, 500, "Low Mid"), (500, 2000, "Mid"),
+                       (2000, 4000, "High Mid"), (4000, 6000, "Presence"), (6000, 12000, "Brilliance"),
+                       (12000, 16000, "Air")]
+            lo, hi, label = presets[len(bands)]
+            bands.append({"label": label, "lo": lo, "hi": hi, "gain": 1.0, "smoothing": 0.0,
+                          "attack": 0.0, "release": 0.0, "agc": False})
+            layer.set(BANDS, bands)
+            self.on_change(layer)
+            self.toast("Added %s (%d-%d Hz) = CustomBand%d" % (label, lo, hi, len(bands)))
+            self._refresh()
+        elif self.on_action(layer, path):
+            self._refresh()
+
+    # ------------------------------------------------------------ custom analyzer bands
+    def _bands(self, layer, path, bands):
+        box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
+        box.bind(minimum_height=box.setter("height"))
+        if not bands:
+            box.add_widget(m3.lbl("No custom bands. Tap Add Band; each one becomes a CustomBand measure mode.",
+                                  12, T.on_var, shorten=False, size_hint_y=None, height=dp(36)))
+        for index, band in enumerate(bands):
+            head = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(6))
+            head.add_widget(m3.text_field(str(band.get("label", "")), lambda v, i=index: self._set_band(layer, i, "label", v, False),
+                                          "Band name"))
+            head.add_widget(m3.lbl("CustomBand%d" % (index + 1), 11, T.primary, size_hint_x=None, width=dp(92)))
+            head.add_widget(m3.IconBtn("delete", lambda i=index: self._delete_band(layer, i), size=dp(38)))
+            box.add_widget(head)
+            rows = [("Low (Hz)", "lo", 10, 20000, 1), ("High (Hz)", "hi", 20, 22000, 1), ("Gain", "gain", 0, 8, 0),
+                    ("Smoothing", "smoothing", 0, 0.95, 0), ("Attack (ms)", "attack", 0, 1000, 1),
+                    ("Release (ms)", "release", 0, 3000, 1)]
+            for name, key, lo, hi, step in rows:
+                val = float(band.get(key, 0) or 0)
+                fmt = (lambda v: "%d" % round(v)) if step else (lambda v: "%.2f" % v)
+                box.add_widget(m3.SliderRow(name, lo, hi, max(lo, min(hi, val)),
+                                            lambda v, i=index, k=key, st=step: self._set_band(
+                                                layer, i, k, int(round(v)) if st else round(float(v), 3)),
+                                            step=step, fmt=fmt, default=val))
+            box.add_widget(m3.switch_row("Auto gain (AGC)", bool(band.get("agc")),
+                                         lambda v, i=index: self._set_band(layer, i, "agc", bool(v))))
+        return box
+
+    def _set_band(self, layer, index, key, value, live=True):
+        bands = [dict(b) for b in (layer.get(BANDS) or [])]
+        if 0 <= index < len(bands):
+            bands[index][key] = value
+            if key == "lo" and bands[index]["hi"] <= value:
+                bands[index]["hi"] = value + 1
+            layer.set(BANDS, bands)
+            self.on_change(layer)
+
+    def _delete_band(self, layer, index):
+        bands = [dict(b) for b in (layer.get(BANDS) or [])]
+        if 0 <= index < len(bands):
+            bands.pop(index)
+            layer.set(BANDS, bands)
             self.on_change(layer)
             self._refresh()
 

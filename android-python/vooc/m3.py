@@ -120,9 +120,9 @@ class Box(BoxLayout):
 
     def _u(self, *_):
         self._c.rgba = self.bg
-        self._r.pos, self._r.size, self._r.radius = self.pos, self.size, [self.radius]
+        self._r.pos, self._r.size, self._r.radius = self.pos, self.size, [0]
         self._lc.rgba = self.line
-        r = min(self.radius, self.height / 2.0, self.width / 2.0)
+        r = 0
         self._l.rounded_rectangle = (self.x + .5, self.y + .5, max(1, self.width - 1), max(1, self.height - 1), max(1, r))
 
 
@@ -131,7 +131,7 @@ def card(**kw):
     kw.setdefault("padding", dp(14))
     kw.setdefault("spacing", dp(8))
     kw.setdefault("size_hint_y", None)
-    kw.setdefault("radius", dp(20))
+    kw.setdefault("radius", 0)
     kw.setdefault("bg", T.surface1)
     b = Box(**kw)
     b.bind(minimum_height=b.setter("height"))
@@ -434,7 +434,7 @@ class Tap(TouchGuard, ButtonBehavior, Box):
             self.bind(on_release=lambda *_: on_tap())
 
     def _us(self, *_):
-        self._sr.pos, self._sr.size, self._sr.radius = self.pos, self.size, [self.radius]
+        self._sr.pos, self._sr.size, self._sr.radius = self.pos, self.size, [0]
 
     def on_press(self):
         Animation.cancel_all(self._sc)
@@ -587,7 +587,7 @@ class Chip(Tap):
             fg = T.on_primary_container
             self.check.width, self.check.opacity = dp(16), 1
         else:
-            self.bg, self.line = [0, 0, 0, 0], T.outline
+            self.bg, self.line = [0, 0, 0, 0], [0, 0, 0, 0]
             fg = T.on_var
             self.check.width, self.check.opacity = 0, 0
         self.label.color = fg

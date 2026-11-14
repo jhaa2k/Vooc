@@ -253,7 +253,7 @@ class VoocRoot(FloatLayout):
         if Window is not None:
             Window.clearcolor = T.bg
         top, bottom = self.insets
-        main = m3.Box(orientation="vertical", bg=T.bg, padding=(dp(12), dp(6) + top, dp(12), 0), spacing=dp(10))
+        main = m3.Box(orientation="vertical", bg=T.bg, padding=(dp(8), dp(4) + top, dp(8), 0), spacing=dp(6))
         main.add_widget(self._top_bar())
         main.add_widget(self._visual_card())
         main.add_widget(self._player_card())
@@ -270,8 +270,8 @@ class VoocRoot(FloatLayout):
         self._update_player_ui()
 
     def _top_bar(self):
-        bar = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(4))
-        logo = m3.Box(bg=T.primary, radius=dp(12), size_hint=(None, None), size=(dp(36), dp(36)), padding=dp(8))
+        bar = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(3))
+        logo = m3.Box(bg=T.primary, radius=dp(12), size_hint=(None, None), size=(dp(32), dp(32)), padding=dp(7))
         logo.add_widget(m3.Icon(name="bars", tint=T.on_primary))
         holder = BoxLayout(size_hint_x=None, width=dp(44), padding=(0, dp(6)))
         holder.add_widget(logo)
@@ -308,7 +308,7 @@ class VoocRoot(FloatLayout):
         def fit(*_):
             ratio = self._preview_ratio()
             inner_w = max(dp(100), (frame.width or self.width or 360) - pad * 2)
-            limit = max(dp(120), (self.height or 800) * 0.40)
+            limit = max(dp(112), (self.height or 800) * 0.36)
             h = inner_w / ratio
             w = inner_w
             if h > limit:                 # tall ratios: letterbox inside the card
@@ -364,7 +364,7 @@ class VoocRoot(FloatLayout):
     def _player_card(self):
         """Compact mini player: art + title + prev/play/next on one row, shuffle / seek / repeat below."""
         c = m3.Box(orientation="vertical", bg=T.surface1, radius=dp(20), padding=(dp(10), dp(6), dp(10), dp(2)),
-                   size_hint_y=None, height=dp(84), spacing=0)
+                   size_hint_y=None, height=dp(76), spacing=0)
         head = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
         art = m3.Box(bg=T.primary_container, radius=dp(10), size_hint=(None, None), size=(dp(36), dp(36)), padding=dp(9))
         art.add_widget(m3.Icon(name="note", tint=T.on_primary_container))

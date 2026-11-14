@@ -40,10 +40,10 @@ class Theme:
 T = Theme()
 
 # spacing / type scale
-PAD = dp(16)
-GAP = dp(10)
-RADIUS = dp(18)
-ROW_H = dp(52)
+PAD = dp(12)
+GAP = dp(6)
+RADIUS = dp(0)
+ROW_H = dp(46)
 FS_TITLE = sp(20)
 FS_BODY = sp(14)
 FS_LABEL = sp(12)

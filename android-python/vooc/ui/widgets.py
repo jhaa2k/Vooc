@@ -32,23 +32,23 @@ def label(text, size=FS_BODY, color=None, bold=False, halign="left", **kw):
 class Surface(BoxLayout):
     """BoxLayout with a rounded background."""
     bg = ListProperty([0, 0, 0, 0])
-    radius = NumericProperty(RADIUS)
+    radius = NumericProperty(0)
     border = ListProperty([0, 0, 0, 0])
 
     def __init__(self, **kw):
         super().__init__(**kw)
         with self.canvas.before:
             self._c = Color(*self.bg)
-            self._r = RoundedRectangle(radius=[self.radius])
+            self._r = Rectangle()
             self._bc = Color(*self.border)
             self._b = Line(width=dp(1))
         self.bind(pos=self._upd, size=self._upd, bg=self._upd, border=self._upd, radius=self._upd)
 
     def _upd(self, *_):
         self._c.rgba = self.bg
-        self._r.pos, self._r.size, self._r.radius = self.pos, self.size, [self.radius]
+        self._r.pos, self._r.size = self.pos, self.size
         self._bc.rgba = self.border
-        self._b.rounded_rectangle = (self.x, self.y, self.width, self.height, self.radius)
+        self._b.rectangle = (self.x, self.y, self.width, self.height)
 
 
 class Pressable(ButtonBehavior, Surface):
@@ -72,7 +72,7 @@ class TextButton(Pressable):
     def __init__(self, text, on_tap=None, primary=False, fs=FS_BODY, **kw):
         bg = T.primary if primary else kw.pop("bg", T.surface_hi)
         kw.setdefault("padding", (dp(14), 0))
-        kw.setdefault("radius", dp(14))
+        kw.setdefault("radius", 0)
         super().__init__(bg=bg, **kw)
         self.lbl = Label(text=text, font_size=fs, bold=True,
                          color=T.on_primary if primary else T.on_surface,

@@ -308,7 +308,7 @@ class VoocRoot(FloatLayout):
         def fit(*_):
             ratio = self._preview_ratio()
             inner_w = max(dp(100), (frame.width or self.width or 360) - pad * 2)
-            limit = max(dp(112), (self.height or 800) * 0.36)
+            limit = max(dp(108), (self.height or 800) * 0.34)
             h = inner_w / ratio
             w = inner_w
             if h > limit:                 # tall ratios: letterbox inside the card
@@ -364,9 +364,9 @@ class VoocRoot(FloatLayout):
     def _player_card(self):
         """Compact mini player: art + title + prev/play/next on one row, shuffle / seek / repeat below."""
         c = m3.Box(orientation="vertical", bg=T.surface1, radius=dp(20), padding=(dp(10), dp(6), dp(10), dp(2)),
-                   size_hint_y=None, height=dp(76), spacing=0)
-        head = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
-        art = m3.Box(bg=T.primary_container, radius=dp(10), size_hint=(None, None), size=(dp(36), dp(36)), padding=dp(9))
+                   size_hint_y=None, height=dp(72), spacing=0)
+        head = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(6))
+        art = m3.Box(bg=T.primary_container, radius=dp(10), size_hint=(None, None), size=(dp(34), dp(34)), padding=dp(8))
         art.add_widget(m3.Icon(name="note", tint=T.on_primary_container))
         wrap = BoxLayout(size_hint_x=None, width=dp(36), padding=(0, dp(4)))
         wrap.add_widget(art)

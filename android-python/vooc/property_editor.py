@@ -77,7 +77,7 @@ class AdvancedProperties(BoxLayout):
     def _new_scroll(self):
         from kivy.uix.scrollview import ScrollView
         cls = self.scroll_cls or ScrollView
-        return cls(do_scroll_x=False, bar_width=dp(3))
+        return cls(do_scroll_x=False, bar_width=0, scroll_type=["content"])
 
     # ------------------------------------------------------------ helpers
     def _changed(self, layer, path, value):
@@ -168,10 +168,10 @@ class AdvancedProperties(BoxLayout):
         top.add_widget(m3.IconBtn("info", lambda: self._info(module)))
         self.add_widget(top)
         scroll = self._new_scroll()
-        col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=(0, 0, 0, dp(16)))
+        col = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(5), padding=(0, 0, 0, dp(10)))
         col.bind(minimum_height=col.setter("height"))
         self._open_sections = set(open_sections or [])
-        first = not self._open_sections
+        first = False
         locked = bool(layer.values.get("General/Layer/Locked", False))
         if locked:
             banner = m3.card(padding=(dp(12), dp(8)), spacing=dp(4), bg=T.secondary_container, radius=dp(16))
@@ -182,14 +182,18 @@ class AdvancedProperties(BoxLayout):
             if locked and section != "General":
                 continue
             count = sum(len(f) for f in groups.values())
-            sec_card = m3.card(padding=(dp(4), dp(4)), spacing=dp(2), bg=T.surface1, radius=dp(18))
-            header = m3.Tap(size_hint_y=None, height=dp(48), radius=dp(16), padding=(dp(12), 0), spacing=dp(8))
+            sec_card = m3.card(padding=(dp(3), dp(3)), spacing=dp(1), bg=T.surface1, radius=0)
+            header = m3.Tap(size_hint_y=None, height=dp(36), radius=0, padding=(dp(9), 0), spacing=dp(6))
             header.add_widget(m3.lbl(section, 14, bold=True))
             header.add_widget(m3.lbl(str(count), 12, T.on_var, halign="right", size_hint_x=None, width=dp(36)))
             arrow = m3.Icon(name="down", tint=T.on_var, size_hint_x=None, width=dp(18))
             header.add_widget(arrow)
             holder = BoxLayout(orientation="vertical", size_hint_y=None, height=0, spacing=dp(4), padding=(dp(8), 0))
             holder.bind(minimum_height=holder.setter("height"))
+
+            sec_card._vooc_section_name = section
+            sec_card._vooc_holder = holder
+            sec_card._vooc_arrow = arrow
 
             def toggle(sec=section, grp=groups, box=holder, arr=arrow):
                 if box.children:
@@ -198,25 +202,35 @@ class AdvancedProperties(BoxLayout):
                     arr.name = "down"
                     self._open_sections.discard(sec)
                     return
+                # Collapse any other open category before building this one.
+                for other in col.children:
+                    other_name = getattr(other, "_vooc_section_name", None)
+                    if other_name and other_name != sec:
+                        other_box = getattr(other, "_vooc_holder", None)
+                        other_arrow = getattr(other, "_vooc_arrow", None)
+                        if other_box is not None:
+                            other_box.clear_widgets()
+                            other_box.height = 0
+                        if other_arrow is not None:
+                            other_arrow.name = "down"
+                        self._open_sections.discard(other_name)
                 arr.name = "up"
                 self._open_sections.add(sec)
                 for group, fields in grp.items():
-                    box.add_widget(m3.lbl(group, 12, T.primary, bold=True, size_hint_y=None, height=dp(28)))
+                    box.add_widget(m3.lbl(group, 12, T.primary, bold=True, size_hint_y=None, height=dp(24)))
                     for name, spec in fields.items():
                         try:
                             box.add_widget(self._control(layer, sec + "/" + group + "/" + name, name, spec))
                         except Exception as exc:
-                            box.add_widget(m3.lbl(name + ": " + str(exc), 11, T.error, size_hint_y=None, height=dp(30)))
-                box.add_widget(Widget(size_hint_y=None, height=dp(6)))
+                            box.add_widget(m3.lbl(name + ": " + str(exc), 11, T.error, size_hint_y=None, height=dp(28)))
+                box.add_widget(Widget(size_hint_y=None, height=dp(4)))
 
             header.bind(on_release=lambda *_, t=toggle: t())
             sec_card.add_widget(header)
             sec_card.add_widget(holder)
             col.add_widget(sec_card)
-            if first or section in self._open_sections:
-                self._open_sections.discard(section)
+            if section in self._open_sections:
                 toggle()
-                first = False
         scroll.add_widget(col)
         self.add_widget(scroll)
 

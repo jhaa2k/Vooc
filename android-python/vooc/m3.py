@@ -127,8 +127,8 @@ class Box(BoxLayout):
 
 def card(**kw):
     kw.setdefault("orientation", "vertical")
-    kw.setdefault("padding", dp(12))
-    kw.setdefault("spacing", dp(6))
+    kw.setdefault("padding", dp(8))
+    kw.setdefault("spacing", dp(4))
     kw.setdefault("size_hint_y", None)
     kw.setdefault("radius", 0)
     kw.setdefault("bg", T.surface1)
@@ -449,7 +449,7 @@ class Tap(TouchGuard, ButtonBehavior, Box):
 class Button3(Tap):
     """M3 button. kind: filled | tonal | outlined | text."""
 
-    def __init__(self, text, on_tap=None, kind="tonal", icon=None, height=dp(44), fs=14, **kw):
+    def __init__(self, text, on_tap=None, kind="tonal", icon=None, height=dp(38), fs=13, **kw):
         colors = {
             "filled": (T.primary, T.on_primary, [0, 0, 0, 0]),
             "tonal": (T.secondary_container, T.on_secondary_container, [0, 0, 0, 0]),
@@ -500,7 +500,7 @@ class IconBtn(TouchGuard, ButtonBehavior, Widget):
     """Circular icon button. kind: standard | tonal | filled."""
     active = BooleanProperty(False)
 
-    def __init__(self, icon, on_tap=None, kind="standard", size=dp(44), tint=None, **kw):
+    def __init__(self, icon, on_tap=None, kind="standard", size=dp(38), tint=None, **kw):
         kw.setdefault("size_hint", (None, None))
         super().__init__(size=(size, size), **kw)
         self.kind = kind
@@ -1252,7 +1252,7 @@ class SelectField(Tap):
 
     def __init__(self, title, options, value, on_change, **kw):
         kw.setdefault("size_hint_y", None)
-        kw.setdefault("height", dp(46))
+        kw.setdefault("height", dp(40))
         super().__init__(bg=[0, 0, 0, 0], line=T.outline, radius=dp(12), padding=(dp(14), 0), spacing=dp(6), **kw)
         self.title, self.options, self.on_change = title, list(options), on_change
         self.value = value
@@ -1327,7 +1327,7 @@ class _NavItem(TouchGuard, ButtonBehavior, BoxLayout):
 
 class Segmented(Box):
     def __init__(self, options, value, on_change, **kw):
-        super().__init__(size_hint_y=None, height=dp(40), line=T.outline, radius=0, spacing=0, **kw)
+        super().__init__(size_hint_y=None, height=dp(34), line=T.outline, radius=0, spacing=0, **kw)
         self.on_change = on_change
         self.btns = {}
         for i, opt in enumerate(options):

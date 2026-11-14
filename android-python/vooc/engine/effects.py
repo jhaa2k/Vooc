@@ -5,6 +5,7 @@ import math
 
 from kivy.graphics import BindTexture, Color, Fbo, Rectangle
 
+from .. import fx_library
 from ..model import hex_to_rgba
 from ..property_schema import BLEND
 from . import gl, textures
@@ -95,7 +96,7 @@ class EffectPass:
         f["bass"] = float(frame.snapshot["bass"])
         f["mid"] = float(frame.snapshot.get("mid", 0.0))
         f["treble"] = float(frame.snapshot.get("treble", 0.0))
-        f["fx_mix"] = 1.0
+        f["fx_mix"] = float(self.values.get("Effect Stack/Mix/Effect Mix", 1.0))
         f["blend_mode"] = _blend_index(self.values[G + "Layer/Blend Mode"])
         f["fx_pos"], f["fx_scale"] = t["pos"], t["scale"]
         f["fx_rot"], f["fx_pivot"] = t["rot"], t["pivot"]
@@ -243,6 +244,40 @@ class CustomShaderPass(EffectPass):
         self.set_extra(self.values["Appearance/Target/Target Image"])
 
 
+class LibraryPass(EffectPass):
+    """Dedicated effect from fx_library: one shader, one uniform per parameter."""
+    SPEC = None
+
+    def fragment(self):
+        return gl.EFFECT_HEADER + self.SPEC["glsl"] + "\n" + gl.EFFECT_FOOTER
+
+    def uniforms(self, frame, t):
+        v, f, spec = self.values, self.fbo, self.SPEC
+        react = fx_library.react_level(frame.snapshot, frame.measure, v.get("Effect Stack/Audio Reactivity/React To",
+                                                                              "Nothing"))
+        boost = 1.0 + react * float(v.get("Effect Stack/Audio Reactivity/React Amount", 1.0))
+        for p in spec["params"]:
+            label, uni, kind = p[0], p[1], p[2]
+            val = v[fx_library.param_path(label)]
+            if kind in ("f", "i"):
+                val = float(val)
+                if uni == spec["main"]:
+                    val = min(float(p[5]) * 2.0, val * boost) if val >= 0 else val * boost
+                f[uni] = val
+            elif kind == "b":
+                f[uni] = 1.0 if val else 0.0
+            elif kind == "c":
+                f[uni] = tuple(hex_to_rgba(val))
+            else:
+                opts = p[6]
+                f[uni] = float(opts.index(val)) if val in opts else 0.0
+
+
+def _library_pass(name):
+    return type(name.title() + "Pass", (LibraryPass,), {"SPEC": fx_library.LIBRARY[name]})
+
+
 PASSES = {"RGBSPLITEFFECT": RGBSplitPass, "MIRROREREFFECT": MirrorPass,
           "BLUREFFECT": BlurPass, "MOTIONBLUREFFECT": MotionBlurPass,
           "CUSTOMSHADER": CustomShaderPass}
+PASSES.update({name: _library_pass(name) for name in fx_library.ORDER})

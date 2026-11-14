@@ -21,7 +21,7 @@ try:
     from vooc.android_audio import AndroidMediaPlayerSource
     from vooc.android_media import choose_audio, choose_image, choose_template, publish_file
     from vooc.property_editor import AdvancedProperties, pretty as pretty_module, _ICONS as EDITOR_ICONS
-    from vooc.property_schema import field_spec, iter_fields
+    from vooc.property_schema import EFFECT_MODULES, field_spec, iter_fields
     from vooc.model import ProjectModel, LayerModel
     from vooc.audio.timeline_hub import TimelineHub
     from vooc.engine.scene import SceneView
@@ -126,9 +126,9 @@ QUICK_EFFECTS = [
     ("Film Grain", "CUSTOMSHADER", "Film Grain", "Shader Code/GLSL/Intensity", 0.0, 1.0),
 ]
 ADDABLE = [("Text", "TEXT", "text"), ("Image", "IMAGE", "image"), ("Bars", "BARS", "bars"),
-           ("Particles", "PARTICLES", "sparkle"), ("Glow", "BLUREFFECT", "eye"),
-           ("Motion", "MOTIONBLUREFFECT", "next"), ("RGB Split", "RGBSPLITEFFECT", "layers"),
-           ("Mirror", "MIRROREREFFECT", "copy"), ("Shader", "CUSTOMSHADER", "more")]
+           ("Particles", "PARTICLES", "sparkle"), ("Waveform", "WAVEFORM", "tune"), ("Shape", "SHAPE", "studio"),
+           ("Glow", "BLUREFFECT", "eye"), ("Shader", "CUSTOMSHADER", "more"), ("Effect", "__EFFECT__", "plus")]
+VISIBLE_ON_ADD = ("WAVEFORM", "SHAPE")
 FIXED_MODULES = ("COMPOSITION", "AUDIOPROVIDER")
 B = "Bars Setup/Bars/"
 CANVAS = "Render Settings/Canvas/"
@@ -938,7 +938,8 @@ class VoocRoot(FloatLayout):
         add = GridLayout(cols=3, spacing=dp(8), size_hint_y=None)
         add.bind(minimum_height=add.setter("height"))
         for title, module, icon in ADDABLE:
-            add.add_widget(m3.Button3(title, lambda m=module: self.add_layer(m), kind="tonal", icon=icon, height=dp(44)))
+            act = self._pick_effect if module == "__EFFECT__" else (lambda m=module: self.add_layer(m))
+            add.add_widget(m3.Button3(title, act, kind="tonal", icon=icon, height=dp(44)))
         col.add_widget(add)
         col.add_widget(m3.section("Layer stack", "top draws last"))
         layers = self.project.layers
@@ -1019,9 +1020,13 @@ class VoocRoot(FloatLayout):
                     self.show("layers")
         choose_image(got)
 
+    def _pick_effect(self, *_):
+        names = {pretty_module(m): m for m in EFFECT_MODULES}
+        m3.select_sheet("Add effect", sorted(names), None, lambda title: self.add_layer(names[title]))
+
     def add_layer(self, module):
         layer = LayerModel(module)
-        if module in ("BLUREFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT", "CUSTOMSHADER", "RGBSPLITEFFECT"):
+        if module in EFFECT_MODULES or module in VISIBLE_ON_ADD:
             layer.set("General/Layer/Visible", True)
         if module == "TEXT":
             layer.set("Content/Text/Text Input", "Your text")
@@ -1097,7 +1102,8 @@ class VoocRoot(FloatLayout):
     # ---------------------------------------------------------------- studio
     def _page_studio(self):
         box = BoxLayout(orientation="vertical", spacing=dp(10))
-        box.add_widget(m3.Segmented(["Properties", "Scene", "Export"], self.studio_tab, self._studio_tab))
+        self.studio_seg = m3.Segmented(["Properties", "Scene", "Export"], self.studio_tab, self._studio_tab)
+        box.add_widget(self.studio_seg)
         self.studio_body = BoxLayout()
         box.add_widget(self.studio_body)
         self._studio_tab(self.studio_tab)
@@ -1105,6 +1111,9 @@ class VoocRoot(FloatLayout):
 
     def _studio_tab(self, tab):
         self.studio_tab = tab
+        seg = getattr(self, "studio_seg", None)
+        if seg is not None:
+            seg.select(tab, notify=False)       # keep the segmented control in sync for programmatic switches
         self.studio_body.clear_widgets()
         if tab == "Properties":
             layer, self._edit_layer = self._edit_layer, None

@@ -3,16 +3,18 @@ import os
 import tempfile
 import unittest
 
-from vooc.model import LayerModel, ProjectModel, ProjectStore, hex_to_rgba, normalize_hex, rgba_to_hex
+from vooc.model import DEFAULT_LAYER_ORDER, LayerModel, ProjectModel, ProjectStore, hex_to_rgba, normalize_hex, rgba_to_hex
 from vooc.property_schema import (ANCHOR, BLEND, MEASURE, MODULES, SCHEMA, SHAPES, defaults,
                                   field_spec, iter_fields)
 
 
 class SchemaTests(unittest.TestCase):
     def test_modules_match_main_menu(self):
-        self.assertEqual(MODULES, ["COMPOSITION", "TEXT", "BARS", "PARTICLES", "IMAGE",
-                                   "AUDIOPROVIDER", "BLUREFFECT", "RGBSPLITEFFECT",
-                                   "MOTIONBLUREFFECT", "MIRROREREFFECT", "CUSTOMSHADER"])
+        original = ["COMPOSITION", "TEXT", "BARS", "PARTICLES", "IMAGE", "AUDIOPROVIDER", "BLUREFFECT",
+                    "RGBSPLITEFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT", "CUSTOMSHADER"]
+        self.assertEqual([m for m in MODULES if m in original], original)   # the 11 Avee modules, in order
+        for extra in ("WAVEFORM", "SHAPE", "ZOOMBLUREFFECT", "BLOOMEFFECT", "WAVEEFFECT"):
+            self.assertIn(extra, MODULES)
         self.assertEqual(set(SCHEMA), set(MODULES))
 
     def test_full_shared_dropdown_lists(self):
@@ -76,7 +78,7 @@ class ModelTests(unittest.TestCase):
                                                          "Removed/Old/Key": 1}}]}
         project = ProjectModel.from_dict(data)
         self.assertEqual(project.layer("BARS").get("Bars Setup/Bars/Bar Count"), 32)
-        self.assertEqual(set(l.module for l in project.layers), set(MODULES))
+        self.assertEqual(set(l.module for l in project.layers), set(DEFAULT_LAYER_ORDER))
         self.assertEqual(len(project.layer("BARS").values), len(defaults("BARS")))
 
     def test_layer_order_is_back_to_front(self):

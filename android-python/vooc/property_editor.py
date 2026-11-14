@@ -18,11 +18,15 @@ from kivy.uix.widget import Widget
 
 from . import m3
 from .m3 import T
-from .property_schema import MODULE_INFO, MODULES, SCHEMA, defaults
+from .property_schema import EFFECT_MODULES, MODULE_INFO, MODULES, SCHEMA, defaults
+
+from .fx_library import LIBRARY  # noqa: E402
 
 _ICONS = {"COMPOSITION": "studio", "IMAGE": "image", "TEXT": "text", "BARS": "bars", "PARTICLES": "sparkle",
           "AUDIOPROVIDER": "tune", "BLUREFFECT": "eye", "RGBSPLITEFFECT": "layers", "MOTIONBLUREFFECT": "next",
-          "MIRROREREFFECT": "copy", "CUSTOMSHADER": "more"}
+          "MIRROREREFFECT": "copy", "CUSTOMSHADER": "more", "WAVEFORM": "tune", "SHAPE": "studio"}
+for _name, _fx in LIBRARY.items():
+    _ICONS[_name] = _fx["icon"]
 FONTS = ["Roboto", "RobotoMono", "DejaVuSans"]
 VARS = "Variables/Variable Mappings/Mappings"
 BANDS = "Frequency Bands/Custom Bands/Bands"
@@ -41,6 +45,8 @@ def _action_icon(path):
 def pretty(name):
     special = {"AUDIOPROVIDER": "Audio Provider", "BLUREFFECT": "Blur Effect", "RGBSPLITEFFECT": "RGB Split",
                "MOTIONBLUREFFECT": "Motion Blur", "MIRROREREFFECT": "Mirrorer", "CUSTOMSHADER": "Custom Shader"}
+    if name in LIBRARY:
+        return LIBRARY[name]["title"]
     return special.get(name, name.title())
 
 
@@ -95,10 +101,23 @@ class AdvancedProperties(BoxLayout):
         head.add_widget(m3.lbl("%d modules - tap to edit" % len(MODULES), 12, T.on_var, halign="right"))
         self.add_widget(head)
         scroll = self._new_scroll()
-        grid = GridLayout(cols=2, spacing=dp(10), padding=(0, dp(2), 0, dp(12)), size_hint_y=None)
-        grid.bind(minimum_height=grid.setter("height"))
+        page = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6), padding=(0, 0, 0, dp(12)))
+        page.bind(minimum_height=page.setter("height"))
         self.first_tile = None
-        for name in MODULES:
+        core = [m for m in MODULES if m in ("COMPOSITION", "AUDIOPROVIDER")]
+        fx = [m for m in MODULES if m in EFFECT_MODULES]
+        layers = [m for m in MODULES if m not in core and m not in fx]
+        for group, names in (("Core", core), ("Layers", layers), ("Effects", fx)):
+            page.add_widget(m3.section(group, "%d" % len(names)))
+            grid = GridLayout(cols=2, spacing=dp(10), padding=(0, dp(2), 0, dp(6)), size_hint_y=None)
+            grid.bind(minimum_height=grid.setter("height"))
+            self._tiles(grid, names)
+            page.add_widget(grid)
+        scroll.add_widget(page)
+        self.add_widget(scroll)
+
+    def _tiles(self, grid, names):
+        for name in names:
             layer = self.project.layer(name)
             on = bool(layer.values.get("General/Layer/Visible", True))
             tile = m3.Tap(on_tap=lambda l=layer: self.open_layer(l), orientation="vertical", bg=T.surface2,
@@ -120,8 +139,6 @@ class AdvancedProperties(BoxLayout):
             grid.add_widget(tile)
             if self.first_tile is None:
                 self.first_tile = tile
-        scroll.add_widget(grid)
-        self.add_widget(scroll)
 
     def back(self):
         if self.on_back is not None:

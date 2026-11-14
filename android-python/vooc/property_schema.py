@@ -50,7 +50,7 @@ FONT_WEIGHTS = [str(w) for w in range(100, 1000, 100)]
 VARIABLE_TYPES = ["None", "Float", "Vector2", "Vector3", "Color"]
 
 # Order of the main-menu grid (exact names requested).
-MODULES = ["COMPOSITION", "TEXT", "BARS", "PARTICLES", "IMAGE", "AUDIOPROVIDER",
+MODULES = ["COMPOSITION", "TEXT", "BARS", "PARTICLES", "IMAGE", "WAVEFORM", "SHAPE", "AUDIOPROVIDER",
            "BLUREFFECT", "RGBSPLITEFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT",
            "CUSTOMSHADER"]
 
@@ -384,6 +384,80 @@ SCHEMA["PARTICLES"] = OD([
 
 SCHEMA["PARTICLES"]["General"]["Position"]["Position Y"] = slider(0.62)
 
+SHAPE_SOURCES = ["Nothing", "Beat", "Bass", "Mid", "Treble", "Volume", "Kick", "Snare", "HiHat"]
+SHAPE_TYPES = ["Rectangle", "Ellipse", "Line", "Polygon", "Star", "Path"]
+
+SCHEMA["WAVEFORM"] = OD([
+    ("General", general_category("Waveform")),
+    ("Waveform", OD([
+        ("Style", OD([
+            ("Style", dropdown(["Line", "Filled", "Dotted", "Bars"], "Line")),
+            ("Orientation", dropdown(["Horizontal", "Vertical"], "Horizontal")),
+            ("Mirror", check(False, help="Symmetric around the center line")),
+            ("Channel", dropdown(["Mono", "Left", "Right", "Stereo", "Side"], "Mono",
+                                 help="Stereo draws Left and Right in two lanes (needs Channel Mode = Stereo or Mid-Side)")),
+        ])),
+        ("Parameters", OD([
+            ("Thickness (dp)", slider(3, 1, 20, step=0.5)),
+            ("Amplitude", slider(1.0, 0.1, 5, step=0.01)),
+            ("Smoothing", slider(0.3, 0, 0.99, step=0.01, help="Temporal smoothing between frames")),
+            ("Scroll Speed", slider(0.0, 0, 5, step=0.01, help="0 = live oscilloscope; above 0 = scrolling envelope history")),
+            ("Window (samples)", dropdown(["256", "512", "1024", "2048", "4096", "8192"], "1024",
+                                          help="Oscilloscope window at the 8 kHz analysis rate")),
+            ("Points", slider(256, 32, 1024, step=1)),
+        ])),
+        ("Size", OD([
+            ("Width", slider(0.9, 0.05, 1)),
+            ("Height", slider(0.3, 0.02, 1)),
+        ])),
+        ("Color", OD([
+            ("Color Mode", dropdown(["Solid", "Gradient", "By Amplitude"], "Gradient")),
+            ("Color From", color("#C6FF00FF")),
+            ("Color To", color("#00E5FFFF")),
+        ])),
+    ])),
+])
+SCHEMA["WAVEFORM"]["General"]["Layer"]["Visible"] = check(False)
+
+SCHEMA["SHAPE"] = OD([
+    ("General", general_category("Shape")),
+    ("Shape", OD([
+        ("Geometry", OD([
+            ("Shape Type", dropdown(SHAPE_TYPES, "Ellipse")),
+            ("Width", slider(0.5, 0.01, 2)),
+            ("Height", slider(0.5, 0.01, 2)),
+            ("Corner Radius", slider(0.0, 0, 1, help="Rectangle only, fraction of the short side")),
+            ("Sides", slider(6, 3, 32, step=1)),
+            ("Star Points", slider(5, 3, 32, step=1)),
+            ("Inner Radius", slider(0.45, 0.05, 0.95)),
+            ("Line Angle", slider(0, -180, 180, step=1)),
+            ("SVG Path", text("M 0 0 L 100 0 L 50 86 Z", help="SVG path data: M L H V C Q Z (absolute or relative)")),
+        ])),
+        ("Fill", OD([
+            ("Fill Mode", dropdown(["Solid", "Linear Gradient", "Radial Gradient", "None"], "Solid")),
+            ("Fill Color", color("#C6FF0066")),
+            ("Fill Color 2", color("#00E5FF22")),
+            ("Gradient Angle", slider(90, 0, 360, step=1)),
+        ])),
+        ("Stroke", OD([
+            ("Stroke Color", color("#C6FF00FF")),
+            ("Stroke Width", slider(2, 0, 40, step=0.5)),
+            ("Dash Length", slider(0, 0, 60, step=0.5, help="0 = solid stroke")),
+            ("Dash Gap", slider(6, 0, 60, step=0.5)),
+        ])),
+        ("Animation", OD([
+            ("Spin (deg/s)", slider(0, -360, 360, step=1)),
+            ("Rotate On Beat (deg)", slider(0, -180, 180, step=1)),
+            ("Scale With", dropdown(SHAPE_SOURCES, "Bass")),
+            ("Scale Amount", slider(0.3, 0, 3)),
+            ("Morph To", dropdown(["None"] + SHAPE_TYPES[:-1], "None")),
+            ("Morph Amount", slider(0.0)),
+            ("Morph With", dropdown(SHAPE_SOURCES, "Nothing", help="Audio pushes the morph further")),
+        ])),
+    ])),
+])
+SCHEMA["SHAPE"]["General"]["Layer"]["Visible"] = check(False)
+
 SCHEMA["AUDIOPROVIDER"] = OD([
     ("General", OD([
         ("Routing", OD([
@@ -616,6 +690,54 @@ SCHEMA["CUSTOMSHADER"] = OD([
 SCHEMA["CUSTOMSHADER"]["General"]["Layer"]["Visible"] = check(False)
 
 
+# ---------------------------------------------------------------- dedicated effects (spec 2.8)
+from .fx_library import LIBRARY as FX_LIBRARY, ORDER as FX_ORDER, REACT_SOURCES, SCOPES  # noqa: E402
+
+
+def effect_stack_category():
+    """Shared by every effect module: mix, scope and audio reactivity."""
+    return OD([
+        ("Mix", OD([
+            ("Effect Mix", slider(1.0, help="0 = effect off, 1 = full effect (dry/wet)")),
+            ("Scope", dropdown(SCOPES, "All Layers Below",
+                               help="All Layers Below = global effect on everything under it; "
+                                    "Layer Directly Below = applied to that one layer before compositing")),
+        ])),
+        ("Audio Reactivity", OD([
+            ("React To", dropdown(REACT_SOURCES, "Nothing", help="Boosts the effect's main parameter")),
+            ("React Amount", slider(1.0, 0, 4)),
+        ])),
+    ])
+
+
+def _fx_field(param):
+    label, _uni, kind, default = param[:4]
+    if kind == "f":
+        return slider(default, param[4], param[5], step=param[6])
+    if kind == "i":
+        return slider(default, param[4], param[5], step=1)
+    if kind == "b":
+        return check(default)
+    if kind == "c":
+        return color(default)
+    return dropdown(param[6], default)
+
+
+for _name in FX_ORDER:
+    _fx = FX_LIBRARY[_name]
+    SCHEMA[_name] = OD([
+        ("General", general_category(_fx["title"])),
+        ("Effect Settings", OD([("Parameters", OD((p[0], _fx_field(p)) for p in _fx["params"]))])),
+        ("Effect Stack", effect_stack_category()),
+    ])
+    SCHEMA[_name]["General"]["Layer"]["Visible"] = check(False)
+    MODULES.append(_name)
+    EFFECT_MODULES.append(_name)
+
+for _name in ("BLUREFFECT", "RGBSPLITEFFECT", "MOTIONBLUREFFECT", "MIRROREREFFECT", "CUSTOMSHADER"):
+    SCHEMA[_name]["Effect Stack"] = effect_stack_category()
+
+
 # ---------------------------------------------------------------- module info
 MODULE_INFO = {
     "COMPOSITION": "Master canvas. Its General transform moves every layer together. Render Settings set the internal render resolution (and aspect ratio), FPS limit, background color and whether the canvas is cleared every frame (turn off for trails).",
@@ -628,6 +750,10 @@ MODULE_INFO = {
     "RGBSPLITEFFECT": "Separates the red, green and blue channels for a glitch look. Can spike on every beat.",
     "MOTIONBLUREFFECT": "Stretches the image in the direction of movement. Faster movement means more blur. Relative mode uses per-frame movement.",
     "MIRROREREFFECT": "Horizontal/Vertical takes half of the image and flips it onto the other half. Flip Mirror swaps the copied side. Kaleidoscope creates radial symmetry.",
+    **{name: FX_LIBRARY[name]["info"] + " Effect Stack: dry/wet mix, global or single-layer scope, audio reactivity."
+       for name in FX_ORDER},
+    "WAVEFORM": "Draws the real decoded waveform of the playing track: line, filled area, dots or bars, horizontal or vertical, mirrored, per channel, as a live oscilloscope or a scrolling envelope.",
+    "SHAPE": "Vector shape: rectangle (rounded), ellipse, line, polygon, star or SVG path. Solid / gradient fill, dashed stroke, spin, rotate on beat, scale with a band, morph into another shape.",
     "CUSTOMSHADER": "Your own GLSL fragment shader, compiled on the GPU and applied to the scene. Declared variables get sliders/color pickers and are sent to the shader as uniforms every frame.",
 }
 

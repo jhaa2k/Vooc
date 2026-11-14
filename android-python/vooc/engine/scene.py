@@ -21,6 +21,7 @@ from ..model import hex_to_rgba
 from ..property_schema import EFFECT_MODULES
 from .effects import PASSES
 from .layers import RENDERERS, LayerTransform
+from . import vector_layers  # noqa: F401  (registers WAVEFORM / SHAPE renderers)
 
 MAX_RENDER_SIDE = 1280      # preview cap; keeps phones smooth at 60 fps
 C = "Render Settings/"
@@ -32,11 +33,34 @@ class Frame:
                  "position", "duration", "playing")
 
 
+class CompositePass:
+    """Puts an effect's output (scope = Layer Directly Below) back over the layers beneath it."""
+
+    def __init__(self, size, below, top):
+        self.size = size
+        self.fbo = Fbo(size=size, with_stencilbuffer=False)
+        with self.fbo:
+            ClearColor(0, 0, 0, 0)
+            ClearBuffers()
+            Color(1, 1, 1, 1)
+            self.below = Rectangle(size=size, pos=(0, 0), texture=below)
+            Color(1, 1, 1, 1)
+            self.top = Rectangle(size=size, pos=(0, 0), texture=top)
+
+    @property
+    def texture(self):
+        return self.fbo.texture
+
+    def update(self, frame):
+        self.fbo.ask_update()
+
+
 class LayersPass:
-    def __init__(self, size, layers, clear_color, first, clear_each_frame):
+    def __init__(self, size, layers, clear_color, first, clear_each_frame, isolated=False):
         self.fbo = Fbo(size=size, with_stencilbuffer=False)
         self.size = size
         self.first = first
+        self.isolated = isolated        # renders one layer alone on transparent (per-layer effect scope)
         with self.fbo:
             self.clear_color = ClearColor(*clear_color)
             if clear_each_frame or not first:
@@ -153,7 +177,8 @@ class SceneView(Widget):
 
     def _compute_signature(self):
         comp = self.project.layer("COMPOSITION")
-        layers = tuple((l.id, l.module) for l in self.project.layers if self._visible(l))
+        layers = tuple((l.id, l.module, l.values.get("Effect Stack/Mix/Scope")) for l in self.project.layers
+                       if self._visible(l))
         return (layers, self.render_size(), self.perf.get("heavy_blur", True), comp.get(C + "Canvas/Clear Canvas on Frame"),
                 comp.get("General/Layer/Visible"))
 
@@ -189,6 +214,8 @@ class SceneView(Widget):
 
         for layer in visible:
             if layer.module in EFFECT_MODULES:
+                single = layer.values.get("Effect Stack/Mix/Scope") == "Layer Directly Below" and pending
+                target = pending.pop() if single else None
                 if pending or not self.passes:
                     flush()
                 fx = old_effects.get(layer.id)
@@ -197,6 +224,18 @@ class SceneView(Widget):
                     if fx.error:
                         self.shader_errors[layer.id] = fx.error
                 self.effects[layer.id] = fx
+                if target is not None:
+                    below = self.passes[-1].texture
+                    iso = LayersPass(size, [target], (0, 0, 0, 0), False, True, isolated=True)
+                    self.passes.append(iso)
+                    self.pipeline.add(iso.fbo)
+                    fx.set_input(iso.texture)
+                    self.passes.append(fx)
+                    self.pipeline.add(fx.fbo)
+                    comp_pass = CompositePass(size, below, fx.texture)
+                    self.passes.append(comp_pass)
+                    self.pipeline.add(comp_pass.fbo)
+                    continue
                 fx.set_input(self.passes[-1].texture)
                 self.passes.append(fx)
                 self.pipeline.add(fx.fbo)
@@ -302,6 +341,8 @@ class SceneView(Widget):
                 p.bg.texture = None
                 # without clearing, a translucent background fades old frames -> trails
                 p.bg_color.rgba = bg if clear_each else bg[:3] + [0.12]
+            elif p.isolated:
+                p.bg_color.rgba = (0, 0, 0, 0)
             else:
                 p.bg_color.rgba = (1, 1, 1, 1)
         self.display_color.a = comp.get(C + "Canvas/Alpha / Transparency")

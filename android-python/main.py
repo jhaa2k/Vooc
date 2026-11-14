@@ -32,6 +32,7 @@ try:
                                 BUILTINS as BUILTIN_TEMPLATES)
     from vooc.palettes import BUILTIN as PALETTE_BUILTIN, METHODS as PALETTE_METHODS, apply_palette, extract_palette, extract_colors, export_palettes, import_palettes, unique_name
     from vooc.media_meta import read_metadata
+    from vooc import library as LIB, perf as PERF
     from vooc.exporter import (Exporter, plan_export, frame_size, RESOLUTIONS, FPS_OPTIONS, ASPECTS, CODECS,
                                QUALITY, PROFILES, COLOR_MATRIX, B_FRAMES, KEYFRAMES, NAME_TOKENS, DEFAULT_PATTERN,
                                output_name, encoder_available)
@@ -201,6 +202,13 @@ class VoocRoot(FloatLayout):
         if system_insets() is None:
             Clock.schedule_once(self._retry_insets, 0.5)
         Clock.schedule_interval(self.tick, 1 / 15.0)
+        self._tuner = PERF.AutoTuner()
+        Clock.schedule_interval(self._auto_perf, 1.0)
+        if "preset_init" not in self.s.perf:
+            self.s.perf["preset_init"] = True
+            tier = PERF.ram_tier(PERF.device_ram())
+            if tier in ("Low", "Medium"):
+                Clock.schedule_once(lambda *_: self.apply_perf_preset(tier), 0)
         Clock.schedule_interval(self._smoke_autoload, 1.0)
         if Window is not None:
             Window.bind(on_keyboard=self._on_key)
@@ -467,6 +475,7 @@ class VoocRoot(FloatLayout):
         actions.add_widget(m3.Button3("Clear", self.clear_playlist, kind="outlined", icon="delete", height=dp(48),
                                       size_hint_x=.6))
         col.add_widget(actions)
+        sc = self.s.scene
         col.add_widget(m3.section("Playlist", "%d tracks" % len(self.s.playlist)))
         if not self.s.playlist:
             empty = m3.card(bg=T.surface1)
@@ -474,7 +483,56 @@ class VoocRoot(FloatLayout):
             empty.add_widget(m3.lbl("MP3, M4A, AAC, FLAC, OGG, OPUS and WAV are supported.", 11, T.on_var,
                                     size_hint_y=None, height=dp(20)))
             col.add_widget(empty)
-        for path in self.s.playlist:
+            return
+        tools = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
+        tools.add_widget(m3.text_field(sc.get("lib_query", ""), self._lib_query, hint="Search title, artist, file"))
+        tools.add_widget(m3.SelectField("Sort by", LIB.SORTS, sc.get("lib_sort", LIB.SORTS[0]),
+                                        lambda v: self._lib_set("lib_sort", v), size_hint_x=.62))
+        col.add_widget(tools)
+        chips = LIB.chips(self.s.playlist)
+        chip = sc.get("lib_chip", "All")
+        if chip not in chips:
+            chip = "All"
+        col.add_widget(m3.ChipGroup(chips, chip, lambda v: self._lib_set("lib_chip", v)))
+        self.lib_list = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(10))
+        self.lib_list.bind(minimum_height=self.lib_list.setter("height"))
+        col.add_widget(self.lib_list)
+        self._fill_library()
+
+    def _lib_meta(self):
+        return self.s.scene.setdefault("lib_meta", {})
+
+    def _lib_query(self, text):
+        self.s.scene["lib_query"] = text
+        self._fill_library()
+
+    def _lib_set(self, key, value):
+        self.s.scene[key] = value
+        self._save_trigger()
+        self._fill_library()
+
+    def toggle_track_favorite(self, path):
+        favs = self.s.scene.setdefault("lib_favs", [])
+        if path in favs:
+            favs.remove(path)
+        else:
+            favs.append(path)
+        self._save_trigger()
+        self._fill_library()
+
+    def _fill_library(self):
+        box = getattr(self, "lib_list", None)
+        if box is None:
+            return
+        box.clear_widgets()
+        sc = self.s.scene
+        favs = sc.get("lib_favs") or []
+        meta = self._lib_meta()
+        paths = LIB.view(self.s.playlist, sc.get("lib_query", ""), sc.get("lib_sort", LIB.SORTS[0]),
+                         sc.get("lib_chip", "All"), favs, meta)
+        if not paths:
+            box.add_widget(m3.lbl("No tracks match.", 13, T.on_var, size_hint_y=None, height=dp(40), halign="center"))
+        for path in paths:
             on = path == self.track
             tile = m3.Tap(on_tap=lambda p=path: self.load_track(p, autoplay=True), size_hint_y=None, height=dp(60),
                           radius=dp(18), bg=T.secondary_container if on else T.surface1, padding=(dp(12), 0), spacing=dp(12))
@@ -484,15 +542,19 @@ class VoocRoot(FloatLayout):
             wrap.add_widget(badge)
             tile.add_widget(wrap)
             info = BoxLayout(orientation="vertical", padding=(0, dp(10)))
-            title = (self.meta.get("title") if on and self.meta.get("title") else Path(path).stem)
+            title = (self.meta.get("title") if on and self.meta.get("title") else LIB.title_of(path, meta))
             info.add_widget(m3.lbl(title, 14, T.on_secondary_container if on else T.on_surface, bold=on))
-            sub = Path(path).suffix.upper().lstrip(".")
-            if on and self.meta.get("artist"):
-                sub = self.meta["artist"] + "  -  " + sub
+            sub = LIB.ext_of(path)
+            artist = self.meta.get("artist") if on and self.meta.get("artist") else LIB.artist_of(path, meta)
+            if artist:
+                sub = artist + "  -  " + sub
             info.add_widget(m3.lbl(sub + ("  -  now playing" if on else ""), 11, T.on_var))
             tile.add_widget(info)
+            fav = path in favs
+            tile.add_widget(m3.IconBtn("star_on" if fav else "star", lambda p=path: self.toggle_track_favorite(p),
+                                       size=dp(40), tint=T.primary if fav else None))
             tile.add_widget(m3.IconBtn("close", lambda p=path: self.remove_track(p), size=dp(40)))
-            col.add_widget(tile)
+            box.add_widget(tile)
 
     # ---------------------------------------------------------------- visual (quick look editor)
     def _engine_changed(self, layer=None):
@@ -1384,6 +1446,10 @@ class VoocRoot(FloatLayout):
         else:
             self.project.layers.remove(l)
             self.selected_layer = None
+            self._engine_changed(l)
+            self.show("layers")
+            self.toast_undo("Deleted %s" % pretty_module(l.module))
+            return
         self._engine_changed(l)
         self.show("layers")
 
@@ -1452,6 +1518,13 @@ class VoocRoot(FloatLayout):
         p = m3.card(spacing=dp(2))
         self.fps_lbl = m3.lbl("Preview: %d fps" % round(self.scene.fps), 12, T.primary, size_hint_y=None, height=dp(22))
         p.add_widget(self.fps_lbl)
+        p.add_widget(m3.lbl("Preset  (suggested for this device: %s)" % PERF.ram_tier(PERF.device_ram()), 12, T.on_var,
+                            size_hint_y=None, height=dp(20)))
+        p.add_widget(m3.Segmented(PERF.PRESET_NAMES + (["Custom"] if PERF.match(perf) == "Custom" else []),
+                                  PERF.match(perf), self.apply_perf_preset))
+        p.add_widget(m3.switch_row("Auto lower quality", bool(perf.get("auto", True)),
+                                   lambda on: self._set_perf_flag("auto", bool(on)),
+                                   "Steps down a preset when the preview keeps dropping frames"))
         p.add_widget(m3.lbl("Preview frame rate cap", 12, T.on_var, size_hint_y=None, height=dp(20)))
         p.add_widget(m3.ChipGroup(["24", "30", "45", "60"], str(perf.get("preview_fps", 60)),
                                   lambda v: self._set_perf("preview_fps", int(v))))
@@ -1497,6 +1570,33 @@ class VoocRoot(FloatLayout):
         col.add_widget(a)
         col.add_widget(m3.section("Background theme (canvas)"))
         col.add_widget(m3.SelectField("Background theme", list(THEMES), self.s.scene.get("theme", "Acid Night"), self._set_bg_theme))
+
+    def apply_perf_preset(self, name, toast=False):
+        if name not in PERF.PRESETS:
+            return
+        values = dict(PERF.PRESETS[name])
+        self.s.perf.update(values)
+        self.scene.set_perf(**values)
+        self._save_trigger()
+        if toast:
+            self.toast("Preview quality lowered to %s to keep it smooth" % name)
+        if self.page == "studio" and getattr(self, "studio_tab", "") == "Scene":
+            self._studio_tab("Scene")
+
+    def _set_perf_flag(self, key, value):
+        self.s.perf[key] = value
+        self._save_trigger()
+
+    def _auto_perf(self, *_):
+        perf = self.s.perf
+        if not perf.get("auto", True) or not self.playing or self.export_state.get("running"):
+            return
+        cur = PERF.match({k: perf.get(k) for k in PERF.PRESETS["High"]})
+        if cur == "Custom":
+            return
+        nxt = self._tuner.feed(self.scene.fps, float(perf.get("preview_fps", 60)), cur)
+        if nxt:
+            self.apply_perf_preset(nxt, toast=True)
 
     def _set_perf(self, key, value):
         self.s.perf[key] = value
@@ -1853,8 +1953,13 @@ class VoocRoot(FloatLayout):
     def toggle_theme(self):
         self.set_ui_theme(ui_mode="Light" if T.dark else "Dark")
 
-    def toast(self, text):
-        m3.Snackbar.show(text, self)
+    def toast(self, text, action=None, on_action=None):
+        m3.Snackbar.show(text, self, action, on_action)
+
+    def toast_undo(self, text):
+        """Snackbar with an Undo button that rolls back the last project change."""
+        self.autosave()
+        self.toast(text, "Undo", self.undo)
 
     def _on_key(self, _win, key, *_):
         if key == 27:
@@ -1938,6 +2043,8 @@ class VoocRoot(FloatLayout):
         self.meta.clear()
         self.meta.update(meta)
         self.meta["path"] = path
+        if meta.get("title") or meta.get("artist"):
+            self._lib_meta()[path] = {"title": meta.get("title") or "", "artist": meta.get("artist") or ""}
         if meta.get("art") and self.s.look.get("auto_palette", True):
             self.palette_from_art(quiet=True)
 
@@ -2056,18 +2163,36 @@ class VoocRoot(FloatLayout):
         self.toast({"off": "Repeat off", "all": "Repeat all", "one": "Repeat one"}[self.s.repeat])
 
     def remove_track(self, path):
-        if path in self.s.playlist:
-            self.s.playlist.remove(path)
+        if path not in self.s.playlist:
+            return
+        index = self.s.playlist.index(path)
+        self.s.playlist.remove(path)
         if path == self.track:
             self.stop()
         self.show("library")
         self._save_trigger()
 
+        def restore():
+            if path not in self.s.playlist:
+                self.s.playlist.insert(min(index, len(self.s.playlist)), path)
+                self.show("library")
+                self._save_trigger()
+        self.toast("Removed %s" % Path(path).stem, "Undo", restore)
+
     def clear_playlist(self):
+        old = list(self.s.playlist)
+        if not old:
+            return
         self.stop()
         self.s.playlist = []
         self.show("library")
         self._save_trigger()
+
+        def restore():
+            self.s.playlist = old + [p for p in self.s.playlist if p not in old]
+            self.show("library")
+            self._save_trigger()
+        self.toast("Cleared %d tracks" % len(old), "Undo", restore)
 
     def _native_error(self, message):
         Clock.schedule_once(lambda _dt: self.toast(message), 0)

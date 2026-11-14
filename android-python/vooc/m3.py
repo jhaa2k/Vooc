@@ -1330,15 +1330,29 @@ class Snackbar:
     _current = None
 
     @classmethod
-    def show(cls, text, parent):
+    def show(cls, text, parent, action=None, on_action=None):
+        """``action`` adds a text button (e.g. "Undo"); the bar then stays 5 s."""
         if cls._current is not None and cls._current.parent:
             cls._current.parent.remove_widget(cls._current)
-        bar = Box(bg=T.on_surface, radius=dp(10), padding=(dp(16), 0), size_hint=(None, None),
+        bar = Box(bg=T.on_surface, radius=dp(10), padding=(dp(16), 0, dp(6), 0), size_hint=(None, None),
                   height=dp(48), width=parent.width - dp(32), pos=(parent.x + dp(16), parent.y + dp(84)))
         bar.add_widget(lbl(text, 13, T.surface, shorten=True))
+        if action and on_action:
+            btn = Tap(radius=dp(18), size_hint=(None, None), size=(dp(76), dp(36)), padding=(dp(8), 0))
+            btn.add_widget(lbl(action, 14, T.inverse_primary if hasattr(T, "inverse_primary") else T.primary_container,
+                               bold=True, halign="center"))
+            wrap = BoxLayout(size_hint_x=None, width=dp(80), padding=(0, dp(6)))
+            wrap.add_widget(btn)
+
+            def act(*_):
+                if bar.parent:
+                    bar.parent.remove_widget(bar)
+                on_action()
+            btn.bind(on_release=act)
+            bar.add_widget(wrap)
         bar.opacity = 0
         parent.add_widget(bar)
         cls._current = bar
-        anim = Animation(opacity=1, d=0.15) + Animation(d=2.4) + Animation(opacity=0, d=0.3)
+        anim = Animation(opacity=1, d=0.15) + Animation(d=5.0 if action else 2.4) + Animation(opacity=0, d=0.3)
         anim.bind(on_complete=lambda *_: bar.parent and bar.parent.remove_widget(bar))
         anim.start(bar)

@@ -1514,7 +1514,7 @@ class VoocRoot(FloatLayout):
                                    "Off = motion trails"))
         col.add_widget(c)
         perf = self.s.perf
-        col.add_widget(m3.section("Performance", "preview only, export is always full quality"))
+        col.add_widget(m3.section("Performance", "preview only"))
         p = m3.card(spacing=dp(2))
         self.fps_lbl = m3.lbl("Preview: %d fps" % round(self.scene.fps), 12, T.primary, size_hint_y=None, height=dp(22))
         p.add_widget(self.fps_lbl)
@@ -1524,7 +1524,7 @@ class VoocRoot(FloatLayout):
                                   PERF.match(perf), self.apply_perf_preset))
         p.add_widget(m3.switch_row("Auto lower quality", bool(perf.get("auto", True)),
                                    lambda on: self._set_perf_flag("auto", bool(on)),
-                                   "Steps down a preset when the preview keeps dropping frames"))
+                                   "Steps down when frames drop"))
         p.add_widget(m3.lbl("Preview frame rate cap", 12, T.on_var, size_hint_y=None, height=dp(20)))
         p.add_widget(m3.ChipGroup(["24", "30", "45", "60"], str(perf.get("preview_fps", 60)),
                                   lambda v: self._set_perf("preview_fps", int(v))))
@@ -1770,7 +1770,9 @@ class VoocRoot(FloatLayout):
             self.plan_lbl.text = "Load a track to see the export size."
             return
         plan = plan_export(self.s.export, dur, available=encoder_available)
-        name = output_name(self.s.export.get("pattern"), self.meta, plan, self.s.look.get("template", "")) + plan["ext"]
+        meta = dict(self.meta, title=self.meta.get("title") or (Path(self.track).stem if self.track else ""))
+        name = output_name(self.s.export.get("pattern"), meta, plan, self.s.look.get("template", ""),
+                           len(self.s.export.get("history") or []) + 1) + plan["ext"]
         text = "%dx%d  %d fps  %s  %.1f Mbps\nAbout %s for %s\n%s" % (
             plan["width"], plan["height"], plan["fps"], plan["codec"], plan["bitrate"] / 1e6,
             _fmt_size(plan["estimate_bytes"]), fmt_time(plan["duration"]), name)
@@ -1893,7 +1895,7 @@ class VoocRoot(FloatLayout):
         self.export_state = {"running": False, "progress": 1.0 if ok else 0.0, "text": "", "queue": queue,
                              "advanced": self.export_state.get("advanced"),
                              "result": result or ("Export failed" if not ok else "Done")}
-        self.toast(self.export_state["result"][:90])
+        self.toast(("Saved " + entry["name"]) if entry["ok"] else self.export_state["result"][:60])
         if queue and ok:
             Clock.schedule_once(lambda *_: self.run_queue(), 0.5)
         if self.page == "studio" and self.studio_tab == "Export":

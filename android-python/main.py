@@ -162,6 +162,7 @@ class VoocRoot(FloatLayout):
         self.page = "library"
         self.studio_tab = "Properties"
         self._accordion_state = {}
+        self._accordion_widgets = {}
         self._scroll_positions = {}
         self._active_scroll = None
         self._active_scroll_key = "library"
@@ -415,6 +416,15 @@ class VoocRoot(FloatLayout):
         if scroll is not None and key:
             self._scroll_positions[key] = float(scroll.scroll_y)
 
+    def _attach_scroll_tracking(self, scroll, key):
+        self._active_scroll, self._active_scroll_key = scroll, key
+        scroll.bind(scroll_y=lambda _obj, value, k=key: self._scroll_positions.__setitem__(k, float(value)))
+        saved = self._scroll_positions.get(key, 1.0)
+        # Restore after ScrollView has completed layout; a zero-delay callback
+        # can run before the content height is known and be discarded.
+        Clock.schedule_once(lambda _dt, s=scroll, v=saved: setattr(s, "scroll_y", v), 0.08)
+        Clock.schedule_once(lambda _dt, s=scroll, v=saved: setattr(s, "scroll_y", v), 0.24)
+
     def _compact_sections(self, col, page_key):
         """Compact single-open accordion for every top-level editor category."""
         original = list(reversed(col.children))
@@ -432,6 +442,7 @@ class VoocRoot(FloatLayout):
         if current is not None:
             groups.append(current)
         col.clear_widgets()
+        self._accordion_widgets[page_key] = {}
         for source, children in groups:
             if source is None:
                 for child in children:
@@ -450,8 +461,8 @@ class VoocRoot(FloatLayout):
                              padding=(dp(4), dp(4), dp(4), dp(5)))
             for child in children:
                 body.add_widget(child)
-            def update(*_args, p=panel, b=body, h=header, a=arrow, k=title):
-                opened = self._accordion_state.get(page_key) == k
+            def update(*_args, p=panel, b=body, h=header, a=arrow, k=title, pk=page_key):
+                opened = self._accordion_state.get(pk) == k
                 b.height = b.minimum_height if opened else 0
                 b.opacity = 1 if opened else 0
                 p.height = h.height + b.height
@@ -459,16 +470,21 @@ class VoocRoot(FloatLayout):
             body.bind(minimum_height=update)
             panel.add_widget(header)
             panel.add_widget(body)
+            self._accordion_widgets[page_key][title] = (panel, body, header, arrow)
             update()
             header.bind(on_release=lambda *_args, k=title, pk=page_key: self._toggle_accordion(pk, k))
             col.add_widget(panel)
 
     def _toggle_accordion(self, page_key, key):
-        self._accordion_state[page_key] = None if self._accordion_state.get(page_key) == key else key
-        if page_key.startswith("studio:"):
-            self._studio_tab(page_key.split(":", 1)[1])
-        else:
-            self.show(page_key)
+        opened = self._accordion_state.get(page_key) != key
+        self._accordion_state[page_key] = key if opened else None
+        # Update existing panels in place; do not rebuild the scrolled page.
+        for section, (panel, body, header, arrow) in self._accordion_widgets.get(page_key, {}).items():
+            is_open = opened and section == key
+            body.height = body.minimum_height if is_open else 0
+            body.opacity = 1 if is_open else 0
+            panel.height = header.height + body.height
+            arrow.name = "up" if is_open else "down"
 
     def show(self, page):
         self._remember_scroll()
@@ -484,10 +500,9 @@ class VoocRoot(FloatLayout):
         col.bind(minimum_height=col.setter("height"))
         builder(col)
         self._compact_sections(col, page)
-        self._active_scroll, self._active_scroll_key = scroll, page
+        self._attach_scroll_tracking(scroll, page)
         scroll.add_widget(col)
         self.body.add_widget(scroll)
-        Clock.schedule_once(lambda _dt, s=scroll, k=page: setattr(s, "scroll_y", self._scroll_positions.get(k, 1.0)), 0)
 
     def _smoke_autoload(self, *_):
         """Emulator smoke test hook: play files/smoke_track.* directly (the
@@ -1571,10 +1586,9 @@ class VoocRoot(FloatLayout):
             self._export_tab(col)
         key = "studio:" + tab
         self._compact_sections(col, key)
-        self._active_scroll, self._active_scroll_key = scroll, key
+        self._attach_scroll_tracking(scroll, key)
         scroll.add_widget(col)
         self.studio_body.add_widget(scroll)
-        Clock.schedule_once(lambda _dt, s=scroll, k=key: setattr(s, "scroll_y", self._scroll_positions.get(k, 1.0)), 0)
 
     def set_aspect(self, aspect):
         self.s.export["aspect"] = aspect

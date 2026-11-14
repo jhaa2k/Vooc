@@ -2294,6 +2294,8 @@ class VoocRoot(FloatLayout):
             print("Vooc media notification update failed: %s" % exc)
 
     def _handle_media_session_action(self):
+        if self.native is None or not self.track:
+            return
         try:
             from jnius import autoclass
             action = str(autoclass("com.jhaa2k.vooc.VoocMediaSession").consumeAction() or "")

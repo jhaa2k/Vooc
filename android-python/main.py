@@ -190,6 +190,10 @@ class VoocRoot(FloatLayout):
                                      scheduler=lambda fn: Clock.schedule_once(lambda _dt: fn(), 0))
         self._save_trigger = Clock.create_trigger(lambda _dt: self.autosave(), 1.0)
         self._reanalyse_trigger = Clock.create_trigger(lambda _dt: self.reanalyse(), 0.8)
+        m3.RECENT_COLORS[:] = [c for c in (self.s.scene.get("recent_colors") or []) if isinstance(c, str)][:20]
+        m3.COLOR_HOOKS["recent_changed"] = lambda cols: (self.s.scene.__setitem__("recent_colors", cols),
+                                                          self._save_trigger())
+        m3.COLOR_HOOKS["eyedropper"] = self.eyedropper
         self.insets = system_insets() or (0, 0)
         self.build_ui()
         if system_insets() is None:
@@ -1770,6 +1774,44 @@ class VoocRoot(FloatLayout):
                 self.s.playlist = [x for x in self.s.playlist if os.path.exists(x)]
         except Exception as exc:
             print("Vooc autoload failed: %s" % exc)
+
+    # ---------------------------------------------------------------- eyedropper
+    def pixel_at(self, wx, wy):
+        """#RRGGBBAA of the rendered frame under window point (wx, wy), or None outside the preview."""
+        d = self.scene.display
+        if not self.scene.passes or d.size[0] <= 0:
+            return None
+        sx, sy = self.scene.to_window(*d.pos)
+        u, v = (wx - sx) / d.size[0], (wy - sy) / d.size[1]
+        if not (0 <= u <= 1 and 0 <= v <= 1):
+            return None
+        rw, rh = self.scene.passes[-1].size
+        x, y = min(rw - 1, int(u * rw)), min(rh - 1, int(v * rh))
+        px = self.scene.pixels()
+        i = (y * rw + x) * 4                 # fbo pixels are bottom-up like window coords
+        r, g, b = px[i], px[i + 1], px[i + 2]
+        return "#%02X%02X%02XFF" % (r, g, b)
+
+    def eyedropper(self, done):
+        from kivy.uix.modalview import ModalView
+        self.show("visual")
+        view = ModalView(background="", background_color=(0, 0, 0, 0), overlay_color=(0, 0, 0, 0.05),
+                         auto_dismiss=False)
+        hint = m3.Box(bg=T.surface2, radius=dp(16), padding=(dp(14), 0), size_hint=(None, None),
+                      height=dp(44), width=dp(300), pos_hint={"center_x": .5, "top": .99})
+        hint.add_widget(m3.lbl("Tap the preview to pick a color", 13))
+        layer = FloatLayout()
+        layer.add_widget(hint)
+        view.add_widget(layer)
+
+        def touch(_w, t):
+            if hint.collide_point(*t.pos):
+                return True
+            view.dismiss()
+            Clock.schedule_once(lambda _dt: done(self.pixel_at(*t.pos)), 0)
+            return True
+        view.bind(on_touch_down=touch)
+        view.open()
 
     # ---------------------------------------------------------------- undo / redo
     def _sync_history_btns(self):

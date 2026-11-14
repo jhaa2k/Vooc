@@ -278,6 +278,11 @@ class Icon(Widget):
         Line(circle=(cx, cy, s * .45, 60, 360), width=w)
         Triangle(points=[cx + s * .22, cy + s * .62, cx + s * .52, cy + s * .3, cx + s * .12, cy + s * .25])
 
+    def _i_eyedropper(self, cx, cy, s, w):
+        Line(points=[cx - s * .55, cy - s * .55, cx + s * .15, cy + s * .15], width=w * 1.2, cap="round")
+        Line(points=[cx + s * .02, cy + s * .42, cx + s * .42, cy + s * .02], width=w * 1.6, cap="round")
+        Ellipse(pos=(cx + s * .18, cy + s * .18), size=(s * .42, s * .42))
+
     def _i_undo(self, cx, cy, s, w):
         Line(circle=(cx, cy - s * .05, s * .45, -80, 160), width=w)
         Triangle(points=[cx - s * .62, cy + s * .02, cx - s * .2, cy + s * .02, cx - s * .41, cy + s * .42])
@@ -847,33 +852,89 @@ def _parse_hex(value, fallback=(1, 1, 1, 1)):
     return None if fallback is None else list(fallback)
 
 
-def color_dialog(title, value, on_value, default=None, swatches=None):
-    """Manual color picker: hue / saturation / brightness / alpha sliders, hex input and
-    palette swatches. Every movement calls ``on_value`` (#RRGGBBAA) so the preview is live."""
+RECENT_COLORS = []          # most recent first (#RRGGBBAA), max 20; the app persists it
+COLOR_HOOKS = {"eyedropper": None, "recent_changed": None}
+COLOR_MODE = {"mode": "HSV"}
+
+
+def remember_color(hex8):
+    hex8 = hex8.upper()
+    if hex8 in RECENT_COLORS:
+        RECENT_COLORS.remove(hex8)
+    RECENT_COLORS.insert(0, hex8)
+    del RECENT_COLORS[20:]
+    cb = COLOR_HOOKS.get("recent_changed")
+    if cb:
+        cb(list(RECENT_COLORS))
+
+
+def _swatch_line(colors, pick, height=dp(30)):
+    line = BoxLayout(size_hint_y=None, height=height, spacing=dp(5))
+    for c in colors:
+        rgba = _parse_hex(c)
+        line.add_widget(Tap(on_tap=lambda c_=rgba: pick(c_), bg=rgba, radius=height / 2, line=T.outline))
+    return line
+
+
+def color_dialog(title, value, on_value, default=None, swatches=None, _start=None):
+    """Color picker: HSV / RGB / HSL slider modes, hex input, alpha, palette swatches,
+    20 recent colors and an eyedropper (picks from the live preview). Every change calls
+    ``on_value`` (#RRGGBBAA) so the preview is live."""
     import colorsys
     from kivy.core.window import Window
-    start = _parse_hex(value)
-    h, s_, v_ = colorsys.rgb_to_hsv(*start[:3])
-    state = {"h": h, "s": s_, "v": v_, "a": start[3], "busy": False}
+    start = _parse_hex(_start if _start is not None else value)
+    state = {"rgba": list(_parse_hex(value)), "busy": False}
     sheet = Sheet(title)
-    sheet.height = min(Window.height * 0.85, dp(300) + 4 * dp(54) + (dp(42) if swatches else 0))
-    top = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(10))
-    sw = Box(bg=list(start), radius=dp(12), line=T.outline, size_hint_x=None, width=dp(64))
-    ti = TextInput(text=_hex8(start), multiline=False, size_hint_y=None, height=dp(46),
+    recent = RECENT_COLORS[:20]
+    extra = (dp(40) if swatches else 0) + (dp(26) + dp(34) * (1 + (len(recent) > 10)) if recent else 0)
+    sheet.height = min(Window.height * 0.9, dp(372) + 4 * dp(54) + extra)
+    scroll = ScrollView(do_scroll_x=False)
+    body = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
+    body.bind(minimum_height=body.setter("height"))
+    scroll.add_widget(body)
+    top = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
+    sw = Box(bg=list(state["rgba"]), radius=dp(12), line=T.outline, size_hint_x=None, width=dp(56))
+    ti = TextInput(text=_hex8(state["rgba"]), multiline=False, size_hint_y=None, height=dp(46),
                    background_normal="", background_active="", background_color=T.surface3,
                    foreground_color=T.on_surface, cursor_color=T.primary, font_size=sp(16),
                    padding=(dp(14), dp(12)))
     top.add_widget(sw)
     top.add_widget(ti)
-    sheet.box.add_widget(top)
-    rows = {}
+    if COLOR_HOOKS.get("eyedropper"):
+        def dropper():
+            sheet.dismiss()
 
-    def current():
-        r, g, b = colorsys.hsv_to_rgb(state["h"], state["s"], state["v"])
-        return [r, g, b, state["a"]]
+            def picked(hex8):
+                if hex8:
+                    on_value(hex8)
+                color_dialog(title, hex8 or _hex8(state["rgba"]), on_value, default, swatches, _start=_hex8(start))
+            COLOR_HOOKS["eyedropper"](picked)
+        top.add_widget(IconBtn("eyedropper", dropper, size=dp(44)))
+    body.add_widget(top)
+    sliders = BoxLayout(orientation="vertical", size_hint_y=None, height=4 * dp(54), spacing=0)
+    rows = []
+
+    def components(mode):
+        r, g, b, a = state["rgba"]
+        if mode == "RGB":
+            return [r, g, b, a]
+        if mode == "HSL":
+            hh, ll, ss = colorsys.rgb_to_hls(r, g, b)
+            return [hh, ss, ll, a]
+        hh, ss, vv = colorsys.rgb_to_hsv(r, g, b)
+        return [hh, ss, vv, a]
+
+    def from_components(mode, c):
+        if mode == "RGB":
+            rgb = c[:3]
+        elif mode == "HSL":
+            rgb = colorsys.hls_to_rgb(c[0], c[2], c[1])
+        else:
+            rgb = colorsys.hsv_to_rgb(*c[:3])
+        return [float(x) for x in rgb] + [float(c[3])]
 
     def push(from_text=False):
-        rgba = current()
+        rgba = state["rgba"]
         sw.bg = rgba
         if not from_text:
             state["busy"] = True
@@ -881,22 +942,41 @@ def color_dialog(title, value, on_value, default=None, swatches=None):
             state["busy"] = False
         on_value(_hex8(rgba))
 
-    def sync_rows():
-        for k, row in rows.items():
-            row.set(state[k])
+    def build_sliders():
+        mode = COLOR_MODE["mode"]
+        sliders.clear_widgets()
+        rows.clear()
+        pct = lambda x: "%d%%" % round(x * 100)
+        byte = lambda x: "%d" % round(x * 255)
+        spec = {"HSV": [("Hue", lambda x: "%d deg" % round(x * 360)), ("Saturation", pct), ("Brightness", pct)],
+                "HSL": [("Hue", lambda x: "%d deg" % round(x * 360)), ("Saturation", pct), ("Lightness", pct)],
+                "RGB": [("Red", byte), ("Green", byte), ("Blue", byte)]}[mode] + [("Alpha", pct)]
+        comp = components(mode)
+        for i, (name, fmt) in enumerate(spec):
+            def ch(x, i=i):
+                c = components(COLOR_MODE["mode"])
+                c[i] = float(x)
+                state["rgba"] = from_components(COLOR_MODE["mode"], c)
+                push()
+            row = SliderRow(name, 0, 1, comp[i], ch, fmt=fmt, default=comp[i])
+            rows.append(row)
+            sliders.add_widget(row)
 
-    def slider(key, title_, fmt):
-        def ch(x, k=key):
-            state[k] = float(x)
-            push()
-        row = SliderRow(title_, 0, 1, state[key], ch, fmt=fmt, default=state[key])
-        rows[key] = row
-        sheet.box.add_widget(row)
-    pct = lambda x: "%d%%" % round(x * 100)
-    slider("h", "Hue", lambda x: "%d deg" % round(x * 360))
-    slider("s", "Saturation", pct)
-    slider("v", "Brightness", pct)
-    slider("a", "Alpha", pct)
+    def sync_rows():
+        for row, x in zip(rows, components(COLOR_MODE["mode"])):
+            row.set(x)
+
+    def set_mode(m):
+        COLOR_MODE["mode"] = m
+        build_sliders()
+    body.add_widget(Segmented(["HSV", "RGB", "HSL"], COLOR_MODE["mode"], set_mode))
+    build_sliders()
+    body.add_widget(sliders)
+
+    def pick(rgba):
+        state["rgba"] = list(rgba)
+        sync_rows()
+        push()
 
     def typed(_w, text):
         if state["busy"] or len(text.strip().lstrip("#")) not in (6, 8):
@@ -904,29 +984,32 @@ def color_dialog(title, value, on_value, default=None, swatches=None):
         rgba = _parse_hex(text, None)
         if rgba is None:
             return
-        hh, ss, vv = colorsys.rgb_to_hsv(*rgba[:3])
-        state.update(h=hh, s=ss, v=vv, a=rgba[3])
+        state["rgba"] = list(rgba)
         sync_rows()
         push(from_text=True)
     ti.bind(text=typed)
     if swatches:
-        line = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(6))
-        for c in list(swatches)[:8]:
-            rgba = _parse_hex(c)
-
-            def pick(c_=rgba):
-                hh, ss, vv = colorsys.rgb_to_hsv(*c_[:3])
-                state.update(h=hh, s=ss, v=vv, a=c_[3])
-                sync_rows()
-                push()
-            line.add_widget(Tap(on_tap=pick, bg=rgba, radius=dp(18), line=T.outline))
-        sheet.box.add_widget(line)
+        body.add_widget(lbl("Palette", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        body.add_widget(_swatch_line(list(swatches)[:8], pick, dp(32)))
+    if recent:
+        body.add_widget(lbl("Recent", 12, T.on_var, size_hint_y=None, height=dp(20)))
+        for i in range(0, len(recent), 10):
+            chunk = recent[i:i + 10]
+            line = _swatch_line(chunk, pick, dp(28))
+            for _ in range(10 - len(chunk)):
+                line.add_widget(Widget())
+            body.add_widget(line)
+    sheet.box.add_widget(scroll)
     btns = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
     if default is not None:
         btns.add_widget(Button3("Reset", lambda: (sheet.dismiss(), on_value(_hex8(_parse_hex(default)))),
                                 kind="text", icon="reset"))
     btns.add_widget(Button3("Cancel", lambda: (sheet.dismiss(), on_value(_hex8(start))), kind="outlined"))
-    btns.add_widget(Button3("Done", sheet.dismiss, kind="filled"))
+
+    def done():
+        sheet.dismiss()
+        remember_color(_hex8(state["rgba"]))
+    btns.add_widget(Button3("Done", done, kind="filled"))
     sheet.box.add_widget(btns)
     sheet.open()
     return sheet

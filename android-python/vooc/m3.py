@@ -102,7 +102,7 @@ def lbl(text="", size=14, color=None, bold=False, halign="left", valign="middle"
 
 
 class Box(BoxLayout):
-    """BoxLayout with optional rounded fill / outline."""
+    """BoxLayout with square fill / outline."""
     bg = ListProperty([0, 0, 0, 0])
     line = ListProperty([0, 0, 0, 0])
     radius = NumericProperty(0)
@@ -111,7 +111,7 @@ class Box(BoxLayout):
         super().__init__(**kw)
         with self.canvas.before:
             self._c = Color(*self.bg)
-            self._r = RoundedRectangle(radius=[self.radius])
+            self._r = Rectangle()
             self._lc = Color(*self.line)
             # width > 1 forces Kivy's triangle path; 1px GL_LINES drop out on some GPUs
             self._l = Line(width=max(1.05, dp(1)))
@@ -120,16 +120,15 @@ class Box(BoxLayout):
 
     def _u(self, *_):
         self._c.rgba = self.bg
-        self._r.pos, self._r.size, self._r.radius = self.pos, self.size, [0]
+        self._r.pos, self._r.size = self.pos, self.size
         self._lc.rgba = self.line
-        r = 0
-        self._l.rounded_rectangle = (self.x + .5, self.y + .5, max(1, self.width - 1), max(1, self.height - 1), max(1, r))
+        self._l.rectangle = (self.x + .5, self.y + .5, max(1, self.width - 1), max(1, self.height - 1))
 
 
 def card(**kw):
     kw.setdefault("orientation", "vertical")
-    kw.setdefault("padding", dp(14))
-    kw.setdefault("spacing", dp(8))
+    kw.setdefault("padding", dp(12))
+    kw.setdefault("spacing", dp(6))
     kw.setdefault("size_hint_y", None)
     kw.setdefault("radius", 0)
     kw.setdefault("bg", T.surface1)
@@ -427,14 +426,14 @@ class Tap(TouchGuard, ButtonBehavior, Box):
         self._base = list(self.bg)
         with self.canvas.after:
             self._sc = Color(1, 1, 1, 0)
-            self._sr = RoundedRectangle(radius=[self.radius])
+            self._sr = Rectangle()
         self.bind(pos=self._us, size=self._us, radius=self._us)
         self._us()
         if on_tap:
             self.bind(on_release=lambda *_: on_tap())
 
     def _us(self, *_):
-        self._sr.pos, self._sr.size, self._sr.radius = self.pos, self.size, [0]
+        self._sr.pos, self._sr.size = self.pos, self.size
 
     def on_press(self):
         Animation.cancel_all(self._sc)
@@ -658,9 +657,9 @@ class Slider3(Widget):
         self._grow = 0.0
         with self.canvas:
             self._ci = Color(*T.surface3)
-            self._ti = RoundedRectangle()
+            self._ti = Rectangle()
             self._ca = Color(*T.primary)
-            self._ta = RoundedRectangle()
+            self._ta = Rectangle()
             self._cz = Color(*T.a("on_var", 0.6))
             self._zero = Rectangle()
             self._ch = Color(*T.a("primary", 0.0))
@@ -669,7 +668,7 @@ class Slider3(Widget):
             self._th = Ellipse()
         with self.canvas.after:
             self._cb = Color(*T.a("primary", 0))
-            self._bubble = RoundedRectangle()
+            self._bubble = Rectangle()
             self._bt = Color(*T.a("on_primary", 0))
             self._btxt = Rectangle()
         self.value = max(self.lo, min(self.hi, float(value)))
@@ -687,7 +686,7 @@ class Slider3(Widget):
             x = (self.x + self.width / 2.0) - th / 2
             y0, L = self.y + dp(10), max(1, self.height - dp(20))
             pos = y0 + f * L
-            self._ti.pos, self._ti.size, self._ti.radius = (x, y0), (th, L), [th / 2]
+            self._ti.pos, self._ti.size = (x, y0), (th, L)
             if self.bipolar:
                 mid = y0 + L * ((0 - self.lo) / (self.hi - self.lo))
                 a, b = sorted((mid, pos))
@@ -701,7 +700,7 @@ class Slider3(Widget):
             y = (self.y + self.height / 2.0) - th / 2
             x0, L = self.x + dp(10), max(1, self.width - dp(20))
             pos = x0 + f * L
-            self._ti.pos, self._ti.size, self._ti.radius = (x0, y), (L, th), [th / 2]
+            self._ti.pos, self._ti.size = (x0, y), (L, th)
             if self.bipolar:
                 mid = x0 + L * ((0 - self.lo) / (self.hi - self.lo))
                 a, b = sorted((mid, pos))
@@ -711,7 +710,6 @@ class Slider3(Widget):
                 self._ta.pos, self._ta.size = (x0, y), (pos - x0, th)
                 self._zero.size = (0, 0)
             cx, cy = pos, (self.y + self.height / 2.0)
-        self._ta.radius = [th / 2]
         self._th.pos, self._th.size = (cx - knob / 2, cy - knob / 2), (knob, knob)
         r = dp(15) * self._grow
         self._halo.pos, self._halo.size = (cx - r, cy - r), (2 * r, 2 * r)
@@ -727,7 +725,7 @@ class Slider3(Widget):
             if self.vertical:
                 bx = self.right + dp(4) if self.right + bw + dp(4) < (self.parent.right if self.parent else 1e9) else self.x - bw - dp(4)
                 by = cy - bh / 2
-            self._bubble.pos, self._bubble.size, self._bubble.radius = (bx, by), (bw, bh), [bh / 2]
+            self._bubble.pos, self._bubble.size = (bx, by), (bw, bh)
             self._btxt.texture = t.texture
             self._btxt.pos, self._btxt.size = (bx + (bw - tw) / 2, by + (bh - tht) / 2), (tw, tht)
             self._cb.a, self._bt.a = 1, 1
@@ -1128,7 +1126,7 @@ class Switch3(TouchGuard, ButtonBehavior, Widget):
         self.on_change = on_change
         with self.canvas:
             self._tc = Color()
-            self._tr = RoundedRectangle()
+            self._tr = Rectangle()
             self._oc = Color()
             self._ol = Line(width=dp(1.5))
             self._hc = Color()
@@ -1152,9 +1150,9 @@ class Switch3(TouchGuard, ButtonBehavior, Widget):
         k = self._k
         on_bg, off_bg = T.primary, T.surface3
         self._tc.rgba = [off_bg[i] * (1 - k) + on_bg[i] * k for i in range(4)]
-        self._tr.pos, self._tr.size, self._tr.radius = self.pos, self.size, [self.height / 2]
+        self._tr.pos, self._tr.size = self.pos, self.size
         self._oc.rgba = T.a("outline", 1 - k)
-        self._ol.rounded_rectangle = (self.x, self.y, self.width, self.height, self.height / 2)
+        self._ol.rectangle = (self.x, self.y, self.width, self.height)
         d = dp(16) + dp(8) * k
         cx = self.x + self.height / 2 + k * (self.width - self.height)
         hc_on, hc_off = T.on_primary, T.outline
@@ -1168,7 +1166,7 @@ class Switch3(TouchGuard, ButtonBehavior, Widget):
 
 
 def switch_row(title, active, on_change, subtitle="", icon=None):
-    row = Tap(size_hint_y=None, height=dp(52) if not subtitle else dp(60), padding=(dp(10), 0), spacing=dp(10), radius=dp(12))
+    row = Tap(size_hint_y=None, height=dp(48) if not subtitle else dp(54), padding=(dp(8), 0), spacing=dp(8), radius=0)
     if icon:
         row.add_widget(Icon(name=icon, tint=T.on_var, size_hint_x=None, width=dp(20)))
     col = BoxLayout(orientation="vertical", padding=(0, dp(8)))
@@ -1203,12 +1201,12 @@ class Sheet(ModalView):
     def __init__(self, title, **kw):
         super().__init__(size_hint=(1, None), pos_hint={"x": 0, "y": 0}, background="",
                          background_color=T.a("scrim", 0.0), overlay_color=T.a("scrim", 0.5), **kw)
-        self.box = Box(orientation="vertical", bg=T.surface2, radius=dp(28), padding=(dp(16), dp(10), dp(16), dp(16)), spacing=dp(6))
+        self.box = Box(orientation="vertical", bg=T.surface2, radius=0, padding=(dp(12), dp(8), dp(12), dp(12)), spacing=dp(4))
         grip = BoxLayout(size_hint_y=None, height=dp(14))
         g = Widget()
         with g.canvas:
             Color(*T.a("on_var", 0.5))
-            gr = RoundedRectangle(radius=[dp(2)])
+            gr = Rectangle()
         g.bind(pos=lambda w, *_: setattr(gr, "pos", (w.x + w.width / 2 - dp(16), w.y + w.height / 2 - dp(2))))
         gr.size = (dp(32), dp(4))
         grip.add_widget(g)
@@ -1227,7 +1225,7 @@ def select_sheet(title, options, value, on_pick):
     col.bind(minimum_height=col.setter("height"))
     for opt in options:
         sel = str(opt) == str(value)
-        r = Tap(size_hint_y=None, height=dp(46), radius=dp(23), padding=(dp(16), 0), spacing=dp(10),
+        r = Tap(size_hint_y=None, height=dp(40), radius=0, padding=(dp(12), 0), spacing=dp(8),
                 bg=T.secondary_container if sel else [0, 0, 0, 0])
         r.add_widget(lbl(str(opt), 14, T.on_secondary_container if sel else T.on_surface, bold=sel))
         if sel:
@@ -1292,10 +1290,10 @@ class _NavItem(TouchGuard, ButtonBehavior, BoxLayout):
     def __init__(self, key, icon, title, cb, **kw):
         super().__init__(orientation="vertical", spacing=dp(2), **kw)
         self.key, self.cb = key, cb
-        self.pill = Widget(size_hint_y=None, height=dp(32))
+        self.pill = Widget(size_hint_y=None, height=dp(30))
         with self.pill.canvas.before:
             self._pc = Color(*T.secondary_container)
-            self._pr = RoundedRectangle(radius=[dp(16)])
+            self._pr = Rectangle()
         self.icon = Icon(name=icon)
         self.pill.add_widget(self.icon)
         self.pill.bind(pos=self._u, size=self._u)
@@ -1324,11 +1322,11 @@ class _NavItem(TouchGuard, ButtonBehavior, BoxLayout):
 
 class Segmented(Box):
     def __init__(self, options, value, on_change, **kw):
-        super().__init__(size_hint_y=None, height=dp(42), line=T.outline, radius=dp(21), spacing=0, **kw)
+        super().__init__(size_hint_y=None, height=dp(40), line=T.outline, radius=0, spacing=0, **kw)
         self.on_change = on_change
         self.btns = {}
         for i, opt in enumerate(options):
-            b = Tap(radius=dp(20), padding=(dp(6), 0), spacing=dp(4))
+            b = Tap(radius=0, padding=(dp(6), 0), spacing=dp(4))
             b.icon = Icon(name="check", size_hint_x=None, width=dp(16))
             b.label = lbl(opt, 13, bold=True, halign="center")
             b.add_widget(b.icon)
@@ -1358,11 +1356,11 @@ class Snackbar:
         """``action`` adds a text button (e.g. "Undo"); the bar then stays 5 s."""
         if cls._current is not None and cls._current.parent:
             cls._current.parent.remove_widget(cls._current)
-        bar = Box(bg=T.on_surface, radius=dp(10), padding=(dp(16), 0, dp(6), 0), size_hint=(None, None),
+        bar = Box(bg=T.on_surface, radius=0, padding=(dp(12), 0, dp(6), 0), size_hint=(None, None),
                   height=dp(48), width=parent.width - dp(32), pos=(parent.x + dp(16), parent.y + dp(84)))
         bar.add_widget(lbl(text, 13, T.surface, shorten=True))
         if action and on_action:
-            btn = Tap(radius=dp(18), size_hint=(None, None), size=(dp(76), dp(36)), padding=(dp(8), 0))
+            btn = Tap(radius=0, size_hint=(None, None), size=(dp(72), dp(34)), padding=(dp(8), 0))
             btn.add_widget(lbl(action, 14, T.inverse_primary if hasattr(T, "inverse_primary") else T.primary_container,
                                bold=True, halign="center"))
             wrap = BoxLayout(size_hint_x=None, width=dp(80), padding=(0, dp(6)))

@@ -14,7 +14,7 @@ requirements = python3,kivy,numpy,plyer,pyjnius
 
 orientation = portrait
 fullscreen = 0
-android.permissions = MODIFY_AUDIO_SETTINGS,READ_MEDIA_AUDIO,READ_MEDIA_IMAGES,READ_EXTERNAL_STORAGE
+android.permissions = MODIFY_AUDIO_SETTINGS,READ_MEDIA_AUDIO,READ_MEDIA_IMAGES,READ_EXTERNAL_STORAGE,POST_NOTIFICATIONS,WAKE_LOCK
 android.add_src = java
 android.api = 35
 android.minapi = 24

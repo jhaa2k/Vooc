@@ -7,6 +7,7 @@ import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.File;
@@ -34,6 +35,11 @@ public class VideoExporter {
     private final String audioPath;
     private final boolean withAudio;
     private final long limitBytes;
+    // advanced encoder / timeline options
+    private int keyframeSec = 1, bFrames = 0, profile = 0, colorStandard = 0;
+    private boolean webm = false;
+    private long startUs = 0, endUs = 0, fadeInUs = 0, fadeOutUs = 0;
+    private String audioMime = AAC;
 
     private MediaCodec video;
     private MediaMuxer muxer;
@@ -66,6 +72,60 @@ public class VideoExporter {
         this.audioPath = audioPath;
         this.withAudio = withAudio && audioPath != null && audioPath.length() > 0;
         this.limitBytes = limitBytes;
+    }
+
+    /**
+     * Full constructor. container 0 = MP4, 1 = WebM (audio becomes Opus).
+     * colorStandard: MediaFormat.COLOR_STANDARD_* (0 = encoder default). profile 0 = default.
+     * startUs / endUs trim the audio (endUs 0 = to the end); fades apply to re-encoded audio.
+     */
+    public VideoExporter(String outPath, int width, int height, int fps, int bitrate, String mime,
+                         String audioPath, boolean withAudio, long limitBytes, int keyframeSec, int bFrames,
+                         int profile, int colorStandard, int container, long startUs, long endUs,
+                         long fadeInUs, long fadeOutUs) {
+        this(outPath, width, height, fps, bitrate, mime, audioPath, withAudio, limitBytes);
+        this.keyframeSec = Math.max(0, keyframeSec);
+        this.bFrames = Math.max(0, bFrames);
+        this.profile = profile;
+        this.colorStandard = colorStandard;
+        this.webm = container == 1;
+        this.startUs = Math.max(0, startUs);
+        this.endUs = Math.max(0, endUs);
+        this.fadeInUs = Math.max(0, fadeInUs);
+        this.fadeOutUs = Math.max(0, fadeOutUs);
+        this.audioMime = webm ? "audio/opus" : AAC;
+    }
+
+    /** True when the device has an encoder for this MIME type (e.g. video/av01, video/hevc, audio/opus). */
+    public static boolean hasEncoder(String mime) {
+        try {
+            MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
+            for (MediaCodecInfo ci : list.getCodecInfos()) {
+                if (!ci.isEncoder()) continue;
+                for (String t : ci.getSupportedTypes()) {
+                    if (t.equalsIgnoreCase(mime)) return true;
+                }
+            }
+        } catch (Throwable ignored) { }
+        return false;
+    }
+
+    /** Comma separated list of encoder names for a MIME type (diagnostics). */
+    public static String encoderNames(String mime) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
+            for (MediaCodecInfo ci : list.getCodecInfos()) {
+                if (!ci.isEncoder()) continue;
+                for (String t : ci.getSupportedTypes()) {
+                    if (t.equalsIgnoreCase(mime)) {
+                        if (sb.length() > 0) sb.append(", ");
+                        sb.append(ci.getName());
+                    }
+                }
+            }
+        } catch (Throwable ignored) { }
+        return sb.toString();
     }
 
     public String getError() { return error; }
@@ -117,13 +177,60 @@ public class VideoExporter {
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             fmt.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
             fmt.setInteger(MediaFormat.KEY_FRAME_RATE, fps);
-            fmt.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+            fmt.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, keyframeSec);
+            if (bFrames > 0 && Build.VERSION.SDK_INT >= 29) {
+                fmt.setInteger(MediaFormat.KEY_MAX_B_FRAMES, bFrames);
+            }
+            if (colorStandard > 0) {
+                fmt.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
+                fmt.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED);
+                fmt.setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
+            }
             video = MediaCodec.createByCodecName(codecName);
-            video.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            boolean configured = false;
+            if (profile > 0) {
+                try {
+                    MediaFormat pf = MediaFormat.createVideoFormat(mime, width, height);
+                    pf.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+                    pf.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+                    pf.setInteger(MediaFormat.KEY_FRAME_RATE, fps);
+                    pf.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, keyframeSec);
+                    if (bFrames > 0 && Build.VERSION.SDK_INT >= 29) pf.setInteger(MediaFormat.KEY_MAX_B_FRAMES, bFrames);
+                    if (colorStandard > 0) {
+                        pf.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
+                        pf.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED);
+                        pf.setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
+                    }
+                    pf.setInteger(MediaFormat.KEY_PROFILE, profile);
+                    video.configure(pf, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+                    configured = true;
+                } catch (Throwable e) {
+                    Log.w(TAG, "profile " + profile + " rejected, using encoder default: " + e);
+                    video.release();
+                    video = MediaCodec.createByCodecName(codecName);
+                }
+            }
+            if (!configured) {
+                try {
+                    video.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+                } catch (Throwable e) {
+                    // some encoders reject B-frames / color keys: retry with the basic format
+                    Log.w(TAG, "advanced format rejected: " + e);
+                    video.release();
+                    video = MediaCodec.createByCodecName(codecName);
+                    MediaFormat basic = MediaFormat.createVideoFormat(mime, width, height);
+                    basic.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+                    basic.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+                    basic.setInteger(MediaFormat.KEY_FRAME_RATE, fps);
+                    basic.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, Math.max(1, keyframeSec));
+                    video.configure(basic, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+                }
+            }
             video.start();
             File parent = new File(outPath).getParentFile();
             if (parent != null) parent.mkdirs();
-            muxer = new MediaMuxer(outPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            muxer = new MediaMuxer(outPath, webm ? MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM
+                                                 : MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             if (withAudio) {
                 Thread t = new Thread(new Runnable() {
                     public void run() { prepareAudio(); }
@@ -155,9 +262,12 @@ public class VideoExporter {
             ex.selectTrack(track);
             long durUs = src.containsKey(MediaFormat.KEY_DURATION) ? src.getLong(MediaFormat.KEY_DURATION) : 0;
             String m = src.getString(MediaFormat.KEY_MIME);
-            if (AAC.equals(m)) {
+            if (startUs > 0) ex.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+            boolean fades = fadeInUs > 0 || fadeOutUs > 0;
+            if (audioMime.equals(m) && AAC.equals(m) && !fades) {
                 copyAac(ex, src, durUs);
             } else {
+                if (webm && !hasEncoder(audioMime)) throw new RuntimeException("no Opus encoder on this device (WebM audio)");
                 transcode(ex, src, durUs);
             }
         } catch (Throwable e) {
@@ -182,6 +292,9 @@ public class VideoExporter {
             buf.position(0);
             buf.get(b, 0, n);
             long pts = ex.getSampleTime();
+            if (endUs > 0 && pts > endUs) break;
+            if (pts < startUs) { ex.advance(); continue; }
+            pts -= startUs;
             int flags = (ex.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0 ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
             synchronized (audioData) {
                 audioData.add(b);
@@ -191,6 +304,67 @@ public class VideoExporter {
             ex.advance();
         }
         audioFormat = src;
+    }
+
+    /** Linear resampler for interleaved 16-bit PCM that keeps its phase between buffers. */
+    private static final class Resampler {
+        final int ch; final double step; double pos = 0; short[] last;
+        Resampler(int inRate, int outRate, int ch) { this.ch = ch; this.step = inRate / (double) outRate; last = new short[ch]; }
+        byte[] process(byte[] pcm) {
+            ByteBuffer in = ByteBuffer.wrap(pcm).order(ByteOrder.nativeOrder());
+            int frames = pcm.length / (2 * ch);
+            if (frames == 0) return new byte[0];
+            int outMax = (int) ((frames - pos) / step) + 2;
+            ByteBuffer out = ByteBuffer.allocate(Math.max(0, outMax) * 2 * ch).order(ByteOrder.nativeOrder());
+            int n = 0;
+            // pos is measured from the "last" sample (index -1) of the previous buffer
+            while (pos < frames && n < outMax) {
+                int i0 = (int) Math.floor(pos) - 1, i1 = i0 + 1;
+                double f = pos - Math.floor(pos);
+                for (int c = 0; c < ch; c++) {
+                    int a = i0 < 0 ? last[c] : in.getShort((i0 * ch + c) * 2);
+                    int b = in.getShort((i1 * ch + c) * 2);
+                    out.putShort((short) Math.round(a + (b - a) * f));
+                }
+                n++;
+                pos += step;
+            }
+            pos -= frames;
+            for (int c = 0; c < ch; c++) last[c] = in.getShort(((frames - 1) * ch + c) * 2);
+            byte[] r = new byte[n * 2 * ch];
+            out.position(0);
+            out.get(r);
+            return r;
+        }
+    }
+
+    private static boolean opusRate(int sr) {
+        return sr == 8000 || sr == 12000 || sr == 16000 || sr == 24000 || sr == 48000;
+    }
+
+    /** Applies trim (frames before startUs / after endUs) and fades to 16-bit PCM in place. */
+    private byte[] trimAndFade(byte[] pcm, long bufStartUs, int sr, int ch, long totalUs) {
+        int frames = pcm.length / (2 * ch);
+        int from = 0, to = frames;
+        if (bufStartUs < startUs) from = (int) Math.min(frames, (startUs - bufStartUs) * sr / 1000000L);
+        if (endUs > 0) {
+            long room = (endUs - bufStartUs) * sr / 1000000L;
+            to = (int) Math.max(from, Math.min(frames, room));
+        }
+        if (from >= to) return new byte[0];
+        ByteBuffer in = ByteBuffer.wrap(pcm).order(ByteOrder.nativeOrder());
+        ByteBuffer out = ByteBuffer.allocate((to - from) * 2 * ch).order(ByteOrder.nativeOrder());
+        for (int i = from; i < to; i++) {
+            long t = bufStartUs + i * 1000000L / sr - startUs;    // time inside the exported clip
+            float g = 1f;
+            if (fadeInUs > 0 && t < fadeInUs) g = Math.max(0f, t / (float) fadeInUs);
+            if (fadeOutUs > 0 && totalUs > 0 && t > totalUs - fadeOutUs) g = Math.min(g, Math.max(0f, (totalUs - t) / (float) fadeOutUs));
+            for (int c = 0; c < ch; c++) {
+                int v = in.getShort((i * ch + c) * 2);
+                out.putShort((short) (v * g));
+            }
+        }
+        return out.array();
     }
 
     private void transcode(MediaExtractor ex, MediaFormat src, long durUs) throws Exception {
@@ -203,11 +377,13 @@ public class VideoExporter {
         int sr = src.containsKey(MediaFormat.KEY_SAMPLE_RATE) ? src.getInteger(MediaFormat.KEY_SAMPLE_RATE) : 44100;
         int ch = src.containsKey(MediaFormat.KEY_CHANNEL_COUNT) ? src.getInteger(MediaFormat.KEY_CHANNEL_COUNT) : 2;
         int pcmEncoding = 2;   // AudioFormat.ENCODING_PCM_16BIT
+        long totalUs = (endUs > 0 ? endUs : durUs) - startUs;
         boolean inEos = false, decEos = false, encEos = false, encEosQueued = false;
         byte[] pending = null;
-        boolean pendingMixed = false;
         int pendingOff = 0;
-        long pendingPts = 0;
+        long outFrames = 0;            // frames queued into the encoder (drives timestamps)
+        int outRate = sr, outCh = 2;
+        Resampler rs = null;
         long guard = 0;
         try {
             while (!encEos && !cancelled) {
@@ -217,11 +393,11 @@ public class VideoExporter {
                     if (i >= 0) {
                         ByteBuffer b = dec.getInputBuffer(i);
                         int n = ex.readSampleData(b, 0);
-                        if (n < 0) {
+                        long t = n < 0 ? 0 : ex.getSampleTime();
+                        if (n < 0 || (endUs > 0 && t > endUs + 200000L)) {
                             dec.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                             inEos = true;
                         } else {
-                            long t = ex.getSampleTime();
                             dec.queueInputBuffer(i, 0, n, t, 0);
                             if (durUs > 0) audioProgress = Math.min(0.99f, t / (float) durUs);
                             ex.advance();
@@ -246,38 +422,47 @@ public class VideoExporter {
                             if (pcmEncoding == 4) pcm = floatTo16(pcm);   // ENCODING_PCM_FLOAT
                         }
                         if ((di.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) decEos = true;
+                        if (endUs > 0 && di.presentationTimeUs > endUs) decEos = true;
+                        if (ch > 2) pcm = downmix(pcm, ch);
+                        int c2 = Math.min(2, Math.max(1, ch));
+                        pcm = trimAndFade(pcm, di.presentationTimeUs, sr, c2, totalUs);
+                        if (enc == null) {
+                            outCh = c2;
+                            outRate = (webm && !opusRate(sr)) ? 48000 : sr;
+                        }
+                        if (outRate != sr) {
+                            if (rs == null) rs = new Resampler(sr, outRate, outCh);
+                            pcm = rs.process(pcm);
+                        }
                         pending = pcm;
-                        pendingMixed = false;
                         pendingOff = 0;
-                        pendingPts = di.presentationTimeUs;
                         dec.releaseOutputBuffer(o, false);
                     }
                 }
                 if (enc == null && (pending != null || decEos)) {
-                    int outCh = Math.min(2, Math.max(1, ch));
-                    MediaFormat ef = MediaFormat.createAudioFormat(AAC, sr, outCh);
-                    ef.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
-                    ef.setInteger(MediaFormat.KEY_BIT_RATE, outCh == 1 ? 128000 : 192000);
+                    if (pending == null) outCh = Math.min(2, Math.max(1, ch));
+                    if (webm && !opusRate(outRate)) outRate = 48000;
+                    MediaFormat ef = MediaFormat.createAudioFormat(audioMime, outRate, outCh);
+                    if (!webm) ef.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+                    ef.setInteger(MediaFormat.KEY_BIT_RATE, webm ? 128000 : (outCh == 1 ? 128000 : 192000));
                     ef.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 256 * 1024);
-                    enc = MediaCodec.createEncoderByType(AAC);
+                    enc = MediaCodec.createEncoderByType(audioMime);
                     enc.configure(ef, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
                     enc.start();
-                }
-                if (enc != null && pending != null && ch > 2 && !pendingMixed) {
-                    pending = downmix(pending, ch);      // encoder runs in stereo
-                    pendingMixed = true;
                 }
                 if (enc != null && pending != null) {
                     int i = enc.dequeueInputBuffer(2000);
                     if (i >= 0) {
                         ByteBuffer b = enc.getInputBuffer(i);
                         b.clear();
+                        int frameBytes = 2 * outCh;
                         int n = Math.min(b.remaining(), pending.length - pendingOff);
-                        int outCh = Math.min(2, Math.max(1, ch));
-                        long pts = pendingPts + (pendingOff / (2L * outCh)) * 1000000L / sr;
+                        n -= n % frameBytes;
+                        long pts = outFrames * 1000000L / outRate;
                         b.put(pending, pendingOff, n);
                         pendingOff += n;
-                        boolean last = pendingOff >= pending.length;
+                        outFrames += n / frameBytes;
+                        boolean last = pendingOff >= pending.length - (pending.length % frameBytes);
                         int flags = (last && decEos) ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0;
                         enc.queueInputBuffer(i, 0, n, pts, flags);
                         if (flags != 0) encEosQueued = true;
@@ -286,7 +471,7 @@ public class VideoExporter {
                 } else if (enc != null && decEos && !encEosQueued) {
                     int i = enc.dequeueInputBuffer(2000);
                     if (i >= 0) {
-                        enc.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        enc.queueInputBuffer(i, 0, 0, outFrames * 1000000L / outRate, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                         encEosQueued = true;
                     }
                 }
@@ -321,7 +506,7 @@ public class VideoExporter {
                 enc.release();
             }
         }
-        if (audioFormat == null) throw new RuntimeException("AAC encoder produced no format");
+        if (audioFormat == null) throw new RuntimeException("audio encoder produced no format");
     }
 
     private static byte[] floatTo16(byte[] pcm) {

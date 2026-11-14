@@ -19,7 +19,7 @@ try:
     from vooc.state import ProjectState, THEMES, AUDIO_DEFAULTS, VISUALIZER_DEFAULTS, EQ_PRESETS
     from vooc.spectrum_source import AnalysisConfig, SpectrumLoader
     from vooc.android_audio import AndroidMediaPlayerSource
-    from vooc.android_media import choose_audio, choose_file, choose_image, choose_template, publish_file
+    from vooc.android_media import choose_audio, choose_file, choose_image, choose_template, publish_file, share_media, delete_media, request_notification_permission
     from vooc.property_editor import AdvancedProperties, pretty as pretty_module, _ICONS as EDITOR_ICONS
     from vooc.property_schema import EFFECT_MODULES, field_spec, iter_fields
     from vooc.model import ProjectModel, LayerModel
@@ -33,7 +33,8 @@ try:
     from vooc.palettes import BUILTIN as PALETTE_BUILTIN, METHODS as PALETTE_METHODS, apply_palette, extract_palette, extract_colors, export_palettes, import_palettes, unique_name
     from vooc.media_meta import read_metadata
     from vooc.exporter import (Exporter, plan_export, frame_size, RESOLUTIONS, FPS_OPTIONS, ASPECTS, CODECS,
-                               QUALITY)
+                               QUALITY, PROFILES, COLOR_MATRIX, B_FRAMES, KEYFRAMES, NAME_TOKENS, DEFAULT_PATTERN,
+                               output_name, encoder_available)
 except BaseException:
     import traceback
     _STARTUP_IMPORT_ERROR = traceback.format_exc()
@@ -1510,23 +1511,96 @@ class VoocRoot(FloatLayout):
 
     def _export_tab(self, col):
         e = self.s.export
-        col.add_widget(m3.section("Video export", "MP4"))
+        col.add_widget(m3.section("Video export", "MP4 / WebM"))
 
-        def pick(title, key, options, conv=str):
+        def pick(title, key, options, conv=str, after=None):
             col.add_widget(m3.lbl(title, 12, T.on_var, size_hint_y=None, height=dp(20)))
-            col.add_widget(m3.ChipGroup(options, str(e.get(key, options[0])),
-                                        lambda o, k=key: self._set_export(k, conv(o))))
-        pick("Resolution", "resolution", RESOLUTIONS)
+
+            def change(o, k=key):
+                self._set_export(k, conv(o))
+                if after:
+                    after()
+            col.add_widget(m3.ChipGroup(options, str(e.get(key, options[0])), change))
+        pick("Resolution", "resolution", RESOLUTIONS, after=lambda: self._studio_tab("Export"))
+        if e.get("resolution") == "Custom":
+            row = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
+            for key, title in (("custom_w", "Width"), ("custom_h", "Height")):
+                val = int(e.get(key, 1920 if key == "custom_w" else 1080))
+                b = m3.Button3("%s  %d px" % (title, val), kind="outlined",
+                               on_tap=lambda k=key, t=title, v=val: m3.number_dialog(
+                                   t + " (even, 128-4096)", v, 128, 4096, 2,
+                                   lambda x, kk=k: (self._set_export(kk, int(x) // 2 * 2), self._studio_tab("Export")),
+                                   default=1920 if k == "custom_w" else 1080))
+                row.add_widget(b)
+            col.add_widget(row)
         pick("Frame rate", "fps", FPS_OPTIONS)
         col.add_widget(m3.lbl("Aspect ratio", 12, T.on_var, size_hint_y=None, height=dp(20)))
         col.add_widget(m3.ChipGroup(list(ASPECTS), e.get("aspect", "16:9"),
                                     lambda o: (self.set_aspect(o), self._update_plan())))
-        pick("Video codec", "codec", list(CODECS))
+        codecs = [c for c in CODECS]
+        pick("Video codec", "codec", codecs, after=lambda: self._studio_tab("Export"))
+        if not encoder_available(e.get("codec", "H.264 (AVC)")):
+            col.add_widget(m3.lbl("This device has no %s encoder. H.264 will be used." % e.get("codec"),
+                                  11, T.error, shorten=False, size_hint_y=None, height=dp(30)))
         pick("Quality", "quality", list(QUALITY))
         col.add_widget(m3.switch_row("Include audio", bool(e.get("audio", True)),
-                                     lambda on: self._set_export("audio", bool(on)), "AAC, copied or re-encoded from the track"))
+                                     lambda on: self._set_export("audio", bool(on)),
+                                     "AAC in MP4, Opus in WebM"))
+
+        # ---- trim & fades
+        col.add_widget(m3.section("Trim & fades", "seconds"))
+        dur = float(getattr(self.timeline, "duration", 0.0) or self.duration or 0.0)
+        top = max(1.0, dur)
+        col.add_widget(m3.SliderRow("Start", 0, top, min(top, float(e.get("trim_start", 0) or 0)),
+                                    lambda v: self._set_export("trim_start", round(v, 2)), step=0.1, unit="s",
+                                    default=0, fmt=lambda v: fmt_time(v)))
+        end = float(e.get("trim_end", 0) or 0)
+        col.add_widget(m3.SliderRow("End (0 = song end)", 0, top, min(top, end),
+                                    lambda v: self._set_export("trim_end", round(v, 2)), step=0.1, unit="s",
+                                    default=0, fmt=lambda v: fmt_time(v) if v > 0 else "End"))
+        col.add_widget(m3.SliderRow("Fade in", 0, 10, float(e.get("fade_in", 0) or 0),
+                                    lambda v: self._set_export("fade_in", round(v, 2)), step=0.1, unit="s", default=0,
+                                    fmt=lambda v: "Off" if v <= 0 else "%.1f s" % v))
+        col.add_widget(m3.SliderRow("Fade out", 0, 10, float(e.get("fade_out", 0) or 0),
+                                    lambda v: self._set_export("fade_out", round(v, 2)), step=0.1, unit="s", default=0,
+                                    fmt=lambda v: "Off" if v <= 0 else "%.1f s" % v))
+
+        # ---- advanced
+        adv = bool(self.export_state.get("advanced"))
+        col.add_widget(m3.Button3("Advanced settings" + ("  -" if adv else "  +"), kind="text", icon="tune",
+                                  on_tap=lambda: (self.export_state.__setitem__("advanced", not adv),
+                                                  self._studio_tab("Export"))))
+        if adv:
+            col.add_widget(m3.SliderRow("Bitrate (0 = auto)", 0, 120, float(e.get("bitrate_mbps", 0) or 0),
+                                        lambda v: self._set_export("bitrate_mbps", round(v, 1)), step=0.5,
+                                        unit=" Mbps", default=0, fmt=lambda v: "Auto" if v <= 0 else "%.1f Mbps" % v))
+            grid = GridLayout(cols=2, size_hint_y=None, spacing=dp(8), row_default_height=dp(66), row_force_default=True)
+            grid.bind(minimum_height=grid.setter("height"))
+
+            def field(title, key, options, conv=str):
+                box = BoxLayout(orientation="vertical", spacing=dp(2))
+                box.add_widget(m3.lbl(title, 12, T.on_var, size_hint_y=None, height=dp(18)))
+                box.add_widget(m3.SelectField(title, options, str(e.get(key, options[0])),
+                                              lambda o, k=key: self._set_export(k, conv(o))))
+                grid.add_widget(box)
+            field("Keyframe interval (s)", "keyframe_s", KEYFRAMES, int)
+            field("B-frames", "bframes", B_FRAMES, int)
+            field("H.264 profile", "profile", list(PROFILES))
+            field("Color matrix", "color", list(COLOR_MATRIX))
+            col.add_widget(grid)
+            col.add_widget(m3.lbl("B-frames need Android 10+. Unsupported profiles fall back automatically.",
+                                  11, T.on_var, shorten=False, size_hint_y=None, height=dp(30)))
+
+        # ---- file name
+        col.add_widget(m3.section("File name", ""))
+        col.add_widget(m3.text_field(e.get("pattern", DEFAULT_PATTERN), lambda v: self._set_export("pattern", v),
+                                     hint=DEFAULT_PATTERN))
+        col.add_widget(m3.lbl("Tokens: " + " ".join(NAME_TOKENS), 11, T.on_var, shorten=False,
+                              size_hint_y=None, height=dp(30)))
+
+        # ---- plan, progress, actions
         info = m3.card(spacing=dp(4))
-        self.plan_lbl = m3.lbl("", 12, T.on_var, shorten=False, size_hint_y=None, height=dp(64), valign="top")
+        self.plan_lbl = m3.lbl("", 12, T.on_var, shorten=False, size_hint_y=None, height=dp(80), valign="top")
         info.add_widget(self.plan_lbl)
         self.export_bar = Progress()
         info.add_widget(self.export_bar)
@@ -1535,12 +1609,51 @@ class VoocRoot(FloatLayout):
         info.add_widget(self.export_lbl)
         self.export_bar.set(self.export_state.get("progress", 0.0))
         col.add_widget(info)
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
         if self.export_state.get("running"):
-            col.add_widget(m3.Button3("Cancel export", self.cancel_export, kind="outlined", icon="close"))
+            paused = self.exporter is not None and self.exporter.paused
+            row.add_widget(m3.Button3("Resume" if paused else "Pause", self.pause_export, kind="tonal",
+                                      icon="play" if paused else "pause"))
+            row.add_widget(m3.Button3("Cancel", self.cancel_export, kind="outlined", icon="close"))
         else:
-            col.add_widget(m3.Button3("Render video", self.start_export, kind="filled", icon="export"))
-        col.add_widget(m3.lbl("The screen stays on while rendering. Files over 4 GB are avoided automatically.",
-                              11, T.on_var, shorten=False, size_hint_y=None, height=dp(34)))
+            row.add_widget(m3.Button3("Render video", self.start_export, kind="filled", icon="export"))
+            row.add_widget(m3.Button3("Add to queue", self.queue_export, kind="tonal", icon="plus"))
+        col.add_widget(row)
+
+        queue = self.export_state.setdefault("queue", [])
+        if queue:
+            col.add_widget(m3.section("Queue", "%d waiting" % len(queue)))
+            for i, job in enumerate(queue):
+                r = m3.Box(size_hint_y=None, height=dp(48), spacing=dp(6), padding=(dp(12), 0),
+                           bg=T.surface2, radius=dp(14))
+                st = job["settings"]
+                r.add_widget(m3.lbl("%d. %s  %s %sfps  %s" % (i + 1, st.get("resolution"), st.get("aspect"),
+                                                            st.get("fps"), st.get("codec")), 13))
+                r.add_widget(m3.IconBtn("close", lambda j=i: (queue.pop(j), self._studio_tab("Export")),
+                                        size=dp(40)))
+                col.add_widget(r)
+            if not self.export_state.get("running"):
+                col.add_widget(m3.Button3("Render queue", self.run_queue, kind="filled", icon="export"))
+
+        history = self.s.export.get("history") or []
+        if history:
+            col.add_widget(m3.section("Recent exports", "%d" % len(history)))
+            for i, h in enumerate(history[:12]):
+                r = m3.Box(size_hint_y=None, height=dp(56), spacing=dp(4), padding=(dp(12), 0, dp(4), 0),
+                           bg=T.surface2, radius=dp(14))
+                txt = BoxLayout(orientation="vertical")
+                txt.add_widget(m3.lbl(h.get("name", "video"), 13, T.on_surface if h.get("ok") else T.error))
+                txt.add_widget(m3.lbl("%s  -  %s  -  %s" % (h.get("when", ""), _fmt_size(h.get("size", 0)),
+                                                            h.get("status", "")), 11, T.on_var))
+                r.add_widget(txt)
+                if h.get("ok"):
+                    r.add_widget(m3.IconBtn("export", lambda hh=h: self.share_export(hh), size=dp(40)))
+                r.add_widget(m3.IconBtn("delete", lambda j=i: self.delete_export(j), size=dp(40)))
+                col.add_widget(r)
+            col.add_widget(m3.Button3("Clear history", self.clear_export_history, kind="text", icon="delete"))
+        col.add_widget(m3.lbl("Rendering keeps the screen on, shows a notification, slows down when the phone "
+                              "gets hot and avoids files over 4 GB.", 11, T.on_var, shorten=False,
+                              size_hint_y=None, height=dp(44)))
         col.add_widget(m3.Button3("Save project JSON", self.save, kind="outlined", icon="save"))
         self._update_plan()
 
@@ -1556,15 +1669,34 @@ class VoocRoot(FloatLayout):
         if not dur:
             self.plan_lbl.text = "Load a track to see the export size."
             return
-        plan = plan_export(self.s.export, dur)
-        text = "%dx%d  %d fps  %s  %.1f Mbps\nAbout %s for %s" % (
+        plan = plan_export(self.s.export, dur, available=encoder_available)
+        name = output_name(self.s.export.get("pattern"), self.meta, plan, self.s.look.get("template", "")) + plan["ext"]
+        text = "%dx%d  %d fps  %s  %.1f Mbps\nAbout %s for %s\n%s" % (
             plan["width"], plan["height"], plan["fps"], plan["codec"], plan["bitrate"] / 1e6,
-            _fmt_size(plan["estimate_bytes"]), fmt_time(dur))
+            _fmt_size(plan["estimate_bytes"]), fmt_time(plan["duration"]), name)
         if plan["notes"]:
             text += "\n" + "; ".join(plan["notes"])
         self.plan_lbl.text = text
 
-    def start_export(self):
+    def queue_export(self):
+        from copy import deepcopy
+        queue = self.export_state.setdefault("queue", [])
+        if len(queue) >= 10:
+            self.toast("The queue holds up to 10 jobs")
+            return
+        queue.append({"settings": deepcopy(self.s.export)})
+        queue[-1]["settings"].pop("history", None)
+        self.toast("Added to queue (%d)" % len(queue))
+        self._studio_tab("Export")
+
+    def run_queue(self):
+        queue = self.export_state.get("queue") or []
+        if queue and not self.export_state.get("running"):
+            job = queue.pop(0)
+            self.export_state["queue_left"] = len(queue)
+            self.start_export(settings=job["settings"])
+
+    def start_export(self, settings=None):
         if self.exporter is not None and self.exporter.running:
             return
         if not self.track:
@@ -1575,13 +1707,26 @@ class VoocRoot(FloatLayout):
             return
         if self.playing:
             self.toggle()
+        request_notification_permission()
+        settings = dict(settings or self.s.export)
+        settings.pop("history", None)
         out_dir = Path(self._data_dir()) / "exports"
         out_dir.mkdir(parents=True, exist_ok=True)
-        stem = "".join(ch if ch.isalnum() or ch in " -_" else "_" for ch in (self.meta.get("title") or Path(self.track).stem))[:40]
-        out = out_dir / ("Vooc_%s_%s.mp4" % (stem.strip() or "video", time.strftime("%Y%m%d_%H%M%S")))
+        dur = getattr(self.timeline, "duration", 0.0) or self.duration
+        plan = plan_export(settings, dur, available=encoder_available)
+        n = len(self.s.export.get("history") or []) + 1
+        stem = output_name(settings.get("pattern"), dict(self.meta, title=self.meta.get("title") or Path(self.track).stem),
+                           plan, self.s.look.get("template", ""), n)
+        out = out_dir / (stem + plan["ext"])
+        k = 2
+        while out.exists():
+            out = out_dir / ("%s_%d%s" % (stem, k, plan["ext"]))
+            k += 1
         self.scene.stop()
-        self.export_state = {"running": True, "progress": 0.0, "text": "Starting...", "result": ""}
-        self.exporter = Exporter(self.project, self.timeline, self.track, self.meta, self.s.export, str(out),
+        queue = self.export_state.get("queue", [])
+        self.export_state.update({"running": True, "progress": 0.0, "text": "Starting...", "result": "",
+                                  "queue": queue, "mime": "video/webm" if plan["ext"] == ".webm" else "video/mp4"})
+        self.exporter = Exporter(self.project, self.timeline, self.track, self.meta, settings, str(out),
                                  on_progress=self._export_progress, on_done=self._export_done)
         if self.exporter.start():
             if self.page == "studio" and self.studio_tab == "Export":
@@ -1589,12 +1734,28 @@ class VoocRoot(FloatLayout):
         else:
             self.scene.start()
 
+    def pause_export(self):
+        ex = self.exporter
+        if ex is None or not ex.running:
+            return
+        if ex.paused:
+            ex.resume()
+            self.scene.stop()
+        else:
+            ex.pause()
+        if self.page == "studio" and self.studio_tab == "Export":
+            self._studio_tab("Export")
+
     def cancel_export(self):
         if self.exporter is not None:
+            self.export_state["queue"] = []
             self.exporter.cancel()
 
     def _export_progress(self, frac, text):
-        self.export_state.update(progress=frac, text="Rendering %d%%  -  %s" % (round(frac * 100), text))
+        if text == "Paused":
+            self.export_state.update(progress=frac, text="Paused at %d%%" % round(frac * 100))
+        else:
+            self.export_state.update(progress=frac, text="Rendering %d%%  -  %s" % (round(frac * 100), text))
         if getattr(self, "export_bar", None) is not None and self.export_bar.get_root_window() is not None:
             self.export_bar.set(frac)
             self.export_lbl.text = self.export_state["text"]
@@ -1604,19 +1765,65 @@ class VoocRoot(FloatLayout):
     def _export_done(self, ok, path, message):
         self.scene.start()
         result = message or ""
+        mime = self.export_state.get("mime", "video/mp4")
+        entry = {"name": Path(self.exporter.out_path).name if self.exporter else "video",
+                 "when": time.strftime("%d %b %H:%M"), "ok": bool(ok and path), "size": 0,
+                 "status": "Done" if ok else (message or "Failed")[:40], "mime": mime, "path": "", "uri": ""}
         if ok and path:
-            where = publish_file(path, Path(path).name, "video/mp4", "Movies")
+            try:
+                entry["size"] = os.path.getsize(path)
+            except OSError:
+                pass
+            where = publish_file(path, Path(path).name, mime, "Movies")
             if where != path:
+                entry["uri"] = getattr(publish_file, "last_uri", "")
                 try:
                     os.remove(path)
                 except OSError:
                     pass
+            else:
+                entry["path"] = path
+            entry["where"] = where
             result = ("Saved to " + where + (("  (" + message + ")") if message else ""))
-        self.export_state = {"running": False, "progress": 1.0 if ok else 0.0, "text": "",
+        hist = self.s.export.setdefault("history", [])
+        hist.insert(0, entry)
+        del hist[50:]
+        self._save_trigger()
+        queue = self.export_state.get("queue", [])
+        self.export_state = {"running": False, "progress": 1.0 if ok else 0.0, "text": "", "queue": queue,
+                             "advanced": self.export_state.get("advanced"),
                              "result": result or ("Export failed" if not ok else "Done")}
         self.toast(self.export_state["result"][:90])
+        if queue and ok:
+            Clock.schedule_once(lambda *_: self.run_queue(), 0.5)
         if self.page == "studio" and self.studio_tab == "Export":
             self._studio_tab("Export")
+
+    def share_export(self, h):
+        if share_media(h.get("uri"), h.get("mime", "video/mp4")):
+            return
+        self.toast("Saved at " + (h.get("where") or h.get("path") or h.get("name", "")))
+
+    def delete_export(self, index):
+        hist = self.s.export.get("history") or []
+        if not 0 <= index < len(hist):
+            return
+        h = hist.pop(index)
+        if h.get("uri"):
+            delete_media(h["uri"])
+        elif h.get("path") and os.path.exists(h["path"]):
+            try:
+                os.remove(h["path"])
+            except OSError:
+                pass
+        self._save_trigger()
+        self.toast("Deleted " + h.get("name", "export"))
+        self._studio_tab("Export")
+
+    def clear_export_history(self):
+        self.s.export["history"] = []
+        self._save_trigger()
+        self._studio_tab("Export")
 
     # ================================================================ theme / misc
     def _system_dark(self):
@@ -2084,7 +2291,11 @@ class VoocRoot(FloatLayout):
 def _fmt_size(n):
     if n >= 1024 ** 3:
         return "%.2f GB" % (n / 1024.0 ** 3)
-    return "%d MB" % max(1, round(n / 1024.0 ** 2))
+    if n >= 10 * 1024 ** 2:
+        return "%d MB" % round(n / 1024.0 ** 2)
+    if n >= 1024 ** 2:
+        return "%.1f MB" % (n / 1024.0 ** 2)
+    return "%d KB" % max(1, round(n / 1024.0))
 
 
 def _preset_intensity(name):

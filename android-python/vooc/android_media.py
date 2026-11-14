@@ -266,6 +266,7 @@ def publish_file(path, display_name, mime, collection="Download"):
     Android 10+: MediaStore (Movies/Vooc or Download/Vooc), no permission needed.
     Older Android / desktop: the file stays where it is. Returns a user-facing location."""
 
+    publish_file.last_uri = ""
     try:
         from jnius import autoclass
     except Exception:
@@ -290,6 +291,7 @@ def publish_file(path, display_name, mime, collection="Download"):
         uri = resolver.insert(target, values)
         if uri is None:
             return str(path)
+        publish_file.last_uri = uri.toString()
         out = resolver.openOutputStream(uri)
         try:
             with open(path, "rb") as fh:
@@ -304,3 +306,54 @@ def publish_file(path, display_name, mime, collection="Download"):
     except Exception as exc:
         print("Vooc publish failed: %s" % exc)
         return str(path)
+
+
+publish_file.last_uri = ""
+
+
+def share_media(uri, mime, title="Share video"):
+    """Open the Android share sheet for a MediaStore content:// uri. Returns False when not possible."""
+    if not uri or not str(uri).startswith("content://"):
+        return False
+    try:
+        from jnius import autoclass, cast
+        act = autoclass("org.kivy.android.PythonActivity").mActivity
+        Intent = autoclass("android.content.Intent")
+        Uri = autoclass("android.net.Uri")
+        it = Intent(Intent.ACTION_SEND)
+        it.setType(mime)
+        it.putExtra(Intent.EXTRA_STREAM, cast("android.os.Parcelable", Uri.parse(uri)))
+        it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        act.startActivity(Intent.createChooser(it, autoclass("java.lang.String")(title)))
+        return True
+    except Exception as exc:
+        print("Vooc share failed: %s" % exc)
+        return False
+
+
+def delete_media(uri):
+    """Remove a file this app inserted into MediaStore."""
+    if not uri or not str(uri).startswith("content://"):
+        return False
+    try:
+        from jnius import autoclass
+        act = autoclass("org.kivy.android.PythonActivity").mActivity
+        Uri = autoclass("android.net.Uri")
+        return act.getContentResolver().delete(Uri.parse(uri), None, None) > 0
+    except Exception as exc:
+        print("Vooc delete failed: %s" % exc)
+        return False
+
+
+def request_notification_permission():
+    """Android 13+: ask for POST_NOTIFICATIONS once (export progress notification)."""
+    try:
+        from jnius import autoclass
+        if autoclass("android.os.Build$VERSION").SDK_INT < 33:
+            return
+        from android.permissions import request_permissions, check_permission
+        perm = "android.permission.POST_NOTIFICATIONS"
+        if not check_permission(perm):
+            request_permissions([perm])
+    except Exception as exc:
+        print("Vooc notification permission: %s" % exc)

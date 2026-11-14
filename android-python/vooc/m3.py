@@ -396,7 +396,7 @@ class TouchGuard:
     one another. When a drag crosses the threshold, release the button grab
     so the parent ScrollView can continue processing the gesture.
     """
-    GUARD_DIST = dp(14)
+    GUARD_DIST = dp(24)
 
     def _guard_key(self, part):
         return "_vooc_touchguard_%s_%s" % (id(self), part)
@@ -418,7 +418,7 @@ class TouchGuard:
                     Animation(a=0, d=0.12).start(self._sc)
                 except Exception:
                     pass
-                return True
+                return super().on_touch_move(touch)
         return super().on_touch_move(touch)
 
     def on_touch_up(self, touch):
@@ -426,7 +426,7 @@ class TouchGuard:
             if touch.grab_current is self:
                 touch.ungrab(self)
             self.state = "normal"
-            return True
+            return super().on_touch_up(touch)
         return super().on_touch_up(touch)
 
 

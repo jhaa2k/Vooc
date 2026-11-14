@@ -444,9 +444,8 @@ class VoocRoot(FloatLayout):
                 continue
             title, hint = source._vooc_section_title, source._vooc_section_hint
             panel = BoxLayout(orientation="vertical", size_hint_y=None, spacing=0)
-            header = m3.Tap(on_tap=lambda *_args, k=title, pk=page_key: self._toggle_accordion(pk, k),
-                            bg=T.surface2, line=T.outline, radius=0, size_hint_y=None,
-                            height=dp(44), padding=(dp(12), 0), spacing=dp(8))
+            header = m3.Tap(bg=T.surface2, line=T.outline, radius=0, size_hint_y=None,
+                            height=dp(48), padding=(dp(12), 0), spacing=dp(8))
             header.add_widget(m3.lbl(title, 12, T.primary, bold=True))
             if hint:
                 header.add_widget(m3.lbl(hint, 10, T.on_var, halign="right"))
@@ -466,7 +465,9 @@ class VoocRoot(FloatLayout):
             panel.add_widget(header)
             panel.add_widget(body)
             self._accordion_widgets[page_key][title] = (panel, body, header, arrow)
-            update()
+            Clock.schedule_once(lambda _dt, fn=update: fn(), 0)
+            Clock.schedule_once(lambda _dt, fn=update: fn(), 0.12)
+            header.bind(on_release=lambda *_args, k=title, pk=page_key: self._toggle_accordion(pk, k))
             col.add_widget(panel)
 
     def _toggle_accordion(self, page_key, key):
@@ -479,6 +480,15 @@ class VoocRoot(FloatLayout):
             body.opacity = 1 if is_open else 0
             panel.height = header.height + body.height
             arrow.name = "up" if is_open else "down"
+        def settle(_dt):
+            for section, (panel, body, header, arrow) in self._accordion_widgets.get(page_key, {}).items():
+                is_open = self._accordion_state.get(page_key) == section
+                body.height = body.minimum_height if is_open else 0
+                body.opacity = 1 if is_open else 0
+                panel.height = header.height + body.height
+                arrow.name = "up" if is_open else "down"
+        Clock.schedule_once(settle, 0)
+        Clock.schedule_once(settle, 0.12)
 
     def show(self, page):
         self._remember_scroll()

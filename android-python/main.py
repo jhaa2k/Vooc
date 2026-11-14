@@ -362,39 +362,37 @@ class VoocRoot(FloatLayout):
         return frame
 
     def _player_card(self):
-        c = m3.Box(orientation="vertical", bg=T.surface1, radius=dp(24), padding=(dp(14), dp(10), dp(14), dp(6)),
-                   size_hint_y=None, height=dp(156), spacing=0)
-        head = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(10))
-        art = m3.Box(bg=T.primary_container, radius=dp(12), size_hint=(None, None), size=(dp(40), dp(40)), padding=dp(10))
+        """Compact mini player: art + title + prev/play/next on one row, shuffle / seek / repeat below."""
+        c = m3.Box(orientation="vertical", bg=T.surface1, radius=dp(20), padding=(dp(10), dp(6), dp(10), dp(2)),
+                   size_hint_y=None, height=dp(84), spacing=0)
+        head = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(8))
+        art = m3.Box(bg=T.primary_container, radius=dp(10), size_hint=(None, None), size=(dp(36), dp(36)), padding=dp(9))
         art.add_widget(m3.Icon(name="note", tint=T.on_primary_container))
-        head.add_widget(art)
-        col = BoxLayout(orientation="vertical")
-        self.title_lbl = m3.lbl("No track loaded", 15, bold=True)
-        self.sub_lbl = m3.lbl("Import an audio file to start", 11, T.on_var)
+        wrap = BoxLayout(size_hint_x=None, width=dp(36), padding=(0, dp(4)))
+        wrap.add_widget(art)
+        head.add_widget(wrap)
+        col = BoxLayout(orientation="vertical", padding=(0, dp(4)))
+        self.title_lbl = m3.lbl("No track loaded", 14, bold=True)
+        self.sub_lbl = m3.lbl("Import an audio file to start", 10, T.on_var)
         col.add_widget(self.title_lbl)
         col.add_widget(self.sub_lbl)
         head.add_widget(col)
-        c.add_widget(head)
-        seek_row = BoxLayout(size_hint_y=None, height=dp(34), spacing=dp(4))
-        self.pos_lbl = m3.lbl("0:00", 11, T.on_var, size_hint_x=None, width=dp(38))
-        self.seek = m3.Slider3(0, 1, 0, on_change=self._seek_preview, on_commit=self._seek_commit, fmt=fmt_time)
-        self.dur_lbl = m3.lbl("0:00", 11, T.on_var, halign="right", size_hint_x=None, width=dp(38))
-        seek_row.add_widget(self.pos_lbl)
-        seek_row.add_widget(self.seek)
-        seek_row.add_widget(self.dur_lbl)
-        c.add_widget(seek_row)
-        ctl = BoxLayout(size_hint_y=None, height=dp(64), spacing=dp(6))
-        self.shuffle_btn = m3.IconBtn("shuffle", self.toggle_shuffle)
-        self.repeat_btn = m3.IconBtn("repeat", self.cycle_repeat)
-        self.play_btn = m3.IconBtn("play", self.toggle, kind="filled", size=dp(60))
-        ctl.add_widget(Widget())
-        for w in (self.shuffle_btn, m3.IconBtn("prev", self.previous, size=dp(48)), self.play_btn,
-                  m3.IconBtn("next", self.next, size=dp(48)), self.repeat_btn):
-            holder = BoxLayout(size_hint_x=None, width=w.width + dp(4), padding=(dp(2), (dp(64) - w.height) / 2))
+        self.play_btn = m3.IconBtn("play", self.toggle, kind="filled", size=dp(42))
+        for w in (m3.IconBtn("prev", self.previous, size=dp(38)), self.play_btn,
+                  m3.IconBtn("next", self.next, size=dp(38))):
+            holder = BoxLayout(size_hint_x=None, width=w.width, padding=(0, (dp(44) - w.height) / 2))
             holder.add_widget(w)
-            ctl.add_widget(holder)
-        ctl.add_widget(Widget())
-        c.add_widget(ctl)
+            head.add_widget(holder)
+        c.add_widget(head)
+        seek_row = BoxLayout(size_hint_y=None, height=dp(32), spacing=dp(2))
+        self.shuffle_btn = m3.IconBtn("shuffle", self.toggle_shuffle, size=dp(32))
+        self.repeat_btn = m3.IconBtn("repeat", self.cycle_repeat, size=dp(32))
+        self.pos_lbl = m3.lbl("0:00", 10, T.on_var, halign="right", size_hint_x=None, width=dp(32))
+        self.seek = m3.Slider3(0, 1, 0, on_change=self._seek_preview, on_commit=self._seek_commit, fmt=fmt_time)
+        self.dur_lbl = m3.lbl("0:00", 10, T.on_var, size_hint_x=None, width=dp(32))
+        for w in (self.shuffle_btn, self.pos_lbl, self.seek, self.dur_lbl, self.repeat_btn):
+            seek_row.add_widget(w)
+        c.add_widget(seek_row)
         return c
 
     def show(self, page):

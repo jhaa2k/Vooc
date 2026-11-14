@@ -156,11 +156,13 @@ class Icon(Widget):
         self.bind(pos=self.redraw, size=self.redraw, name=self.redraw, tint=self.redraw)
         self.redraw()
 
+    STROKE = 0.06          # stroke half-width relative to the icon radius (thin outline style)
+
     def redraw(self, *_):
         self.canvas.clear()
         s = min(self.width, self.height) / 2.0
         cx, cy = self.x + self.width / 2.0, self.y + self.height / 2.0
-        w = max(dp(1.4), s * 0.13)
+        w = max(dp(0.55), s * self.STROKE)
         n = self.name
         with self.canvas:
             Color(*self.tint)
@@ -168,199 +170,221 @@ class Icon(Widget):
             if draw:
                 draw(cx, cy, s, w)
 
+    # helpers ---------------------------------------------------------
+    @staticmethod
+    def _ln(pts, w, close=False):
+        Line(points=pts, width=w, cap="round", joint="round", close=close)
+
+    def _chev(self, x, y, dx, dy, w):
+        """Open arrow head at (x, y) pointing along (dx, dy)."""
+        L = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / L, dy / L
+        k = L
+        self._ln([x - ux * k - uy * k * .8, y - uy * k + ux * k * .8, x, y,
+                  x - ux * k + uy * k * .8, y - uy * k - ux * k * .8], w)
+
+    # media -----------------------------------------------------------
     def _i_play(self, cx, cy, s, w):
-        Triangle(points=[cx - s * .32, cy - s * .48, cx - s * .32, cy + s * .48, cx + s * .5, cy])
+        self._ln([cx - s * .3, cy - s * .48, cx - s * .3, cy + s * .48, cx + s * .5, cy], w, True)
 
     def _i_pause(self, cx, cy, s, w):
-        RoundedRectangle(pos=(cx - s * .4, cy - s * .45), size=(s * .28, s * .9), radius=[s * .06])
-        RoundedRectangle(pos=(cx + s * .12, cy - s * .45), size=(s * .28, s * .9), radius=[s * .06])
+        for x in (-.24, .24):
+            self._ln([cx + s * x, cy - s * .45, cx + s * x, cy + s * .45], w)
 
     def _i_next(self, cx, cy, s, w, k=1):
-        Triangle(points=[cx - k * s * .42, cy - s * .4, cx - k * s * .42, cy + s * .4, cx + k * s * .22, cy])
-        x = cx + k * s * .26 - (s * .14 if k > 0 else 0)
-        Rectangle(pos=(x, cy - s * .4), size=(s * .14, s * .8))
+        self._ln([cx - k * s * .42, cy - s * .4, cx - k * s * .42, cy + s * .4, cx + k * s * .2, cy], w, True)
+        x = cx + k * s * .38
+        self._ln([x, cy - s * .42, x, cy + s * .42], w)
 
     def _i_prev(self, cx, cy, s, w):
         self._i_next(cx, cy, s, w, -1)
 
     def _i_shuffle(self, cx, cy, s, w):
-        Line(points=[cx - s * .6, cy - s * .35, cx - s * .2, cy - s * .35, cx + s * .2, cy + s * .35, cx + s * .5, cy + s * .35], width=w, joint="round")
-        Line(points=[cx - s * .6, cy + s * .35, cx - s * .2, cy + s * .35, cx + s * .2, cy - s * .35, cx + s * .5, cy - s * .35], width=w, joint="round")
+        self._ln([cx - s * .6, cy - s * .35, cx - s * .25, cy - s * .35, cx + s * .2, cy + s * .35, cx + s * .58, cy + s * .35], w)
+        self._ln([cx - s * .6, cy + s * .35, cx - s * .25, cy + s * .35, cx + s * .2, cy - s * .35, cx + s * .58, cy - s * .35], w)
         for y in (.35, -.35):
-            Triangle(points=[cx + s * .45, cy + s * (y + .18), cx + s * .45, cy + s * (y - .18), cx + s * .68, cy + s * y])
+            self._chev(cx + s * .62, cy + s * y, s * .2, 0, w)
 
     def _i_repeat(self, cx, cy, s, w, one=False):
-        Line(rounded_rectangle=(cx - s * .55, cy - s * .32, s * 1.1, s * .64, s * .2), width=w)
-        Triangle(points=[cx + s * .05, cy + s * .52, cx + s * .05, cy + s * .12, cx + s * .3, cy + s * .32])
+        Line(rounded_rectangle=(cx - s * .58, cy - s * .34, s * 1.16, s * .68, s * .22), width=w)
+        self._chev(cx + s * .22, cy + s * .34, s * .18, 0, w)
+        self._chev(cx - s * .22, cy - s * .34, -s * .18, 0, w)
         if one:
-            Ellipse(pos=(cx - s * .13, cy - s * .13), size=(s * .26, s * .26))
+            self._ln([cx - s * .06, cy + s * .08, cx + s * .04, cy + s * .16, cx + s * .04, cy - s * .16], w)
 
     def _i_repeat_one(self, cx, cy, s, w):
         self._i_repeat(cx, cy, s, w, True)
 
     def _i_note(self, cx, cy, s, w):
-        Ellipse(pos=(cx - s * .55, cy - s * .62), size=(s * .5, s * .4))
-        Line(points=[cx - s * .07, cy - s * .42, cx - s * .07, cy + s * .55, cx + s * .45, cy + s * .35], width=w, joint="round")
+        Line(ellipse=(cx - s * .55, cy - s * .62, s * .48, s * .38), width=w)
+        self._ln([cx - s * .07, cy - s * .44, cx - s * .07, cy + s * .58, cx + s * .45, cy + s * .38], w)
 
     def _i_bars(self, cx, cy, s, w):
         for i, h in enumerate((.45, .85, .6, 1.0, .35)):
-            x = cx - s * .62 + i * s * .28
-            RoundedRectangle(pos=(x, cy - s * .55), size=(s * .17, s * 1.1 * h), radius=[s * .05])
+            x = cx - s * .56 + i * s * .28
+            self._ln([x, cy - s * .55, x, cy - s * .55 + s * 1.1 * h], w)
 
     def _i_tune(self, cx, cy, s, w):
         for i, k in enumerate((.25, -.3, .1)):
             x = cx - s * .45 + i * s * .45
-            Line(points=[x, cy - s * .6, x, cy + s * .6], width=w * .8, cap="round")
-            Ellipse(pos=(x - s * .14, cy + s * k - s * .14), size=(s * .28, s * .28))
+            self._ln([x, cy - s * .6, x, cy + s * k - s * .14], w)
+            self._ln([x, cy + s * k + s * .14, x, cy + s * .6], w)
+            Line(circle=(x, cy + s * k, s * .14), width=w)
 
     def _i_layers(self, cx, cy, s, w):
-        for dy in (.3, 0, -.3):
-            Line(points=[cx - s * .6, cy + s * dy, cx, cy + s * (dy + .28), cx + s * .6, cy + s * dy, cx, cy + s * (dy - .28), cx - s * .6, cy + s * dy], width=w * .8, joint="round")
+        self._ln([cx - s * .6, cy + s * .2, cx, cy + s * .52, cx + s * .6, cy + s * .2, cx, cy - s * .12], w, True)
+        for dy in (-.12, -.42):
+            self._ln([cx - s * .6, cy + s * (dy + .02), cx, cy + s * (dy - .3), cx + s * .6, cy + s * (dy + .02)], w)
 
     def _i_studio(self, cx, cy, s, w):
         for dx in (-1, 1):
             for dy in (-1, 1):
-                RoundedRectangle(pos=(cx + dx * s * .3 - s * .24, cy + dy * s * .3 - s * .24), size=(s * .48, s * .48), radius=[s * .12])
+                Line(rounded_rectangle=(cx + dx * s * .3 - s * .22, cy + dy * s * .3 - s * .22, s * .44, s * .44, s * .1),
+                     width=w)
 
+    # actions ---------------------------------------------------------
     def _i_plus(self, cx, cy, s, w):
-        Line(points=[cx - s * .5, cy, cx + s * .5, cy], width=w, cap="round")
-        Line(points=[cx, cy - s * .5, cx, cy + s * .5], width=w, cap="round")
+        self._ln([cx - s * .5, cy, cx + s * .5, cy], w)
+        self._ln([cx, cy - s * .5, cx, cy + s * .5], w)
 
     def _i_close(self, cx, cy, s, w):
-        Line(points=[cx - s * .4, cy - s * .4, cx + s * .4, cy + s * .4], width=w, cap="round")
-        Line(points=[cx - s * .4, cy + s * .4, cx + s * .4, cy - s * .4], width=w, cap="round")
+        self._ln([cx - s * .4, cy - s * .4, cx + s * .4, cy + s * .4], w)
+        self._ln([cx - s * .4, cy + s * .4, cx + s * .4, cy - s * .4], w)
 
     def _i_check(self, cx, cy, s, w):
-        Line(points=[cx - s * .45, cy, cx - s * .12, cy - s * .35, cx + s * .5, cy + s * .35], width=w * 1.1, cap="round", joint="round")
+        self._ln([cx - s * .45, cy, cx - s * .12, cy - s * .35, cx + s * .5, cy + s * .35], w)
 
     def _i_eye(self, cx, cy, s, w, off=False):
-        Line(ellipse=(cx - s * .65, cy - s * .38, s * 1.3, s * .76), width=w)
-        Ellipse(pos=(cx - s * .2, cy - s * .2), size=(s * .4, s * .4))
+        self._ln([cx - s * .65, cy, cx - s * .3, cy + s * .34, cx, cy + s * .4, cx + s * .3, cy + s * .34, cx + s * .65, cy,
+                  cx + s * .3, cy - s * .34, cx, cy - s * .4, cx - s * .3, cy - s * .34], w, True)
+        Line(circle=(cx, cy, s * .17), width=w)
         if off:
-            Line(points=[cx - s * .6, cy - s * .6, cx + s * .6, cy + s * .6], width=w * 1.1, cap="round")
+            self._ln([cx - s * .6, cy - s * .6, cx + s * .6, cy + s * .6], w)
 
     def _i_eye_off(self, cx, cy, s, w):
         self._i_eye(cx, cy, s, w, True)
 
     def _i_lock(self, cx, cy, s, w, open_=False):
-        RoundedRectangle(pos=(cx - s * .45, cy - s * .55), size=(s * .9, s * .65), radius=[s * .12])
+        Line(rounded_rectangle=(cx - s * .45, cy - s * .55, s * .9, s * .65, s * .12), width=w)
         r = s * .27
         top = cy + s * .3
         Line(circle=(cx, top, r, -90, 90), width=w)
-        Line(points=[cx - r, top, cx - r, cy + s * .1], width=w)
-        Line(points=[cx + r, top, cx + r, cy + (s * .22 if open_ else s * .1)], width=w)
+        self._ln([cx - r, top, cx - r, cy + s * .1], w)
+        self._ln([cx + r, top, cx + r, cy + (s * .22 if open_ else s * .1)], w)
 
     def _i_unlock(self, cx, cy, s, w):
         self._i_lock(cx, cy, s, w, True)
 
     def _i_up(self, cx, cy, s, w, k=1):
-        Line(points=[cx - s * .4, cy - k * s * .15, cx, cy + k * s * .25, cx + s * .4, cy - k * s * .15], width=w, cap="round", joint="round")
+        self._ln([cx - s * .4, cy - k * s * .15, cx, cy + k * s * .25, cx + s * .4, cy - k * s * .15], w)
 
     def _i_down(self, cx, cy, s, w):
         self._i_up(cx, cy, s, w, -1)
 
     def _i_delete(self, cx, cy, s, w):
-        Line(points=[cx - s * .5, cy + s * .4, cx + s * .5, cy + s * .4], width=w, cap="round")
-        Line(points=[cx - s * .15, cy + s * .55, cx + s * .15, cy + s * .55], width=w, cap="round")
-        Line(points=[cx - s * .38, cy + s * .3, cx - s * .3, cy - s * .55, cx + s * .3, cy - s * .55, cx + s * .38, cy + s * .3], width=w, joint="round")
+        self._ln([cx - s * .5, cy + s * .4, cx + s * .5, cy + s * .4], w)
+        self._ln([cx - s * .15, cy + s * .55, cx + s * .15, cy + s * .55], w)
+        self._ln([cx - s * .38, cy + s * .3, cx - s * .3, cy - s * .55, cx + s * .3, cy - s * .55, cx + s * .38, cy + s * .3], w)
+        for x in (-.1, .1):
+            self._ln([cx + s * x, cy + s * .15, cx + s * x, cy - s * .35], w)
 
     def _i_copy(self, cx, cy, s, w):
         Line(rounded_rectangle=(cx - s * .55, cy - s * .55, s * .75, s * .75, s * .12), width=w)
-        Line(points=[cx - s * .25, cy + s * .35, cx - s * .25, cy + s * .55, cx + s * .55, cy + s * .55, cx + s * .55, cy - s * .25, cx + s * .35, cy - s * .25], width=w, joint="round")
+        self._ln([cx - s * .25, cy + s * .35, cx - s * .25, cy + s * .55, cx + s * .55, cy + s * .55,
+                  cx + s * .55, cy - s * .25, cx + s * .35, cy - s * .25], w)
 
     def _i_save(self, cx, cy, s, w):
-        Line(points=[cx, cy + s * .55, cx, cy - s * .2], width=w, cap="round")
-        Line(points=[cx - s * .3, cy + s * .1, cx, cy - s * .22, cx + s * .3, cy + s * .1], width=w, cap="round", joint="round")
-        Line(points=[cx - s * .55, cy - s * .2, cx - s * .55, cy - s * .55, cx + s * .55, cy - s * .55, cx + s * .55, cy - s * .2], width=w, joint="round")
+        self._ln([cx, cy + s * .55, cx, cy - s * .2], w)
+        self._ln([cx - s * .3, cy + s * .1, cx, cy - s * .22, cx + s * .3, cy + s * .1], w)
+        self._ln([cx - s * .55, cy - s * .2, cx - s * .55, cy - s * .55, cx + s * .55, cy - s * .55, cx + s * .55, cy - s * .2], w)
 
     def _i_folder(self, cx, cy, s, w):
-        Line(points=[cx - s * .6, cy + s * .4, cx - s * .15, cy + s * .4, cx, cy + s * .25, cx + s * .6, cy + s * .25,
-                     cx + s * .6, cy - s * .45, cx - s * .6, cy - s * .45, cx - s * .6, cy + s * .4], width=w, joint="round")
+        self._ln([cx - s * .6, cy + s * .4, cx - s * .15, cy + s * .4, cx, cy + s * .25, cx + s * .6, cy + s * .25,
+                  cx + s * .6, cy - s * .45, cx - s * .6, cy - s * .45], w, True)
 
     def _i_sun(self, cx, cy, s, w):
-        Line(circle=(cx, cy, s * .28), width=w)
+        Line(circle=(cx, cy, s * .26), width=w)
         for i in range(8):
             a = i * math.pi / 4
-            Line(points=[cx + math.cos(a) * s * .45, cy + math.sin(a) * s * .45, cx + math.cos(a) * s * .62, cy + math.sin(a) * s * .62], width=w * .9, cap="round")
+            self._ln([cx + math.cos(a) * s * .45, cy + math.sin(a) * s * .45,
+                      cx + math.cos(a) * s * .62, cy + math.sin(a) * s * .62], w)
 
     def _i_moon(self, cx, cy, s, w):
         Line(circle=(cx, cy, s * .55), width=w)
-        Ellipse(pos=(cx - s * .55, cy - s * .55), size=(s * 1.1, s * 1.1), angle_start=180, angle_end=360)
+        Line(circle=(cx, cy, s * .55, 180, 360), width=w)
+        self._ln([cx, cy - s * .55, cx, cy + s * .55], w)
 
     _i_theme = _i_moon
 
     def _i_text(self, cx, cy, s, w):
-        Line(points=[cx - s * .5, cy + s * .5, cx + s * .5, cy + s * .5], width=w * 1.1, cap="round")
-        Line(points=[cx, cy + s * .5, cx, cy - s * .55], width=w * 1.1, cap="round")
+        self._ln([cx - s * .5, cy + s * .5, cx + s * .5, cy + s * .5], w)
+        self._ln([cx, cy + s * .5, cx, cy - s * .55], w)
 
     def _i_image(self, cx, cy, s, w):
         Line(rounded_rectangle=(cx - s * .6, cy - s * .5, s * 1.2, s, s * .15), width=w)
-        Line(points=[cx - s * .45, cy - s * .3, cx - s * .1, cy + s * .1, cx + s * .1, cy - s * .1, cx + s * .25, cy + s * .05, cx + s * .45, cy - s * .3], width=w, joint="round")
-        Ellipse(pos=(cx + s * .12, cy + s * .18), size=(s * .2, s * .2))
+        self._ln([cx - s * .45, cy - s * .3, cx - s * .1, cy + s * .1, cx + s * .1, cy - s * .1, cx + s * .25, cy + s * .05,
+                  cx + s * .45, cy - s * .3], w)
+        Line(circle=(cx + s * .22, cy + s * .26, s * .09), width=w)
 
     def _i_back(self, cx, cy, s, w):
-        Line(points=[cx + s * .5, cy, cx - s * .5, cy], width=w, cap="round")
-        Line(points=[cx - s * .1, cy + s * .42, cx - s * .52, cy, cx - s * .1, cy - s * .42], width=w, cap="round", joint="round")
+        self._ln([cx + s * .5, cy, cx - s * .5, cy], w)
+        self._ln([cx - s * .1, cy + s * .42, cx - s * .52, cy, cx - s * .1, cy - s * .42], w)
 
     def _i_reset(self, cx, cy, s, w):
         Line(circle=(cx, cy, s * .45, 60, 360), width=w)
-        Triangle(points=[cx + s * .22, cy + s * .62, cx + s * .52, cy + s * .3, cx + s * .12, cy + s * .25])
+        self._chev(cx + s * .39, cy + s * .23, s * .1, s * .17, w)
 
     def _i_star(self, cx, cy, s, w):
-        import math
         pts = []
-        for k in range(11):
-            r = s * (.62 if k % 2 == 0 else .26)
+        for k in range(10):
+            r = s * (.62 if k % 2 == 0 else .27)
             a = math.pi / 2 + k * math.pi / 5
             pts += [cx + r * math.cos(a), cy + r * math.sin(a)]
-        Line(points=pts, width=w, joint="round")
+        self._ln(pts, w, True)
 
     def _i_star_on(self, cx, cy, s, w):
-        import math
         outer = []
         for k in range(10):
-            r = s * (.78 if k % 2 == 0 else .34)
+            r = s * (.66 if k % 2 == 0 else .29)
             a = math.pi / 2 + k * math.pi / 5
             outer.append((cx + r * math.cos(a), cy + r * math.sin(a)))
         for k in range(10):
             (x1, y1), (x2, y2) = outer[k], outer[(k + 1) % 10]
             Triangle(points=[cx, cy, x1, y1, x2, y2])
-        Line(points=[c for p in outer + outer[:1] for c in p], width=w * .6, joint="round")
+        self._ln([c for p in outer for c in p], w, True)
 
     def _i_eyedropper(self, cx, cy, s, w):
-        Line(points=[cx - s * .55, cy - s * .55, cx + s * .15, cy + s * .15], width=w * 1.2, cap="round")
-        Line(points=[cx + s * .02, cy + s * .42, cx + s * .42, cy + s * .02], width=w * 1.6, cap="round")
-        Ellipse(pos=(cx + s * .18, cy + s * .18), size=(s * .42, s * .42))
+        self._ln([cx - s * .55, cy - s * .55, cx + s * .12, cy + s * .12], w)
+        self._ln([cx - s * .02, cy + s * .4, cx + s * .4, cy - s * .02], w)
+        Line(circle=(cx + s * .36, cy + s * .36, s * .2), width=w)
 
     def _i_undo(self, cx, cy, s, w):
-        Line(circle=(cx, cy - s * .05, s * .45, -80, 160), width=w)
-        Triangle(points=[cx - s * .62, cy + s * .02, cx - s * .2, cy + s * .02, cx - s * .41, cy + s * .42])
+        Line(circle=(cx + s * .05, cy - s * .05, s * .45, -80, 170), width=w)
+        self._chev(cx - s * .4, cy - s * .02, -s * .04, -s * .2, w)
 
     def _i_redo(self, cx, cy, s, w):
-        Line(circle=(cx, cy - s * .05, s * .45, -160, 80), width=w)
-        Triangle(points=[cx + s * .62, cy + s * .02, cx + s * .2, cy + s * .02, cx + s * .41, cy + s * .42])
+        Line(circle=(cx - s * .05, cy - s * .05, s * .45, -170, 80), width=w)
+        self._chev(cx + s * .4, cy - s * .02, s * .04, -s * .2, w)
 
     def _i_info(self, cx, cy, s, w):
         Line(circle=(cx, cy, s * .55), width=w)
-        Ellipse(pos=(cx - w, cy + s * .22), size=(w * 2, w * 2))
-        Line(points=[cx, cy - s * .3, cx, cy + s * .05], width=w, cap="round")
+        Ellipse(pos=(cx - w * 1.2, cy + s * .22), size=(w * 2.4, w * 2.4))
+        self._ln([cx, cy - s * .3, cx, cy + s * .05], w)
 
     def _i_sparkle(self, cx, cy, s, w):
-        for k, (dx, dy, r) in enumerate(((0, 0, .55), (.45, .45, .22), (-.45, -.4, .18))):
+        for dx, dy, r in ((0, 0, .55), (.45, .45, .2), (-.45, -.42, .16)):
             x, y, rr = cx + dx * s, cy + dy * s, r * s
-            Triangle(points=[x - rr * .25, y, x + rr * .25, y, x, y + rr])
-            Triangle(points=[x - rr * .25, y, x + rr * .25, y, x, y - rr])
-            Triangle(points=[x, y - rr * .25, x, y + rr * .25, x + rr, y])
-            Triangle(points=[x, y - rr * .25, x, y + rr * .25, x - rr, y])
+            q = rr * .22
+            self._ln([x, y + rr, x + q, y + q, x + rr, y, x + q, y - q, x, y - rr, x - q, y - q, x - rr, y, x - q, y + q], w, True)
 
     def _i_export(self, cx, cy, s, w):
-        Line(points=[cx, cy - s * .2, cx, cy + s * .55], width=w, cap="round")
-        Line(points=[cx - s * .3, cy + s * .25, cx, cy + s * .57, cx + s * .3, cy + s * .25], width=w, cap="round", joint="round")
-        Line(points=[cx - s * .55, cy + s * .05, cx - s * .55, cy - s * .55, cx + s * .55, cy - s * .55, cx + s * .55, cy + s * .05], width=w, joint="round")
+        self._ln([cx, cy - s * .2, cx, cy + s * .55], w)
+        self._ln([cx - s * .3, cy + s * .25, cx, cy + s * .57, cx + s * .3, cy + s * .25], w)
+        self._ln([cx - s * .55, cy + s * .05, cx - s * .55, cy - s * .55, cx + s * .55, cy - s * .55, cx + s * .55, cy + s * .05], w)
 
     def _i_more(self, cx, cy, s, w):
         for dy in (-.4, 0, .4):
-            Ellipse(pos=(cx - s * .1, cy + dy * s - s * .1), size=(s * .2, s * .2))
+            Ellipse(pos=(cx - s * .08, cy + dy * s - s * .08), size=(s * .16, s * .16))
 
 
 # ---------------------------------------------------------------- touch guard

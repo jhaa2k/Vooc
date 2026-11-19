@@ -1700,7 +1700,7 @@ private fun ColorWheelField(label: String, value: String, onColorChange: (String
                             val dx = point.x - cx
                             val dy = point.y - cy
                             val radius = kotlin.math.sqrt(dx * dx + dy * dy)
-                            val maxRadius = size.minDimension * 0.48f
+                            val maxRadius = minOf(size.width, size.height).toFloat() * 0.48f
                             val hue = ((Math.toDegrees(kotlin.math.atan2(dy, dx).toDouble()) + 360.0) % 360.0).toFloat()
                             val saturation = (radius / maxRadius).coerceIn(0f, 1f)
                             val hsv = floatArrayOf(hue, saturation, 1f)

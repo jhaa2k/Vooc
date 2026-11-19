@@ -31,6 +31,7 @@ import kotlin.math.min
 import kotlin.math.sin
 import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.LayerKind
+import com.vooc.visualizer.studio.MeasureWhatEngine
 
 /** Encodes H.264 video and muxes a compatible AAC source track into one MP4 timeline. */
 object VideoExportEngine {
@@ -281,13 +282,28 @@ object VideoExportEngine {
             paint.color = color
             paint.alpha = (layer.opacity.coerceIn(0f, 100f) * 2.55f).toInt()
             paint.style = Paint.Style.FILL
-            val cx = width * (0.5f + layer.x / 200f)
-            val cy = height * (0.5f + layer.y / 200f)
-            val scale = layer.scale.coerceIn(1f, 400f) / 100f
+            val bassLevel = providerSamples?.take((providerSamples.size / 5).coerceAtLeast(1))
+                ?.average()?.toFloat() ?: audioLevel
+            val trebleLevel = providerSamples?.takeLast((providerSamples.size / 5).coerceAtLeast(1))
+                ?.average()?.toFloat() ?: audioLevel
+            val motion = MeasureWhatEngine.evaluate(
+                mode = layer.measureWhat,
+                runtimeSeconds = seconds,
+                trackPositionSeconds = seconds,
+                playing = true,
+                beatPulse = providerBeat,
+                bass = bassLevel,
+                treble = trebleLevel,
+                bpm = 120f,
+                seed = layer.id
+            )
+            val cx = width * (0.5f + layer.x / 200f + motion.offsetX)
+            val cy = height * (0.5f + layer.y / 200f + motion.offsetY)
+            val scale = (layer.scale.coerceIn(1f, 400f) / 100f * motion.scale).coerceIn(0.01f, 4f)
             val count = layer.barCount.coerceIn(8, 256)
             val pulse = if (providerSamples != null) (0.08f + providerBeat.coerceIn(0f, 1f) * 0.92f) else (0.08f + audioLevel.coerceIn(0f, 1f) * (0.35f + layer.sensitivity.coerceIn(0f, 200f) / 100f)).coerceIn(0.08f, 1f)
             canvas.save()
-            canvas.rotate(layer.rotation, cx, cy)
+            canvas.rotate(layer.rotation + motion.rotation, cx, cy)
             when (layer.kind) {
                 LayerKind.BACKGROUND -> canvas.drawColor(color)
                 LayerKind.BARS, LayerKind.BARSH, LayerKind.BLOCKS, LayerKind.GRID -> {

@@ -62,8 +62,7 @@ class SpectrumBarsRuntime {
             val delaySeconds = reactionSeconds + accumulatedSeconds * t
             val targetTime = clockSeconds - delaySeconds
             val delayedSource = if (delaySeconds <= 0f || history.size <= 1) source else {
-                history.firstOrNull { it.first >= targetTime }?.second
-                    ?: history.lastOrNull { it.first <= targetTime }?.second
+                history.lastOrNull { it.first <= targetTime }?.second
                     ?: history.first.second
             }
             val sourcePosition = if (logarithmicInput && delayedSource.size > 1) {

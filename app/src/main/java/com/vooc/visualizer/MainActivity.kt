@@ -290,8 +290,7 @@ private fun ProjectBrowserScreen(
     renameTarget?.let { target ->
         AlertDialog(onDismissRequest = { renameTarget = null }, containerColor = Panel,
             title = { Text("RENAME PROJECT", color = Color.White) },
-            text = { OutlinedTextField(value = renameValue, onValueChange = { renameValue = it.take(80) },
-                singleLine = true, label = { Text("PROJECT NAME") }) },
+            text = { CompactTextInput("PROJECT NAME", renameValue) { renameValue = it.take(80) } },
             confirmButton = { TextButton(onClick = { onRename(target, renameValue); renameTarget = null }) { Text("SAVE", color = Lime) } },
             dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("CANCEL", color = Muted) } }
         )

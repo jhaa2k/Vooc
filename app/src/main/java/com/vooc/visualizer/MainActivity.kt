@@ -313,7 +313,7 @@ private fun VoocStudio(
                                 project = StudioPresets.create(preset)
                                 selectedId = project.layers.lastOrNull()?.id ?: 0L
                             }, shape = RectangleShape, contentPadding = PaddingValues(horizontal = 11.dp, vertical = 5.dp)) {
-                                Text(preset, style = MaterialTheme.typography.labelSmall)
+                                Text(preset.uppercase(), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -329,7 +329,7 @@ private fun VoocStudio(
                             DropdownMenu(expanded = showLayerMenu, onDismissRequest = { showLayerMenu = false },
                                 modifier = Modifier.background(Panel)) {
                                 LayerKind.entries.forEach { kind ->
-                                    DropdownMenuItem(text = { Text(kind.title) }, onClick = {
+                                    DropdownMenuItem(text = { Text(kind.title.uppercase()) }, onClick = {
                                         val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
                                         val layer = VisualLayer(id, kind)
                                         project = project.copy(layers = project.layers + layer)
@@ -354,7 +354,7 @@ private fun VoocStudio(
                         }, colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
                         Column(Modifier.weight(1f)) {
                             Text(layer.name.uppercase(), color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Text(layer.kind.name, color = Muted, style = MaterialTheme.typography.labelSmall)
+                            Text(layer.kind.name.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
                         IconButton(onClick = {
                             project = project.copy(layers = project.layers.filterNot { it.id == layer.id })
@@ -633,6 +633,59 @@ private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.Analyzer
             LayerSlider("WAVEFORM SAMPLES", config.waveformSamples.toFloat(), 256f..8192f) {
                 onConfigChange(config.copy(waveformSamples = (it.toInt() / 256 * 256).coerceIn(256, 8192)))
             }
+            OptionDropdown("CUSTOM FREQUENCY BANDS", config.bands.bands.size.toString(), (1..32).map { it.toString() }) {
+                onConfigChange(config.copy(bands = config.bands.copy(bands = com.vooc.visualizer.analyzer.BandConfig.logSpaced(it.toInt()))))
+            }
+            OptionDropdown("CROSSOVER FILTER", config.bands.crossover.name, com.vooc.visualizer.analyzer.CrossoverOrder.entries.map { it.name }) {
+                onConfigChange(config.copy(bands = config.bands.copy(crossover = com.vooc.visualizer.analyzer.CrossoverOrder.valueOf(it))))
+            }
+            OptionDropdown("FILTER SLOPE", config.bands.slope.name, com.vooc.visualizer.analyzer.BandSlope.entries.map { it.name }) {
+                onConfigChange(config.copy(bands = config.bands.copy(slope = com.vooc.visualizer.analyzer.BandSlope.valueOf(it))))
+            }
+            LayerSlider("DB FLOOR", config.bands.dbFloor, -120f..-10f) {
+                onConfigChange(config.copy(bands = config.bands.copy(dbFloor = it)))
+            }
+        }
+        items(config.bands.bands, key = { it.label }) { band ->
+            Column(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(band.label.uppercase(), color = Lime, style = MaterialTheme.typography.labelMedium)
+                LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f) { value ->
+                    val updated = config.bands.bands.map { current ->
+                        if (current.label == band.label) current.copy(lowHz = value.coerceAtMost(current.highHz - 1f)) else current
+                    }
+                    onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
+                }
+                LayerSlider("HIGH CUT HZ", band.highHz, 250f..20000f) { value ->
+                    val updated = config.bands.bands.map { current ->
+                        if (current.label == band.label) current.copy(highHz = value.coerceAtLeast(current.lowHz + 1f)) else current
+                    }
+                    onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
+                }
+                LayerSlider("GAIN", band.gain, 0f..2f) { value ->
+                    val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(gain = value) else current }
+                    onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
+                }
+                LayerSlider("SMOOTHING", band.smoothing * 100f, 0f..99f) { value ->
+                    val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(smoothing = value / 100f) else current }
+                    onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
+                }
+                LayerSlider("ATTACK MS", band.attackMs, 0f..1000f) { value ->
+                    val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(attackMs = value) else current }
+                    onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
+                }
+                LayerSlider("RELEASE MS", band.releaseMs, 0f..1000f) { value ->
+                    val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(releaseMs = value) else current }
+                    onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = band.agc, onCheckedChange = { enabled ->
+                        val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(agc = enabled) else current }
+                        onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
+                    }, colors = CheckboxDefaults.colors(checkedColor = Lime))
+                    Text("AUTO GAIN CONTROL", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
     }
 }
@@ -820,7 +873,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                             textAlign = android.graphics.Paint.Align.CENTER
                             typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
                         }
-                        canvas.nativeCanvas.drawText(layer.textContent, center.x, center.y, paint)
+                        canvas.nativeCanvas.drawText(layer.textContent.uppercase(), center.x, center.y, paint)
                     }
                     LayerKind.IMAGE -> {
                         val bitmap = imageBitmaps[layer.id]
@@ -842,7 +895,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
 private fun OptionDropdown(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(label, color = Muted, style = MaterialTheme.typography.labelSmall)
+        Text(label.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RectangleShape) {
                 Text(value.uppercase(), modifier = Modifier.weight(1f), color = Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -861,7 +914,7 @@ private fun OptionDropdown(label: String, value: String, options: List<String>, 
 private fun EditorSection(title: String, expanded: String, onToggle: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth().background(Panel)) {
         Row(Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 10.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(title, color = Color.White, style = MaterialTheme.typography.labelMedium, letterSpacing = 1.2.sp)
+            Text(title.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, letterSpacing = 1.2.sp)
             Text(if (expanded == title) "−" else "+", color = Lime)
         }
         if (expanded == title) Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), content = content)
@@ -872,7 +925,7 @@ private fun EditorSection(title: String, expanded: String, onToggle: () -> Unit,
 private fun LayerSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(bottom = 5.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, color = Muted, style = MaterialTheme.typography.labelSmall)
+            Text(label.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
             Text(value.toInt().toString(), color = Lime, style = MaterialTheme.typography.labelSmall)
         }
         Slider(value = value.coerceIn(range), onValueChange = onChange, valueRange = range,
@@ -968,37 +1021,44 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
 
 @Composable
 private fun ExportScreen(project: StudioProject, onProjectChange: (StudioProject) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text("VIDEO EXPORT", color = Lime, letterSpacing = 2.sp, style = MaterialTheme.typography.titleMedium)
         Text("OUTPUT RESOLUTION", color = Muted, style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(1280 to 720, 1920 to 1080, 2560 to 1440).forEach { size ->
-                OutlinedButton(
-                    onClick = { onProjectChange(project.copy(width = size.first, height = size.second)) },
-                    shape = RectangleShape,
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = if (project.width == size.first) Lime else Color.White
-                    )
-                ) { Text("${size.first}p") }
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(854 to 480, 1280 to 720, 1920 to 1080, 2560 to 1440, 3840 to 2160).forEach { size ->
+                OutlinedButton(onClick = { onProjectChange(project.copy(width = size.first, height = size.second)) },
+                    shape = RectangleShape, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (project.width == size.first) Lime else Color.White)) {
+                    Text("${size.second}P")
+                }
+            }
+        }
+        Text("ASPECT RATIO", color = Muted, style = MaterialTheme.typography.labelSmall)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("16:9" to (1920 to 1080), "9:16" to (1080 to 1920), "1:1" to (1080 to 1080),
+                "4:3" to (1440 to 1080), "21:10" to (2520 to 1200)).forEach { ratio ->
+                OutlinedButton(onClick = { onProjectChange(project.copy(width = ratio.second.first, height = ratio.second.second)) },
+                    shape = RectangleShape, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (project.width * ratio.second.second == project.height * ratio.second.first) Lime else Color.White)) {
+                    Text(ratio.first)
+                }
             }
         }
         Text("FRAME RATE", color = Muted, style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(30, 60).forEach { rate ->
-                OutlinedButton(
-                    onClick = { onProjectChange(project.copy(fps = rate)) },
-                    shape = RectangleShape,
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = if (project.fps == rate) Lime else Color.White
-                    )
-                ) { Text("$rate FPS") }
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(24, 25, 30, 50, 60).forEach { rate ->
+                OutlinedButton(onClick = { onProjectChange(project.copy(fps = rate)) },
+                    shape = RectangleShape, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (project.fps == rate) Lime else Color.White)) {
+                    Text("$rate FPS")
+                }
             }
         }
         Text("OUTPUT SUMMARY", color = Muted, style = MaterialTheme.typography.labelSmall)
         Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Color.White)
         Text("CONTAINER: MP4  •  VIDEO: H.264  •  AUDIO: AAC", color = Color.White)
-        Spacer(Modifier.height(8.dp))
-        Text("The export encoder and audio/video muxer are not implemented yet. These settings are saved with the project, but this build cannot render an MP4. No fake export action is shown.", color = Muted)
+        Text("THE VIDEO ENCODER AND AUDIO/VIDEO MUXER ARE NOT IMPLEMENTED YET. SETTINGS ARE SAVED, BUT THIS BUILD CANNOT RENDER AN MP4.", color = Muted)
     }
 }
 

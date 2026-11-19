@@ -349,6 +349,9 @@ private fun VoocStudio(
                 project = imported
                 selectedId = imported.layers.lastOrNull()?.id ?: 0L
                 onSave(imported)
+                val created = ProjectRepository.create(context, imported)
+                currentProjectId = created?.id
+                projectEntries = ProjectRepository.list(context)
             }
         }
     }
@@ -373,7 +376,14 @@ private fun VoocStudio(
         onDispose { player.removeListener(listener) }
     }
     LaunchedEffect(Unit) {
-        if (currentProjectId == null) {
+        val existing = projectEntries.firstOrNull()
+        if (existing != null) {
+            ProjectRepository.load(context, existing.id)?.let { restored ->
+                project = restored
+                selectedId = restored.layers.lastOrNull()?.id ?: 0L
+                currentProjectId = existing.id
+            }
+        } else {
             val created = ProjectRepository.create(context, project)
             currentProjectId = created?.id
             projectEntries = ProjectRepository.list(context)
@@ -481,11 +491,15 @@ private fun VoocStudio(
                     },
                     onDelete = { entry ->
                         ProjectRepository.delete(context, entry.id)
-                        projectEntries = ProjectRepository.list(context)
+                        val refreshed = ProjectRepository.list(context)
+                        projectEntries = refreshed
                         if (currentProjectId == entry.id) {
-                            val fallback = projectEntries.firstOrNull()
+                            val fallback = refreshed.firstOrNull()
                             currentProjectId = fallback?.id
-                            fallback?.let { ProjectRepository.load(context, it.id) }?.let { project = it }
+                            fallback?.let { ProjectRepository.load(context, it.id) }?.let {
+                                project = it
+                                selectedId = it.layers.lastOrNull()?.id ?: 0L
+                            }
                         }
                     },
                     onToggleAudio = { showAudioPlayer = !showAudioPlayer },

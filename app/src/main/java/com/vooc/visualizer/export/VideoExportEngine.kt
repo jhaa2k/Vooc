@@ -458,10 +458,14 @@ object VideoExportEngine {
                     val levels = barFrame.levels
                     val peaks = barFrame.peaks
                     val gap = number("Spacing / Gap", 3f).coerceAtLeast(0f) * width / 1080f
-                    val totalWidth = min(width * 0.86f * scale.coerceIn(0.1f, 2f), width.toFloat())
+                    val scaleVector = element.value("Scale") as? ElementValue.Vector2
+                    val scaleX = ((scaleVector?.x ?: 1.0).toFloat() * scale).coerceIn(0f, 10f)
+                    val scaleYRaw = (scaleVector?.y ?: 1.0).toFloat()
+                    val scaleY = ((if ((element.value("Scale Is Uniform") as? ElementValue.Bool)?.value == true) (scaleVector?.x ?: 1.0).toFloat() else scaleYRaw) * scale).coerceIn(0f, 10f)
+                    val totalWidth = min(width * 0.86f * scaleX, width.toFloat())
                     val slot = totalWidth / count
                     val barWidth = (number("Bar Width", 8f) * width / 1080f).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
-                    val maxHeight = (number("Max Height", height * 0.35f) * width / 1080f * scale).coerceIn(1f, height * 0.95f)
+                    val maxHeight = (number("Max Height", height * 0.35f) * width / 1080f * scaleY).coerceIn(1f, height * 0.95f)
                     val minHeight = (number("Min Height", 0f) * width / 1080f).coerceIn(0f, maxHeight)
                     val design = textValue("Bar Design", "Rounded Rect")
                     val alignment = textValue("Alignment", "Bottom")

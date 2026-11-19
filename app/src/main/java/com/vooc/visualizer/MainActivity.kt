@@ -329,6 +329,7 @@ private fun VoocStudio(
     val context = androidx.compose.ui.platform.LocalContext.current
     var projectEntries by remember { mutableStateOf(ProjectRepository.list(context)) }
     var currentProjectId by remember { mutableStateOf(projectEntries.firstOrNull()?.id) }
+    var repositoryReady by remember { mutableStateOf(false) }
     var showAudioPlayer by remember { mutableStateOf(false) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -388,8 +389,10 @@ private fun VoocStudio(
             currentProjectId = created?.id
             projectEntries = ProjectRepository.list(context)
         }
+        repositoryReady = true
     }
-    LaunchedEffect(project, currentProjectId) {
+    LaunchedEffect(project, currentProjectId, repositoryReady) {
+        if (!repositoryReady) return@LaunchedEffect
         delay(450)
         onSave(project)
         val id = currentProjectId

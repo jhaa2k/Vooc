@@ -1,5 +1,8 @@
 package com.vooc.visualizer.analyzer
 
+import com.vooc.visualizer.studio.ElementDocument
+import com.vooc.visualizer.studio.ElementValue
+import com.vooc.visualizer.studio.StudioElementType
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.max

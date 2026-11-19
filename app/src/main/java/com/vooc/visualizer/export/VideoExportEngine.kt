@@ -406,8 +406,9 @@ object VideoExportEngine {
                     val gap = width * 0.28f / count
                     val barWidth = (width * 0.72f / count).coerceAtLeast(1f)
                     val maxHeight = number("Max Height", height * 0.32f).coerceAtLeast(1f) * scale
+                    val safeSamples = providerSamples?.takeIf { it.isNotEmpty() }
                     repeat(count) { index ->
-                        val sample = providerSamples?.getOrNull((index * (providerSamples?.size ?: 1) / count).coerceIn(0, (providerSamples?.size ?: 1) - 1))?.coerceIn(0f, 1f) ?: audioLevel.coerceIn(0f, 1f)
+                        val sample = safeSamples?.getOrNull((index * safeSamples.size / count).coerceIn(0, safeSamples.lastIndex))?.coerceIn(0f, 1f) ?: audioLevel.coerceIn(0f, 1f)
                         val barHeight = (number("Min Height", 0f) + sample * maxHeight).coerceAtMost(height.toFloat())
                         val x = cx - width * 0.36f + index * (barWidth + gap)
                         canvas.drawRect(x, cy - barHeight / 2f, x + barWidth, cy + barHeight / 2f, paint)

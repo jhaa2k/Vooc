@@ -604,12 +604,26 @@ private fun VoocStudio(
                             }
                             DropdownMenu(expanded = showLayerMenu, onDismissRequest = { showLayerMenu = false },
                                 modifier = Modifier.background(Panel)) {
+                                DropdownMenuItem(text = { Text("VISUAL LAYERS", color = Lime, style = MaterialTheme.typography.labelSmall) }, onClick = {}, enabled = false)
                                 LayerKind.entries.forEach { kind ->
                                     DropdownMenuItem(text = { Text(kind.title.uppercase()) }, onClick = {
                                         val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
                                         val layer = VisualLayer(id, kind)
                                         project = project.copy(layers = project.layers + layer)
                                         selectedId = id
+                                        showLayerMenu = false
+                                    })
+                                }
+                                HorizontalDivider(color = Color(0xFF343A2B))
+                                DropdownMenuItem(text = { Text("COMPOSITION ELEMENTS", color = Lime, style = MaterialTheme.typography.labelSmall) }, onClick = {}, enabled = false)
+                                StudioElementType.entries.forEach { type ->
+                                    DropdownMenuItem(text = { Text(type.displayName.uppercase()) }, onClick = {
+                                        val id = "${type.name.lowercase()}-${System.currentTimeMillis()}"
+                                        val created = ElementPropertyCatalog.create(type, id)
+                                        val next = project.copy(document = project.document.copy(elements = project.document.elements + created))
+                                        project = next
+                                        selectedElementId = id
+                                        onSave(next)
                                         showLayerMenu = false
                                     })
                                 }
@@ -751,14 +765,6 @@ private fun VoocStudio(
                         elements = editableElements,
                         selectedId = selectedElementId,
                         onSelect = { selectedElementId = it },
-                        onAdd = { type ->
-                            val id = "${type.name.lowercase()}-${System.currentTimeMillis()}"
-                            val created = ElementPropertyCatalog.create(type, id)
-                            val next = project.copy(document = project.document.copy(elements = project.document.elements + created))
-                            project = next
-                            selectedElementId = id
-                            onSave(next)
-                        },
                         onChange = { updated ->
                             val next = project.copy(document = project.document.copy(
                                 elements = project.document.elements.filterNot { it.id == updated.id } + updated
@@ -1080,33 +1086,15 @@ private fun ElementStudioEditor(
     elements: List<ElementDocument>,
     selectedId: String,
     onSelect: (String) -> Unit,
-    onAdd: (StudioElementType) -> Unit,
     onChange: (ElementDocument) -> Unit,
     onDelete: (String) -> Unit
 ) {
     var expandedCategory by remember(selectedId) { mutableStateOf("General") }
-    var showAddMenu by remember { mutableStateOf(false) }
     val selected = elements.firstOrNull { it.id == selectedId } ?: elements.firstOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text("COMPOSITION ELEMENTS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
-                Text("${elements.size} ELEMENTS • SPECIFICATION-DRIVEN CONTROLS", color = Muted, style = MaterialTheme.typography.labelSmall)
-            }
-            Box {
-                OutlinedButton(onClick = { showAddMenu = true }, shape = RectangleShape) {
-                    Icon(Icons.Default.Add, null, tint = Lime)
-                    Text("ADD", color = Lime)
-                }
-                DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }, modifier = Modifier.background(Panel)) {
-                    StudioElementType.entries.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.displayName.uppercase(), color = Color.White) },
-                            onClick = { showAddMenu = false; onAdd(type) }
-                        )
-                    }
-                }
-            }
+        Column {
+            Text("COMPOSITION ELEMENTS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
+            Text("${elements.size} ELEMENTS • ADD THEM FROM ADD LAYER", color = Muted, style = MaterialTheme.typography.labelSmall)
         }
         elements.forEach { element ->
             Row(
@@ -1413,7 +1401,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 }
                 (rawValue * layer.sensitivity / 100f).coerceIn(0f, 1f)
             }
-            val smoothed = layerSmoothing.getOrPut(layer.id) { FloatArray(count) }
+            // Presets reuse layer IDs; resize buffers when the sample count changes.
+            val smoothed = layerSmoothing[layer.id]?.takeIf { it.size == count }
+                ?: FloatArray(count).also { layerSmoothing[layer.id] = it }
             val smoothingFactor = (1f - layer.smoothing / 100f * 0.95f).coerceIn(0.03f, 1f)
             for (sampleIndex in 0 until count) {
                 val targetValue = valueAt(sampleIndex)
@@ -1772,14 +1762,25 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
     var seek by remember { mutableFloatStateOf(position.toFloat()) }
     var speed by remember { mutableFloatStateOf(player.playbackParameters.speed) }
     LaunchedEffect(position) { if (!player.isPlaying) seek = position.toFloat() }
-    Column(modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+    Column(
+        modifier.fillMaxSize().offset(y = (-8).dp).verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
         Text("MUSIC LIBRARY / PLAYER", color = Lime, letterSpacing = 2.sp)
-        Box(Modifier.fillMaxWidth().height(150.dp).background(Panel), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("♫", color = Lime, style = MaterialTheme.typography.displayLarge)
-                Text(trackName.uppercase(), color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Box(Modifier.fillMaxWidth().height(76.dp).background(Panel), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text("♫", color = Lime, style = MaterialTheme.typography.headlineMedium)
+                Text(trackName.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text("QUEUE  •  ${player.mediaItemCount} TRACKS", color = Muted, style = MaterialTheme.typography.labelSmall)
             }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { player.seekToPreviousMediaItem() }) { Icon(Icons.Default.SkipPrevious, null, tint = Color.White) }
+            IconButton(onClick = { if (player.isPlaying) player.pause() else player.play() }) {
+                Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Lime, modifier = Modifier.size(42.dp))
+            }
+            IconButton(onClick = { player.seekToNextMediaItem() }) { Icon(Icons.Default.SkipNext, null, tint = Color.White) }
         }
         ThinSlider(
             label = "PLAYBACK SEEK",
@@ -1793,13 +1794,6 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatTime(position), color = Muted, style = MaterialTheme.typography.labelSmall)
             Text(formatTime(duration), color = Muted, style = MaterialTheme.typography.labelSmall)
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { player.seekToPreviousMediaItem() }) { Icon(Icons.Default.SkipPrevious, null, tint = Color.White) }
-            IconButton(onClick = { if (player.isPlaying) player.pause() else player.play() }) {
-                Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Lime, modifier = Modifier.size(42.dp))
-            }
-            IconButton(onClick = { player.seekToNextMediaItem() }) { Icon(Icons.Default.SkipNext, null, tint = Color.White) }
         }
         Column(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1836,7 +1830,7 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
             }
         }
         Text("UP NEXT", color = Lime, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp)
-        Column(Modifier.weight(1f).fillMaxWidth().background(Panel)) {
+        Column(Modifier.heightIn(min = 64.dp, max = 120.dp).fillMaxWidth().background(Panel)) {
             if (player.mediaItemCount == 0) {
                 Text("YOUR QUEUE IS EMPTY. IMPORT AUDIO TO ADD TRACKS.", color = Muted, modifier = Modifier.padding(14.dp))
             } else {

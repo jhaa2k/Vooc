@@ -33,6 +33,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -289,12 +294,32 @@ private fun VoocStudio(
         bottomBar = {
             NavigationBar(containerColor = Panel, tonalElevation = 0.dp) {
                 listOf("LIBRARY", "STUDIO", "TEMPLATES", "EXPORT", "SETTINGS").forEach { item ->
+                    val selected = screen == item
+                    val icon = when (item) {
+                        "LIBRARY" -> Icons.Outlined.LibraryMusic
+                        "STUDIO" -> Icons.Outlined.Tune
+                        "TEMPLATES" -> Icons.Outlined.Collections
+                        "EXPORT" -> Icons.Outlined.FileUpload
+                        else -> Icons.Outlined.Settings
+                    }
                     NavigationBarItem(
-                        selected = screen == item,
+                        selected = selected,
                         onClick = { screen = item },
-                        icon = { Text(when(item) { "LIBRARY" -> "♫"; "STUDIO" -> "◈"; "TEMPLATES" -> "▦"; "EXPORT" -> "⇧"; else -> "⚙" }, color = if (screen == item) Lime else Muted) },
-                        label = { Text(item, letterSpacing = 1.sp) },
-                        colors = NavigationBarItemDefaults.colors(selectedTextColor = Lime, indicatorColor = Color(0xFF303A20))
+                        icon = {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = item,
+                                tint = if (selected) Lime else Muted,
+                                modifier = Modifier.size(23.dp)
+                            )
+                        },
+                        label = null,
+                        alwaysShowLabel = false,
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Lime,
+                            unselectedIconColor = Muted,
+                            indicatorColor = Color(0xFF303A20)
+                        )
                     )
                 }
             }

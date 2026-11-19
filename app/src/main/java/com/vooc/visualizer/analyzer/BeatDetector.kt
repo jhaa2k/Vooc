@@ -3,10 +3,7 @@ package com.vooc.visualizer.analyzer
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.roundToInt
 
 /** Optional bundled onset model for [BeatAlgorithm.NEURAL]. Returns onset probability 0..1 for a frame. */
 interface BeatModel {
@@ -288,6 +285,7 @@ class BeatTracker(
     private val phaseEnergy = FloatArray(pulsesPerBar)
     private var beatCounter = -1
     private var barCount = 0
+    private var downbeatOffset = 0
     private val taps = ArrayList<Double>()
 
     fun reset() {
@@ -296,6 +294,7 @@ class BeatTracker(
         phaseEnergy.fill(0f)
         beatCounter = -1
         barCount = 0
+        downbeatOffset = 0
         taps.clear()
     }
 
@@ -324,8 +323,12 @@ class BeatTracker(
             val idx = beatCounter % pulsesPerBar
             phaseEnergy[idx] += bass
             if (idx == pulsesPerBar - 1) for (i in phaseEnergy.indices) phaseEnergy[i] *= 0.9f
-            val offset = phaseEnergy.indices.maxByOrNull { phaseEnergy[it] } ?: 0
-            val inBar = (idx - offset + pulsesPerBar) % pulsesPerBar
+            val candidate = phaseEnergy.indices.maxByOrNull { phaseEnergy[it] } ?: 0
+            // Hysteresis: only move the downbeat when another phase is clearly stronger (kick on "1").
+            if (candidate != downbeatOffset && phaseEnergy[candidate] > phaseEnergy[downbeatOffset] * 1.25f) {
+                downbeatOffset = candidate
+            }
+            val inBar = (idx - downbeatOffset + pulsesPerBar) % pulsesPerBar
             if (inBar == 0) { downbeat = true; barCount++ }
         }
         val bandBeats = BooleanArray(bands.size)
@@ -334,8 +337,7 @@ class BeatTracker(
             bandBeats[i] = bands[i].process(magnitude, t)
             bandPulses[i] = bands[i].pulse(t)
         }
-        val offset = phaseEnergy.indices.maxByOrNull { phaseEnergy[it] } ?: 0
-        val current = if (beatCounter < 0) 0 else (beatCounter % pulsesPerBar - offset + pulsesPerBar) % pulsesPerBar
+        val current = if (beatCounter < 0) 0 else (beatCounter % pulsesPerBar - downbeatOffset + pulsesPerBar) % pulsesPerBar
         return BeatState(
             beat = beat,
             pulse = main.pulse(t),

@@ -77,6 +77,11 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.vooc.visualizer.analyzer.AnalysisFrame
 import com.vooc.visualizer.analyzer.AudioAnalyzer
+import com.vooc.visualizer.analyzer.AudioProviderConfig
+import com.vooc.visualizer.analyzer.AudioProviderFrame
+import com.vooc.visualizer.analyzer.AudioProviderProcessor
+import com.vooc.visualizer.analyzer.applyTo
+import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.analyzer.FftSize
 import com.vooc.visualizer.analyzer.ChannelMode
 import com.vooc.visualizer.analyzer.WindowFunction
@@ -85,6 +90,8 @@ import com.vooc.visualizer.analyzer.BeatAlgorithm
 import com.vooc.visualizer.playback.VoocAudioEngine
 import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind
+import com.vooc.visualizer.studio.ElementPropertyCatalog
+import com.vooc.visualizer.studio.StudioElementType
 import com.vooc.visualizer.studio.ProjectStore
 import com.vooc.visualizer.studio.ProjectRepository
 import com.vooc.visualizer.studio.ProjectEntry
@@ -330,6 +337,13 @@ private fun VoocStudio(
     var duration by remember { mutableLongStateOf(0L) }
     var position by remember { mutableLongStateOf(0L) }
     var frame by remember { mutableStateOf<AnalysisFrame?>(null) }
+    var providerFrame by remember { mutableStateOf<AudioProviderFrame?>(null) }
+    val providerProcessor = remember { AudioProviderProcessor() }
+    val providerElement = remember(project.document.elements) {
+        project.document.elements.firstOrNull { it.type == StudioElementType.AUDIO_PROVIDER && it.visible }
+            ?: ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-default")
+    }
+    val providerConfig = remember(providerElement) { providerElement.toAudioProviderConfig() }
     var analyzerConfig by remember { mutableStateOf(analyzer.config) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var projectEntries by remember { mutableStateOf(ProjectRepository.list(context)) }
@@ -406,10 +420,28 @@ private fun VoocStudio(
         if (id != null) ProjectRepository.save(context, id, project)
         projectEntries = ProjectRepository.list(context)
     }
-    LaunchedEffect(player, analyzer) {
+    LaunchedEffect(player, analyzer, providerConfig) {
+        providerProcessor.reset()
+        val providerAnalyzerConfig = providerConfig.applyTo(analyzer.config)
+        if (providerAnalyzerConfig != analyzer.config) {
+            analyzer.updateConfig(providerAnalyzerConfig)
+            analyzerConfig = providerAnalyzerConfig
+        }
+        var previousPosition = -1L
         while (true) {
             position = player.currentPosition.coerceAtLeast(0L)
-            if (player.isPlaying) frame = analyzer.analyzeLive(player.currentPosition / 1000.0)
+            if (player.isPlaying) {
+                val currentPosition = player.currentPosition.coerceAtLeast(0L)
+                if (previousPosition >= 0L && (currentPosition < previousPosition || currentPosition - previousPosition > 350L)) {
+                    providerProcessor.reset()
+                }
+                val analyzed = analyzer.analyzeLive(currentPosition / 1000.0)
+                frame = analyzed
+                providerFrame = providerProcessor.process(analyzed, providerConfig)
+                previousPosition = currentPosition
+            } else {
+                previousPosition = -1L
+            }
             delay(16)
         }
     }
@@ -522,7 +554,7 @@ private fun VoocStudio(
                 }
             }
             "EXPORT" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, providerFrame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 ExportScreen(project, onProjectChange = { project = it; onSave(it) }, Modifier.weight(0.60f))
             }
@@ -929,7 +961,7 @@ private fun evaluateAnimatedLayer(project: StudioProject, layer: VisualLayer, ti
 }
 
 @Composable
-private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, playing: Boolean, timeMs: Long, modifier: Modifier = Modifier) {
+private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, playing: Boolean, timeMs: Long, modifier: Modifier = Modifier) {
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(bottom = 5.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(project.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelLarge,
@@ -937,7 +969,7 @@ private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, playing: 
             Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
         VisualizerPreview(modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF343A2B)),
-            layers = project.layers.filter { it.enabled }.map { evaluateAnimatedLayer(project, it, timeMs) }, frame = frame, playing = playing)
+            layers = project.layers.filter { it.enabled }.map { evaluateAnimatedLayer(project, it, timeMs) }, frame = frame, providerFrame = providerFrame, playing = playing)
     }
 }
 
@@ -1165,7 +1197,7 @@ private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLaye
     project.copy(layers = project.layers.map { if (it.id == id) transform(it) else it })
 
 @Composable
-private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, frame: AnalysisFrame?, playing: Boolean) {
+private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, playing: Boolean) {
     var phase by remember { mutableFloatStateOf(0f) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val poppinsTypeface = remember(context) {
@@ -1199,7 +1231,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
             val scale = (layer.scale / 100f).coerceIn(0f, 4f)
             val center = Offset(cx + layer.x / 100f * size.width, cy + layer.y / 100f * size.height)
             val channel = runCatching { frame?.channel(ChannelSelect.valueOf(layer.channel)) }.getOrNull()
-            val spectrum = channel?.spectrum ?: frame?.spectrum ?: FloatArray(64)
+            val providerSamples = providerFrame?.samples
+            val spectrum = providerSamples ?: channel?.spectrum ?: frame?.spectrum ?: FloatArray(64)
             val waveform = frame?.waveform ?: FloatArray(64)
             val band = when (layer.measureWhat) {
                 "Bass" -> frame?.band(0) ?: 0f
@@ -1207,7 +1240,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 "Treble" -> frame?.band(2) ?: 0f
                 "RMS" -> channel?.rms ?: 0f
                 "Peak" -> channel?.peak ?: 0f
-                "Beat" -> frame?.beat?.pulse ?: 0f
+                "Beat" -> providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f
                 "Waveform" -> waveform.maxOfOrNull { kotlin.math.abs(it) } ?: 0f
                 else -> 0f
             }.coerceIn(0f, 1f)
@@ -1220,7 +1253,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
             val valueAt: (Int) -> Float = { index: Int ->
                 val rawValue = if (values.isEmpty()) {
                     0f
-                } else if (layer.measureWhat == "Spectrum" && frame != null) {
+                } else if (layer.measureWhat == "Spectrum" && frame != null && providerSamples == null) {
                     val x = index.toFloat() / (count - 1).coerceAtLeast(1)
                     val minHz: Float = layer.spectrumMinHz.coerceIn(10f, frame.sampleRate.toFloat() * 0.45f)
                     val maxHz: Float = layer.spectrumMaxHz.coerceIn(minHz + 1f, frame.sampleRate.toFloat() * 0.49f)

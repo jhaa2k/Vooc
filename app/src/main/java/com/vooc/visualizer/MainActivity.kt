@@ -428,17 +428,23 @@ private fun LayerSlider(label: String, value: Float, range: ClosedFloatingPointR
 @Composable
 private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, position: Long, duration: Long,
                          picker: androidx.activity.result.ActivityResultLauncher<Array<String>>) {
-    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    var shuffle by remember { mutableStateOf(player.shuffleModeEnabled) }
+    var repeat by remember { mutableIntStateOf(player.repeatMode) }
+    var seek by remember { mutableFloatStateOf(position.toFloat()) }
+    LaunchedEffect(position) { if (!player.isPlaying) seek = position.toFloat() }
+    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("MUSIC PLAYER", color = Lime, letterSpacing = 2.sp)
-        Box(Modifier.fillMaxWidth().weight(1f).background(Panel), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().height(150.dp).background(Panel), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("♫", color = Lime, style = MaterialTheme.typography.displayLarge)
-                Text(trackName, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(trackName, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 Text("QUEUE  •  ${player.mediaItemCount} TRACKS", color = Muted, style = MaterialTheme.typography.labelSmall)
             }
         }
-        Slider(value = if (duration > 0) position.toFloat().coerceIn(0f, duration.toFloat()) else 0f,
-            onValueChange = { player.seekTo(it.toLong()) }, valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+        Slider(value = seek.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+            onValueChange = { seek = it },
+            onValueChangeFinished = { player.seekTo(seek.toLong()) },
+            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
             colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { player.seekToPreviousMediaItem() }) { Icon(Icons.Default.SkipPrevious, null, tint = Color.White) }
@@ -446,6 +452,38 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
                 Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Lime, modifier = Modifier.size(42.dp))
             }
             IconButton(onClick = { player.seekToNextMediaItem() }) { Icon(Icons.Default.SkipNext, null, tint = Color.White) }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { shuffle = !shuffle; player.shuffleModeEnabled = shuffle }) {
+                Text(if (shuffle) "SHUFFLE ON" else "SHUFFLE OFF", color = if (shuffle) Lime else Muted)
+            }
+            TextButton(onClick = {
+                repeat = when (repeat) {
+                    Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                    Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                    else -> Player.REPEAT_MODE_OFF
+                }
+                player.repeatMode = repeat
+            }) {
+                Text(when (repeat) { Player.REPEAT_MODE_ALL -> "REPEAT ALL"; Player.REPEAT_MODE_ONE -> "REPEAT ONE"; else -> "REPEAT OFF" },
+                    color = if (repeat == Player.REPEAT_MODE_OFF) Muted else Lime)
+            }
+        }
+        Text("UP NEXT", color = Lime, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp)
+        Column(Modifier.weight(1f).fillMaxWidth().background(Panel)) {
+            if (player.mediaItemCount == 0) {
+                Text("Your queue is empty. Import audio to add tracks.", color = Muted, modifier = Modifier.padding(14.dp))
+            } else {
+                for (index in 0 until player.mediaItemCount) {
+                    val item = player.getMediaItemAt(index)
+                    val title = item.mediaMetadata.title?.toString()
+                        ?: item.localConfiguration?.uri?.lastPathSegment ?: "Track ${index + 1}"
+                    Row(Modifier.fillMaxWidth().clickable { player.seekTo(index, 0L); player.play() }.padding(horizontal = 12.dp, vertical = 9.dp)) {
+                        Text("${index + 1}.", color = Muted, modifier = Modifier.width(28.dp))
+                        Text(title, color = if (index == player.currentMediaItemIndex) Lime else Color.White, maxLines = 1)
+                    }
+                }
+            }
         }
         OutlinedButton(onClick = { picker.launch(arrayOf("audio/*")) }, modifier = Modifier.fillMaxWidth(), shape = RectangleShape) {
             Icon(Icons.Default.FolderOpen, null); Text("IMPORT MUSIC")

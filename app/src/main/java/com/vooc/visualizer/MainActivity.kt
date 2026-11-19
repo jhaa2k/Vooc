@@ -574,7 +574,7 @@ private fun VoocStudio(
                 )
             }
             "SETTINGS" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, providerFrame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 AnalyzerSettingsScreen(analyzerConfig, onConfigChange = { next ->
                     analyzerConfig = next

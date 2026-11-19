@@ -29,12 +29,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.outlined.Layers
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -621,7 +615,7 @@ private fun VoocStudio(
                             if (!layer.locked) selectedId = layer.id
                         }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Icon(Icons.Outlined.Layers, null, tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Default.FolderOpen, null, tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(15.dp))
                                 Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White,
                                     style = MaterialTheme.typography.labelMedium, maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -635,12 +629,8 @@ private fun VoocStudio(
                             },
                             modifier = Modifier.size(34.dp)
                         ) {
-                            Icon(
-                                if (layer.enabled) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
-                                if (layer.enabled) "Hide layer" else "Show layer",
-                                tint = if (layer.enabled) Lime else Muted,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Text(if (layer.enabled) "◉" else "○", color = if (layer.enabled) Lime else Muted,
+                                style = MaterialTheme.typography.titleMedium)
                         }
                         IconButton(onClick = {
                             project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it })
@@ -661,7 +651,7 @@ private fun VoocStudio(
                                 list.add(index - 1, item)
                                 project = project.copy(layers = list)
                             }
-                        }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Move layer up", tint = Muted) }
+                        }, modifier = Modifier.size(30.dp)) { Text("↑", color = Muted) }
                         IconButton(onClick = {
                             val index = project.layers.indexOfFirst { it.id == layer.id }
                             if (index in 0 until project.layers.lastIndex) {
@@ -670,12 +660,12 @@ private fun VoocStudio(
                                 list.add(index + 1, item)
                                 project = project.copy(layers = list)
                             }
-                        }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Move layer down", tint = Muted) }
+                        }, modifier = Modifier.size(30.dp)) { Text("↓", color = Muted) }
                         IconButton(onClick = {
                             val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
                             project = project.copy(layers = project.layers + layer.copy(id = id, name = layer.name + " Copy"))
                             selectedId = id
-                        }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.ContentCopy, "Duplicate layer", tint = Lime, modifier = Modifier.size(16.dp)) }
+                        }, modifier = Modifier.size(30.dp)) { Text("⧉", color = Lime) }
                     }
                 }
                 item {
@@ -1218,7 +1208,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 "Waveform" -> waveform.maxOfOrNull { kotlin.math.abs(it) } ?: 0f
                 else -> 0f
             }.coerceIn(0f, 1f)
-            val count = layer.barCount.coerceIn(8, 256)
+            val count: Int = layer.barCount.coerceIn(8, 256)
             val values: FloatArray = when (layer.measureWhat) {
                 "Bass", "Mid", "Treble", "RMS", "Peak", "Beat" -> FloatArray(count) { band }
                 "Waveform" -> waveform
@@ -1229,8 +1219,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                     0f
                 } else if (layer.measureWhat == "Spectrum" && frame != null) {
                     val x = index.toFloat() / (count - 1).coerceAtLeast(1)
-                    val minHz = layer.spectrumMinHz.coerceIn(10f, frame.sampleRate * 0.45f)
-                    val maxHz = layer.spectrumMaxHz.coerceIn(minHz + 1f, frame.sampleRate * 0.49f)
+                    val minHz: Float = layer.spectrumMinHz.coerceIn(10f, frame.sampleRate.toFloat() * 0.45f)
+                    val maxHz: Float = layer.spectrumMaxHz.coerceIn(minHz + 1f, frame.sampleRate.toFloat() * 0.49f)
                     val hz = if (layer.spectrumScale == "LOGARITHMIC")
                         minHz * kotlin.math.exp(kotlin.math.ln(maxHz / minHz) * x)
                     else minHz + (maxHz - minHz) * x

@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import android.graphics.BitmapFactory
@@ -1410,6 +1411,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
         while (playing) { phase += 0.08f; delay(16) }
     }
     Canvas(modifier.background(Color.Black)) {
+        clipRect {
         val cx = size.width / 2f
         val cy = size.height / 2f
         layers.forEach { layer ->
@@ -1719,6 +1721,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 }
             }
         }
+        }
     }
 }
 
@@ -1819,7 +1822,6 @@ private fun MeasureWhatDropdown(value: String, options: List<String>, onSelect: 
                     DropdownMenuItem(
                         text = { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(option.uppercase(), style = MaterialTheme.typography.labelMedium, color = Color.White)
-                            Text(MeasureWhatEngine.description(option), style = MaterialTheme.typography.labelSmall, color = Muted)
                         } },
                         onClick = { onSelect(option); expanded = false }
                     )

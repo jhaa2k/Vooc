@@ -7,6 +7,7 @@ import com.vooc.visualizer.analyzer.AudioAnalyzer
 import com.vooc.visualizer.analyzer.AnalyzerConfig
 import com.vooc.visualizer.analyzer.FftSize
 import com.vooc.visualizer.analyzer.AudioProviderProcessor
+import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.studio.ElementPropertyCatalog
 import com.vooc.visualizer.studio.ElementValue
@@ -22,6 +23,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import android.graphics.DashPathEffect
 import android.graphics.Typeface
 import java.nio.ByteBuffer
 import kotlin.math.PI
@@ -30,6 +34,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.pow
 import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.MeasureWhatEngine
@@ -164,6 +169,8 @@ object VideoExportEngine {
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         val imageCache = mutableMapOf<String, Bitmap>()
+        val barRuntimes = mutableMapOf<String, SpectrumBarsRuntime>()
+        val barLastUpdateMs = mutableMapOf<String, Long>()
         project.layers.filter { it.kind == LayerKind.IMAGE && it.imageUri.isNotBlank() }.forEach { layer ->
             runCatching {
                 resolver.openInputStream(Uri.parse(layer.imageUri))?.use { stream ->
@@ -171,8 +178,9 @@ object VideoExportEngine {
                 }
             }
         }
-        project.document.elements.filter { it.type == StudioElementType.IMAGE }.forEach { element ->
-            val uriText = (element.value("Custom Image") as? ElementValue.Text)?.value.orEmpty()
+        project.document.elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BARS_SEGMENTS }.forEach { element ->
+            val uriText = ((element.value("Custom Bar Image") as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
+                ?: (element.value("Custom Image") as? ElementValue.Text)?.value.orEmpty())
             if (uriText.isNotBlank()) runCatching {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                     BitmapFactory.decodeStream(stream)?.let { imageCache[uriText] = it }
@@ -207,7 +215,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(canvas, paint, project, width, height, timeMs, imageCache, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f })
+                            drawFrame(canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -283,7 +291,7 @@ object VideoExportEngine {
         }
     }
 
-    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float) {
+    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float) {
         canvas.save()
         canvas.clipRect(0, 0, width, height)
         canvas.drawColor((project.document.backgroundArgb or (0xFFL shl 24)).toInt())
@@ -429,17 +437,175 @@ object VideoExportEngine {
                     paint.textAlign = Paint.Align.LEFT
                 }
                 StudioElementType.BARS_SEGMENTS -> {
-                    val count = number("Bar Count", 64f).toInt().coerceIn(1, 256)
-                    val gap = width * 0.28f / count
-                    val barWidth = (width * 0.72f / count).coerceAtLeast(1f)
-                    val maxHeight = number("Max Height", height * 0.32f).coerceAtLeast(1f) * scale
-                    val safeSamples = providerSamples?.takeIf { it.isNotEmpty() }
-                    repeat(count) { index ->
-                        val sample = safeSamples?.getOrNull((index * safeSamples.size / count).coerceIn(0, safeSamples.lastIndex))?.coerceIn(0f, 1f) ?: audioLevel.coerceIn(0f, 1f)
-                        val barHeight = (number("Min Height", 0f) + sample * maxHeight).coerceAtMost(height.toFloat())
-                        val x = cx - width * 0.36f + index * (barWidth + gap)
-                        canvas.drawRect(x, cy - barHeight / 2f, x + barWidth, cy + barHeight / 2f, paint)
+                    val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
+                    val source = providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+                    val gain = number("Amplitude Scale", 1f).coerceIn(0f, 16f)
+                    val gamma = number("Amplitude Gamma", 1f).coerceIn(0.1f, 4f)
+                    val input = FloatArray(source.size) { i ->
+                        (source[i].coerceAtLeast(0f) * gain).coerceIn(0f, 32f).let { it.toDouble().pow(gamma.toDouble()).toFloat().coerceIn(0f, 1f) }
                     }
+                    val previous = barLastUpdateMs.put(element.id, timeMs) ?: (timeMs - 1000L / project.fps.coerceIn(15, 60))
+                    val delta = ((timeMs - previous).coerceIn(1L, 100L) / 1000f)
+                    val runtime = barRuntimes.getOrPut(element.id) { SpectrumBarsRuntime() }
+                    val barFrame = runtime.update(
+                        input, count, delta, number("Smoothing / Damping", 0.72f),
+                        number("Peak Hold Time", number("Peak Hold", 0.65f)),
+                        number("Peak Fall Speed", 0.8f),
+                        logarithmicInput = providerSamples == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
+                        reactionDelayMs = number("Reaction Delay", 0f),
+                        accumulatedDelayMs = number("Accumulated Delay", 0f)
+                    )
+                    val levels = barFrame.levels
+                    val peaks = barFrame.peaks
+                    val gap = number("Spacing / Gap", 3f).coerceAtLeast(0f) * width / 1080f
+                    val totalWidth = min(width * 0.86f * scale.coerceIn(0.1f, 2f), width.toFloat())
+                    val slot = totalWidth / count
+                    val barWidth = (number("Bar Width", 8f) * width / 1080f).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
+                    val maxHeight = (number("Max Height", height * 0.35f) * width / 1080f * scale).coerceIn(1f, height * 0.95f)
+                    val minHeight = (number("Min Height", 0f) * width / 1080f).coerceIn(0f, maxHeight)
+                    val design = textValue("Bar Design", "Rounded Rect")
+                    val alignment = textValue("Alignment", "Bottom")
+                    val mirrorMode = textValue("Mirror Mode", "Off")
+                    val mirrorX = mirrorMode == "Horizontal" || mirrorMode == "Both" || (element.value("Mirror") as? ElementValue.Bool)?.value == true
+                    val mirrorY = mirrorMode == "Vertical" || mirrorMode == "Both" || (element.value("Center Symmetry") as? ElementValue.Bool)?.value == true
+                    val outline = (element.value("Outline / Stroke") as? ElementValue.Bool)?.value == true
+                    val strokeWidth = (number("Stroke Width", 1.5f) * width / 1080f).coerceAtLeast(0.5f)
+                    val strokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(color)
+                    val colorA = runCatching { android.graphics.Color.parseColor(textValue("Bar Color A", "#FF56D8FF")) }.getOrDefault(color)
+                    val colorB = runCatching { android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF")) }.getOrDefault(color)
+                    val capColor = runCatching { android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF")) }.getOrDefault(strokeColor)
+                    val peakColor = runCatching { android.graphics.Color.parseColor(textValue("Peak Color", "#FFFFFFFF")) }.getOrDefault(strokeColor)
+                    val colorMode = textValue("Color Mode", "Gradient")
+                    val capMode = textValue("Top/Bottom Cap", "None")
+                    val capPlacement = textValue("Cap Placement", "Top")
+                    val capSize = (number("Cap Size", 4f) * width / 1080f).coerceAtLeast(1f)
+                    val barOffset = number("Bar Offset", 0f) * width / 1080f
+                    val customBitmap = imageCache[textValue("Custom Bar Image", "")]
+                    val corner = when (design) {
+                        "Capsule / Pill" -> barWidth / 2f
+                        "Rounded Rect" -> barWidth * 0.22f
+                        else -> 0f
+                    }
+                    val dash = when (textValue("Stroke Style", "Solid")) {
+                        "Dashed" -> DashPathEffect(floatArrayOf(strokeWidth * 3f, strokeWidth * 2f), 0f)
+                        "Dotted" -> DashPathEffect(floatArrayOf(strokeWidth, strokeWidth * 1.8f), 0f)
+                        else -> null
+                    }
+                    val extrusion = (element.value("3D / Extrusion") as? ElementValue.Bool)?.value == true
+                    val extrusionDepth = number("Extrusion Depth", 5f) * width / 1080f
+                    val glow = (element.value("Glow / Shadow") as? ElementValue.Bool)?.value == true
+                    val glowStrength = number("Glow Strength", 0.35f).coerceIn(0f, 1f)
+                    val peakEnabled = (element.value("Peak / Cap") as? ElementValue.Bool)?.value == true
+                    val peakWidth = (number("Peak Width", 2f) * width / 1080f).coerceAtLeast(0.5f)
+                    fun lerpColor(a: Int, b: Int, t: Float): Int = android.graphics.Color.argb(
+                        alpha, (android.graphics.Color.red(a) + (android.graphics.Color.red(b) - android.graphics.Color.red(a)) * t).toInt(),
+                        (android.graphics.Color.green(a) + (android.graphics.Color.green(b) - android.graphics.Color.green(a)) * t).toInt(),
+                        (android.graphics.Color.blue(a) + (android.graphics.Color.blue(b) - android.graphics.Color.blue(a)) * t).toInt()
+                    )
+                    repeat(count) { index ->
+                        val sourceIndex = if (mirrorX) minOf(index, count - 1 - index) else index
+                        var level = levels[sourceIndex].coerceIn(0f, 1f)
+                        if ((element.value("Flip Input") as? ElementValue.Bool)?.value == true) level = 1f - level
+                        val barHeight = (minHeight + level * maxHeight).coerceIn(0f, height * 0.95f)
+                        val x = cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
+                        val baseline = when (alignment) {
+                            "Top" -> cy - height * 0.38f
+                            "Center" -> cy
+                            "Stretch" -> cy + height * 0.44f
+                            else -> cy + height * 0.38f
+                        }
+                        val h = if (alignment == "Stretch") (barHeight * 1.25f).coerceAtMost(height * 0.95f) else barHeight
+                        val top = if (mirrorY || alignment == "Center") baseline - h / 2f else if (alignment == "Top") baseline else baseline - h
+                        val bottom = top + h
+                        val fill = when (colorMode) {
+                            "Alternating" -> if (index % 2 == 0) colorA else colorB
+                            "Gradient", "By Amplitude" -> lerpColor(colorA, colorB, level)
+                            else -> color
+                        }
+                        fun drawShape(yTop: Float, yBottom: Float) {
+                            val rect = RectF(x, yTop, x + barWidth, yBottom)
+                            val path = android.graphics.Path().apply {
+                                when (design) {
+                                    "Triangle" -> { moveTo(x + barWidth / 2f, yTop); lineTo(x + barWidth, yBottom); lineTo(x, yBottom); close() }
+                                    "Diamond" -> { moveTo(x + barWidth / 2f, yTop); lineTo(x + barWidth, (yTop + yBottom) / 2f); lineTo(x + barWidth / 2f, yBottom); lineTo(x, (yTop + yBottom) / 2f); close() }
+                                    "Hexagon" -> { moveTo(x + barWidth * 0.22f, yTop); lineTo(x + barWidth * 0.78f, yTop); lineTo(x + barWidth, (yTop + yBottom) / 2f); lineTo(x + barWidth * 0.78f, yBottom); lineTo(x + barWidth * 0.22f, yBottom); lineTo(x, (yTop + yBottom) / 2f); close() }
+                                    else -> { addRoundRect(rect, corner, corner, android.graphics.Path.Direction.CW) }
+                                }
+                            }
+                            paint.color = if (outline) strokeColor else fill
+                            paint.alpha = alpha
+                            paint.style = if (outline) Paint.Style.STROKE else Paint.Style.FILL
+                            paint.strokeWidth = strokeWidth
+                            paint.pathEffect = dash
+                            if (glow) {
+                                paint.style = Paint.Style.STROKE
+                                paint.strokeWidth = strokeWidth + capSize * 2f
+                                paint.alpha = (alpha * glowStrength * 0.2f).toInt()
+                                canvas.drawPath(path, paint)
+                                paint.alpha = alpha
+                                paint.strokeWidth = strokeWidth
+                            }
+                            if (extrusion) {
+                                canvas.save()
+                                canvas.translate(extrusionDepth, extrusionDepth)
+                                paint.alpha = (alpha * 0.32f).toInt()
+                                canvas.drawPath(path, paint)
+                                canvas.restore()
+                                paint.alpha = alpha
+                            }
+                            if (design == "Custom Image" && customBitmap != null && !outline) {
+                                canvas.drawBitmap(customBitmap, null, rect, paint)
+                            } else if (design == "Circle / Dot") {
+                                paint.style = if (outline) Paint.Style.STROKE else Paint.Style.FILL
+                                canvas.drawCircle(x + barWidth / 2f, (yTop + yBottom) / 2f, max(1f, h / 2f), paint)
+                            } else if (design == "Line") {
+                                paint.style = Paint.Style.STROKE
+                                paint.strokeWidth = if (outline) strokeWidth else barWidth
+                                canvas.drawLine(x + barWidth / 2f, yTop, x + barWidth / 2f, yBottom, paint)
+                            } else {
+                                canvas.drawPath(path, paint)
+                            }
+                            paint.pathEffect = null
+                            paint.style = Paint.Style.FILL
+                            paint.shader = null
+                            if (capMode != "None") {
+                                paint.color = capColor
+                                paint.alpha = alpha
+                                val cxBar = x + barWidth / 2f
+                                fun cap(y: Float) {
+                                    when (capMode) {
+                                        "Circle" -> canvas.drawCircle(cxBar, y, capSize, paint)
+                                        "Square" -> canvas.drawRect(cxBar - capSize, y - capSize, cxBar + capSize, y + capSize, paint)
+                                        "Diamond" -> {
+                                            val cp = android.graphics.Path().apply { moveTo(cxBar, y - capSize); lineTo(cxBar + capSize, y); lineTo(cxBar, y + capSize); lineTo(cxBar - capSize, y); close() }
+                                            canvas.drawPath(cp, paint)
+                                        }
+                                    }
+                                }
+                                if (capPlacement != "Bottom") cap(yTop)
+                                if (capPlacement != "Top") cap(yBottom)
+                            }
+                            if (peakEnabled) {
+                                paint.color = peakColor
+                                paint.alpha = alpha
+                                paint.strokeWidth = peakWidth
+                                paint.style = Paint.Style.STROKE
+                                val py = baseline - peaks[index] * maxHeight
+                                canvas.drawLine(x - peakWidth, py, x + barWidth + peakWidth, py, paint)
+                                paint.style = Paint.Style.FILL
+                            }
+                        }
+                        canvas.save()
+                        canvas.rotate(number("Bar Rotation", 0f), x + barWidth / 2f, baseline)
+                        drawShape(top, bottom)
+                        if (mirrorY) drawShape(if (top < baseline) baseline else baseline - h, if (top < baseline) baseline + h else baseline)
+                        canvas.restore()
+                    }
+                    paint.color = color
+                    paint.alpha = alpha
+                    paint.style = Paint.Style.FILL
+                    paint.shader = null
+                    paint.pathEffect = null
                 }
                 StudioElementType.PARTICLES -> {
                     val count = number("Count Limit", 64f).toInt().coerceIn(1, 300)

@@ -20,6 +20,40 @@ object MeasureWhatEngine {
         "Beat Trigger Anim", "Beat Trigger Reverse", "Beat PingPong", "HighFreq React", "BassPulse Smooth"
     )
 
+    private val descriptions = mapOf(
+        "Nothing" to "No time-based or audio-reactive movement is applied.",
+        "Beat" to "Triggers an action, pulse, or animation step strictly on detected audio beats.",
+        "Total Time" to "Drives an animation continuously forward using total elapsed runtime.",
+        "Total Time Backward" to "Drives the animation continuously in reverse using elapsed runtime.",
+        "TotalTimeWhen Playing" to "Advances continuously, but pauses when the audio track is paused.",
+        "Total TimeAndBeat" to "Combines steady time progression with extra bursts on each audio beat.",
+        "TrackPosition" to "Syncs animation progress directly to the current audio-track timestamp.",
+        "TrackPosition Backward" to "Syncs animation in reverse according to the audio-track timestamp.",
+        "TrackPosition Smooth" to "Smoothly syncs animation with track position without sudden jumps.",
+        "BeatRandom Shake" to "Applies a randomized jolt or position offset each time a beat hits.",
+        "BeatCamShake RotMore" to "Beat camera shake with stronger rotational tilt or roll.",
+        "BeatCamShakeRotLess" to "Beat camera shake with subtle rotation and more positional movement.",
+        "BeatCamShake PosOnly" to "Shakes camera position on each beat with zero rotational tilt.",
+        "BeatZoom Shake" to "Applies a quick zoom in/out shake effect on each beat.",
+        "Constant Shake RotMore" to "Applies continuous shaking with heavy rotation, independent of beats.",
+        "Constant Shake RotLess" to "Applies continuous subtle shaking with minimal rotational tilt.",
+        "Constant Shake Smooth" to "Applies slow, smooth, continuous floating camera movement.",
+        "Beat Trigger Anim" to "Triggers the forward procedural animation response on each detected beat.",
+        "Beat Trigger Reverse" to "Triggers the reverse procedural animation response on each detected beat.",
+        "Beat PingPong" to "Alternates animation direction forward on one beat and backward on the next.",
+        "HighFreq React" to "Reacts to high-frequency audio notes or treble.",
+        "BassPulse Smooth" to "Creates a smooth pumping or scaling effect driven by bass frequencies.",
+        "Spectrum" to "Maps visual elements to the full audio frequency spectrum.",
+        "Bass" to "Uses the low-frequency bass band as the measurement source.",
+        "Mid" to "Uses the mid-frequency band as the measurement source.",
+        "Treble" to "Uses the high-frequency treble band as the measurement source.",
+        "RMS" to "Uses root-mean-square audio amplitude as the measurement source.",
+        "Peak" to "Uses peak audio amplitude as the measurement source.",
+        "Waveform" to "Uses audio waveform amplitude as the measurement source."
+    )
+
+    fun description(mode: String): String = descriptions[mode] ?: "Select a measurement source or animation driver."
+
     fun evaluate(
         mode: String,
         runtimeSeconds: Float,

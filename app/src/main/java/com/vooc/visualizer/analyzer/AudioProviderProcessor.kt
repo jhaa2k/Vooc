@@ -73,19 +73,15 @@ data class AudioProviderFrame(
 
 class AudioProviderProcessor {
     private var smoothed = FloatArray(0)
-    private var previousBeatLevel = 0f
     private var beatValue = 0f
     private var lastTimeSec = Double.NaN
     private var primed = false
-    private var hasPreviousBeatLevel = false
 
     fun reset() {
         smoothed = FloatArray(0)
-        previousBeatLevel = 0f
         beatValue = 0f
         lastTimeSec = Double.NaN
         primed = false
-        hasPreviousBeatLevel = false
     }
 
     fun process(frame: AnalysisFrame, requested: AudioProviderConfig): AudioProviderFrame {
@@ -135,29 +131,25 @@ class AudioProviderProcessor {
         val alpha = cfg.smooth.coerceIn(0f, 1f)
         for (i in 0 until count) {
             smoothed[i] = if (!primed) filtered[i] else alpha * smoothed[i] + (1f - alpha) * filtered[i]
-            smoothed[i] = (smoothed[i] * cfg.outputMultiplier).coerceIn(0f, 32f)
         }
         primed = true
+
+        val outputSamples = FloatArray(count) { (smoothed[it] * cfg.outputMultiplier).coerceIn(0f, 32f) }
 
         val first = cfg.beatRangeBarFirst.coerceIn(0, count - 1)
         val last = cfg.beatRangeBarLast.coerceIn(first, count - 1)
         var level = 0f
-        for (i in first..last) level += smoothed[i]
+        for (i in first..last) level += outputSamples[i]
         level /= (last - first + 1)
         val lower = cfg.beatRangeValueLower
         val upper = max(lower + 1e-4f, cfg.beatRangeValueHigher)
         val normalizedLevel = ((level - lower) / (upper - lower)).coerceIn(0f, 1f)
-        val onset = if (hasPreviousBeatLevel) max(0f, level - previousBeatLevel) / upper.coerceAtLeast(1e-4f) else 0f
-        previousBeatLevel = level
-        hasPreviousBeatLevel = true
-        // A transient must be confirmed by the analyzer's onset detector; sustained loudness alone is not a beat.
-        val beatTarget = if (frame.beat.beat) max(normalizedLevel, frame.beat.pulse) else 0f
-        val onsetTarget = if (onset > 0.04f) (onset * 2f).coerceIn(0f, 1f) * normalizedLevel else 0f
-        val target = max(beatTarget, onsetTarget)
+        // A range crossing alone is not a musical beat: the analyzer onset detector must confirm it.
+        val target = if (frame.beat.beat) max(normalizedLevel, frame.beat.pulse) else 0f
         val beatAlpha = cfg.beatSmooth
         beatValue = beatAlpha * beatValue + (1f - beatAlpha) * target
 
-        return AudioProviderFrame(smoothed.copyOf(), beatValue.coerceIn(0f, 1f), frame.timeSec, frame.sampleRate)
+        return AudioProviderFrame(outputSamples, beatValue.coerceIn(0f, 1f), frame.timeSec, frame.sampleRate)
     }
 
     private fun frequencyAt(t: Float, low: Float, high: Float, factor: Float): Float {

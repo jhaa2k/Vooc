@@ -1188,9 +1188,9 @@ private fun ElementStudioEditor(
                                         onChange(selected.withValue(spec.name, nextValue))
                                     }
                                 } else if (spec.name.contains("image", ignoreCase = true) || spec.name.contains("target", ignoreCase = true)) {
-                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.fillMaxWidth()) {
                                         CompactTextInput(spec.name.uppercase(), current) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
-                                        TextButton(onClick = { onPickImage(spec.name) }) { Text("BROWSE", color = Lime) }
+                                        TextButton(onClick = { onPickImage(spec.name) }) { Text("BROWSE IMAGE", color = Lime) }
                                     }
                                 } else {
                                     CompactTextInput(spec.name.uppercase(), current) {
@@ -1384,6 +1384,22 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             ?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
                     }.getOrNull()
                     bitmap?.let { image -> layer.id to image }
+                }
+            }.toMap()
+        }
+    }
+    val elementImages by produceState(
+        initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
+        key1 = elements.map { it.id to ((it.value("Custom Image") as? ElementValue.Text)?.value.orEmpty()) }
+    ) {
+        value = withContext(Dispatchers.IO) {
+            elements.mapNotNull { element ->
+                val uriText = (element.value("Custom Image") as? ElementValue.Text)?.value.orEmpty()
+                if (uriText.isBlank()) null else {
+                    val bitmap = runCatching {
+                        context.contentResolver.openInputStream(Uri.parse(uriText))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+                    }.getOrNull()
+                    bitmap?.let { element.id to it }
                 }
             }.toMap()
         }
@@ -1672,9 +1688,16 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                     }
                     StudioElementType.IMAGE -> {
-                        drawCircle(elementColor.copy(alpha = 0.35f), size.minDimension * 0.11f * scale, center, style = Stroke(width = 2.dp.toPx()))
-                        drawLine(elementColor, Offset(center.x - 18.dp.toPx(), center.y), Offset(center.x + 18.dp.toPx(), center.y), 2.dp.toPx())
-                        drawLine(elementColor, Offset(center.x, center.y - 18.dp.toPx()), Offset(center.x, center.y + 18.dp.toPx()), 2.dp.toPx())
+                        val bitmap = elementImages[element.id]
+                        if (bitmap != null) {
+                            val side = (size.minDimension * 0.45f * scale).coerceAtLeast(1f)
+                            drawImage(bitmap, dstOffset = androidx.compose.ui.unit.IntOffset((center.x - side / 2f).toInt(), (center.y - side / 2f).toInt()),
+                                dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt()))
+                        } else {
+                            drawCircle(elementColor.copy(alpha = 0.35f), size.minDimension * 0.11f * scale, center, style = Stroke(width = 2.dp.toPx()))
+                            drawLine(elementColor, Offset(center.x - 18.dp.toPx(), center.y), Offset(center.x + 18.dp.toPx(), center.y), 2.dp.toPx())
+                            drawLine(elementColor, Offset(center.x, center.y - 18.dp.toPx()), Offset(center.x, center.y + 18.dp.toPx()), 2.dp.toPx())
+                        }
                     }
                     StudioElementType.RGB_SPLIT -> {
                         val amount = number("Split Amount", 4f).coerceIn(0f, 64f).dp.toPx()

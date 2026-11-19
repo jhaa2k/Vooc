@@ -24,6 +24,7 @@ object MeasureWhatEngine {
         mode: String,
         runtimeSeconds: Float,
         trackPositionSeconds: Float,
+        playingSeconds: Float = runtimeSeconds,
         playing: Boolean,
         beatPulse: Float,
         bass: Float,
@@ -49,7 +50,8 @@ object MeasureWhatEngine {
             "Total Time" -> MeasureMotion(offsetX = continuous * 0.025f, rotation = continuous * 2.5f)
             "Total Time Backward" -> MeasureMotion(offsetX = -continuous * 0.025f, rotation = -continuous * 2.5f)
             "TotalTimeWhen Playing" -> {
-                val p = if (playing) continuous else 0f
+                val playingPhase = sin(playingSeconds.coerceAtLeast(0f) * 2f * PI.toFloat() * 0.45f)
+                val p = if (playing) playingPhase else 0f
                 MeasureMotion(offsetY = p * 0.025f, scale = 1f + p * 0.035f)
             }
             "Total TimeAndBeat" -> MeasureMotion(

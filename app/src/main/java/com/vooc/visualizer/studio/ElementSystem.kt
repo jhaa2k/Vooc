@@ -548,15 +548,64 @@ object ElementPropertyCatalog {
         text("Case", "Typography", "Original", listOf("Original", "Uppercase", "Lowercase", "Capitalize"))
     )
 
-    private val motionBlur = listOf(
-        text("Blend Mode Content", "Appearance", "Normal"),
+    private val motionBlurGeneral = listOf(
+        text("Tag", "General", "Motion Blur Effect"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Anchor Y", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val motionBlurAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
         text("Color", "Appearance", "#FFFFFFFF"),
-        text("Target Image", "Appearance", ""),
+        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
         bool("Show Unblurred Content", "Appearance", false),
-        bool("Show Unblurred Content Under", "Appearance", false),
-        number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0),
-        text("Motion Source", "Motion Blur", "Transform Movement", listOf("Transform Movement", "Measured Movement", "Target Motion")),
-        text("Relative Motion Mode", "Motion Blur", "Composition", listOf("Relative", "Absolute", "Target Relative"))
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
+    private val motionBlur = listOf(
+        number("Blur Amount / Strength", "Motion Blur", 1.0, 0.0, 64.0),
+        number("Blur Length", "Motion Blur", 24.0, 0.0, 512.0),
+        number("Blur Direction / Angle", "Motion Blur", 0.0, -360.0, 360.0),
+        integer("Samples / Iterations", "Motion Blur", 8, 1.0, 64.0),
+        integer("Trails / Echo", "Motion Blur", 0, 0.0, 32.0),
+        number("Trail Opacity / Fade", "Motion Blur", 0.75, 0.0, 1.0),
+        ElementPropertySpec("Center / Focus Point", "Motion Blur", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Radial Motion", "Motion Blur", false),
+        bool("Velocity Influence", "Motion Blur", true),
+        text("Motion Source", "Motion Blur", "Transform Movement", listOf(
+            "Transform Movement", "Measured Movement", "Target Motion"
+        )),
+        text("Relative Motion Mode", "Motion Blur", "Composition", listOf(
+            "Relative", "Absolute", "Target Relative"
+        )),
+        number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0)
     )
 
     fun forElement(type: StudioElementType): List<ElementPropertySpec> {
@@ -579,6 +628,10 @@ object ElementPropertyCatalog {
         }
         if (type == StudioElementType.RGB_SPLIT) {
             return (rgbGeneral + rgbAppearance + rgbSplit)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
+        if (type == StudioElementType.MOTION_BLUR_EFFECT) {
+            return (motionBlurGeneral + motionBlurAppearance + motionBlur)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         val specific = when (type) {

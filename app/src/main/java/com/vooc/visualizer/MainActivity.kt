@@ -31,6 +31,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
@@ -654,70 +660,24 @@ private fun VoocStudio(
                     }
                 }
                 items(project.layers.reversed(), key = { it.id }) { layer ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .background(if (layer.id == selectedId) Color(0xFF29321D) else Panel)
-                            .padding(horizontal = 7.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(checked = layer.id in multiSelectedIds, onCheckedChange = { checked ->
-                            multiSelectedIds = if (checked) multiSelectedIds + layer.id else multiSelectedIds - layer.id
-                        }, modifier = Modifier.size(30.dp), colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
-                        Column(Modifier.weight(1f).clickable {
-                            if (!layer.locked) selectedId = layer.id
-                        }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Icon(Icons.Default.FolderOpen, null, tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(15.dp))
-                                Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White,
-                                    style = MaterialTheme.typography.labelMedium, maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Column(Modifier.fillMaxWidth().background(if (layer.id == selectedId) Color(0xFF29321F) else Panel).padding(horizontal = 9.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = layer.id in multiSelectedIds, onCheckedChange = { checked -> multiSelectedIds = if (checked) multiSelectedIds + layer.id else multiSelectedIds - layer.id }, modifier = Modifier.size(28.dp), colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
+                            Icon(Icons.Default.FolderOpen, null, tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(16.dp))
+                            Column(Modifier.weight(1f).padding(start = 8.dp).clickable { if (!layer.locked) selectedId = layer.id }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                Text(layer.kind.name.uppercase() + if (layer.groupId.isNotBlank()) "  •  GROUPED" else "", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
-                            Text(layer.kind.name.uppercase() + if (layer.groupId.isNotBlank()) "  •  GROUPED" else "",
-                                color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                            IconButton(onClick = { if (!layer.locked) selectedId = layer.id }, modifier = Modifier.size(28.dp), enabled = !layer.locked) { Icon(Icons.Default.RadioButtonChecked, "Select layer", tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(16.dp)) }
                         }
-                        IconButton(
-                            onClick = {
-                                project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it })
-                            },
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Text(if (layer.enabled) "◉" else "○", color = if (layer.enabled) Lime else Muted,
-                                style = MaterialTheme.typography.titleMedium)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it }) }, modifier = Modifier.size(28.dp)) { Icon(if (layer.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff, if (layer.enabled) "Hide layer" else "Show layer", tint = if (layer.enabled) Lime else Muted, modifier = Modifier.size(16.dp)) }
+                            IconButton(onClick = { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it }); if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L }, modifier = Modifier.size(28.dp)) { Icon(if (layer.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (layer.locked) "Unlock layer" else "Lock layer", tint = if (layer.locked) Lime else Muted, modifier = Modifier.size(16.dp)) }
+                            IconButton(onClick = { val index = project.layers.indexOfFirst { it.id == layer.id }; if (index > 0) { val list = project.layers.toMutableList(); val moved = list.removeAt(index); list.add(index - 1, moved); project = project.copy(layers = list) } }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.ArrowUpward, "Move layer up", tint = Muted, modifier = Modifier.size(16.dp)) }
+                            IconButton(onClick = { val index = project.layers.indexOfFirst { it.id == layer.id }; if (index in 0 until project.layers.lastIndex) { val list = project.layers.toMutableList(); val moved = list.removeAt(index); list.add(index + 1, moved); project = project.copy(layers = list) } }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.ArrowDownward, "Move layer down", tint = Muted, modifier = Modifier.size(16.dp)) }
+                            IconButton(onClick = { val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L; project = project.copy(layers = project.layers + layer.copy(id = id, name = layer.name + " Copy")); selectedId = id }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.ContentCopy, "Copy layer", tint = Lime, modifier = Modifier.size(16.dp)) }
+                            IconButton(onClick = { project = project.copy(layers = project.layers.filterNot { it.id == layer.id }, document = project.document.copy(keyframes = project.document.keyframes.filterNot { it.layerId == layer.id })); if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L; multiSelectedIds = multiSelectedIds - layer.id }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.Delete, "Delete layer", tint = Color(0xFFFF7777), modifier = Modifier.size(16.dp)) }
                         }
-                        IconButton(onClick = {
-                            project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it })
-                            if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L
-                        }) { Icon(if (layer.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (layer.locked) "Unlock layer" else "Lock layer", tint = if (layer.locked) Lime else Muted) }
-                        IconButton(onClick = {
-                            project = project.copy(
-                                layers = project.layers.filterNot { it.id == layer.id },
-                                document = project.document.copy(keyframes = project.document.keyframes.filterNot { it.layerId == layer.id })
-                            )
-                            if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L
-                        }) { Icon(Icons.Default.Delete, "Delete layer", tint = Muted) }
-                        IconButton(onClick = {
-                            val index = project.layers.indexOfFirst { it.id == layer.id }
-                            if (index > 0) {
-                                val list = project.layers.toMutableList()
-                                val item = list.removeAt(index)
-                                list.add(index - 1, item)
-                                project = project.copy(layers = list)
-                            }
-                        }, modifier = Modifier.size(30.dp)) { Text("↑", color = Muted) }
-                        IconButton(onClick = {
-                            val index = project.layers.indexOfFirst { it.id == layer.id }
-                            if (index in 0 until project.layers.lastIndex) {
-                                val list = project.layers.toMutableList()
-                                val item = list.removeAt(index)
-                                list.add(index + 1, item)
-                                project = project.copy(layers = list)
-                            }
-                        }, modifier = Modifier.size(30.dp)) { Text("↓", color = Muted) }
-                        IconButton(onClick = {
-                            val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
-                            project = project.copy(layers = project.layers + layer.copy(id = id, name = layer.name + " Copy"))
-                            selectedId = id
-                        }, modifier = Modifier.size(30.dp)) { Text("⧉", color = Lime) }
                     }
                 }
                 item {
@@ -787,13 +747,14 @@ private fun VoocStudio(
                         EditorSection("GENERAL", expandedSection, { expandedSection = if (expandedSection == "GENERAL") "" else "GENERAL" }) {
                             OutlinedTextField(value = selected.name, onValueChange = { value ->
                                 project = updateLayer(project, selectedId) { it.copy(name = value) }
-                            }, label = { Text("NAME / TAG") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            }, label = { Text("NAME / TAG") }, singleLine = true, textStyle = MaterialTheme.typography.labelMedium, modifier = Modifier.fillMaxWidth().height(42.dp))
                             if (selected.kind == LayerKind.TEXT) {
                                 OutlinedTextField(
                                     value = selected.textContent,
                                     onValueChange = { value -> project = updateLayer(project, selectedId) { it.copy(textContent = value) } },
                                     label = { Text("TEXT CONTENT") },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                                    textStyle = MaterialTheme.typography.labelMedium,
                                     singleLine = true
                                 )
                             }
@@ -1158,7 +1119,7 @@ private fun ElementStudioEditor(
                             }
                             ElementValueType.TEXT, ElementValueType.COLOR -> {
                                 val current = (value as? ElementValue.Text)?.value.orEmpty()
-                                OutlinedTextField(value = current, onValueChange = { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }, label = { Text(spec.name.uppercase()) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                OutlinedTextField(value = current, onValueChange = { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }, label = { Text(spec.name.uppercase()) }, singleLine = true, textStyle = MaterialTheme.typography.labelMedium, modifier = Modifier.fillMaxWidth().height(42.dp))
                             }
                             ElementValueType.VECTOR2 -> {
                                 val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
@@ -1751,7 +1712,7 @@ private fun ThinSlider(
             )
         },
         track = { sliderState ->
-            Canvas(Modifier.fillMaxWidth().height(4.dp)) {
+            Canvas(Modifier.fillMaxWidth().height(34.dp)) {
                 val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)
                 val progress = ((sliderState.value - valueRange.start) / span).coerceIn(0f, 1f)
                 val centerY = size.height / 2f

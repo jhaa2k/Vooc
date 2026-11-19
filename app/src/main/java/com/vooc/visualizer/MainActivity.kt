@@ -1758,7 +1758,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         repeat(count) { index ->
                             val sourceIndex = if (textValue("Frequency Scale", "Logarithmic") == "Logarithmic") {
                                 val t = (index + 0.5f) / count
-                                ((kotlin.math.pow(safeSamples.size.toFloat(), t) - 1f) /
+                                ((Math.pow(safeSamples.size.toDouble(), t.toDouble()).toFloat() - 1f) /
                                     (safeSamples.size - 1).coerceAtLeast(1)).toInt()
                             } else (index * safeSamples.size / count)
                             val sampleIndex = sourceIndex.coerceIn(0, safeSamples.lastIndex)

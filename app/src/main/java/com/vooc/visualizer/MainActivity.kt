@@ -366,6 +366,7 @@ private fun VoocStudio(
     var showAudioPlayer by remember { mutableStateOf(true) }
     var timelineProperty by remember { mutableStateOf("X") }
     var multiSelectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var multiSelectedElementIds by remember { mutableStateOf(setOf<String>()) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && selectedId != 0L) {
@@ -642,7 +643,7 @@ private fun VoocStudio(
                         }
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("${multiSelectedIds.size} SELECTED", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterVertically).weight(1f))
+                            Text("${multiSelectedIds.size + multiSelectedElementIds.size} SELECTED", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterVertically).weight(1f))
                             TextButton(enabled = multiSelectedIds.size >= 2, onClick = {
                                 val group = "group-${System.nanoTime()}"
                                 project = project.copy(layers = project.layers.map { if (it.id in multiSelectedIds) it.copy(groupId = group) else it })
@@ -655,11 +656,64 @@ private fun VoocStudio(
                             TextButton(enabled = multiSelectedIds.isNotEmpty(), onClick = {
                                 project = project.copy(
                                     layers = project.layers.filterNot { it.id in multiSelectedIds },
-                                    document = project.document.copy(keyframes = project.document.keyframes.filterNot { it.layerId in multiSelectedIds })
+                                    document = project.document.copy(
+                                        keyframes = project.document.keyframes.filterNot { it.layerId in multiSelectedIds },
+                                        elements = project.document.elements.filterNot { it.id in multiSelectedElementIds }
+                                    )
                                 )
                                 if (selectedId in multiSelectedIds) selectedId = project.layers.lastOrNull()?.id ?: 0L
+                                if (selectedElementId in multiSelectedElementIds) selectedElementId = project.document.elements.firstOrNull { it.id !in multiSelectedElementIds }?.id ?: "audio-provider-default"
                                 multiSelectedIds = emptySet()
+                                multiSelectedElementIds = emptySet()
+                                onSave(project)
                             }) { Text("DELETE", color = Color(0xFFFF7777)) }
+                        }
+                    }
+                }
+                item(key = "composition-layer-rows") {
+                    project.document.elements.reversed().forEach { element ->
+                        Row(Modifier.fillMaxWidth().height(42.dp).background(if (element.id == selectedElementId) Color(0xFF29321F) else Panel).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(24.dp).clickable { multiSelectedElementIds = if (element.id in multiSelectedElementIds) multiSelectedElementIds - element.id else multiSelectedElementIds + element.id }, contentAlignment = Alignment.Center) {
+                                Icon(if (element.id in multiSelectedElementIds) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, "Multi-select composition layer", tint = if (element.id in multiSelectedElementIds) Lime else Muted, modifier = Modifier.size(16.dp))
+                            }
+                            Column(Modifier.weight(1f).padding(start = 5.dp).clickable { if (!element.locked) selectedElementId = element.id }) {
+                                Text(element.tag.uppercase(), color = if (element.locked) Muted else Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                Text(element.type.displayName.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                            }
+                            Box(Modifier.size(24.dp).clickable { if (!element.locked) selectedElementId = element.id }, contentAlignment = Alignment.Center) { Icon(Icons.Default.RadioButtonChecked, "Select composition layer", tint = if (element.id == selectedElementId) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                            Box(Modifier.size(24.dp).clickable {
+                                val updated = element.withValue("Visible", ElementValue.Bool(!element.visible))
+                                val next = project.copy(document = project.document.copy(elements = project.document.elements.map { if (it.id == element.id) updated else it }))
+                                project = next; onSave(next)
+                            }, contentAlignment = Alignment.Center) { Icon(if (element.visible) Icons.Default.Visibility else Icons.Default.VisibilityOff, if (element.visible) "Hide composition layer" else "Show composition layer", tint = if (element.visible) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                            Box(Modifier.size(24.dp).clickable {
+                                val updated = element.copy(locked = !element.locked)
+                                val next = project.copy(document = project.document.copy(elements = project.document.elements.map { if (it.id == element.id) updated else it }))
+                                project = next; onSave(next)
+                            }, contentAlignment = Alignment.Center) { Icon(if (element.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (element.locked) "Unlock composition layer" else "Lock composition layer", tint = if (element.locked) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                            Box(Modifier.size(24.dp).clickable {
+                                val list = project.document.elements.toMutableList(); val index = list.indexOfFirst { it.id == element.id }
+                                if (index > 0) { val moved = list.removeAt(index); list.add(index - 1, moved) }
+                                val next = project.copy(document = project.document.copy(elements = list)); project = next; onSave(next)
+                            }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowUpward, "Move composition layer up", tint = Muted, modifier = Modifier.size(15.dp)) }
+                            Box(Modifier.size(24.dp).clickable {
+                                val list = project.document.elements.toMutableList(); val index = list.indexOfFirst { it.id == element.id }
+                                if (index in 0 until list.lastIndex) { val moved = list.removeAt(index); list.add(index + 1, moved) }
+                                val next = project.copy(document = project.document.copy(elements = list)); project = next; onSave(next)
+                            }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowDownward, "Move composition layer down", tint = Muted, modifier = Modifier.size(15.dp)) }
+                            Box(Modifier.size(24.dp).clickable {
+                                val copyId = "${element.type.name.lowercase()}-${System.currentTimeMillis()}"
+                                val duplicate = element.copy(id = copyId, tag = element.tag + " Copy")
+                                val next = project.copy(document = project.document.copy(elements = project.document.elements + duplicate))
+                                project = next; selectedElementId = copyId; onSave(next)
+                            }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ContentCopy, "Duplicate composition layer", tint = Lime, modifier = Modifier.size(15.dp)) }
+                            Box(Modifier.size(24.dp).clickable {
+                                val next = project.copy(document = project.document.copy(elements = project.document.elements.filterNot { it.id == element.id }))
+                                project = next
+                                if (selectedElementId == element.id) selectedElementId = next.document.elements.firstOrNull()?.id ?: "audio-provider-default"
+                                multiSelectedElementIds = multiSelectedElementIds - element.id
+                                onSave(next)
+                            }, contentAlignment = Alignment.Center) { Icon(Icons.Default.Delete, "Delete composition layer", tint = Color(0xFFFF7777), modifier = Modifier.size(15.dp)) }
                         }
                     }
                 }
@@ -1055,29 +1109,7 @@ private fun ElementStudioEditor(
     var expandedCategory by remember(selectedId) { mutableStateOf("General") }
     val selected = elements.firstOrNull { it.id == selectedId } ?: elements.firstOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Column {
-            Text("COMPOSITION ELEMENTS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
-            Text("${elements.size} ELEMENTS • ADD THEM FROM ADD LAYER", color = Muted, style = MaterialTheme.typography.labelSmall)
-        }
-        elements.forEach { element ->
-            Row(
-                Modifier.fillMaxWidth()
-                    .background(if (element.id == selected?.id) Color(0xFF29321F) else Panel)
-                    .clickable { onSelect(element.id) }
-                    .padding(horizontal = 9.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Tune, null, tint = if (element.id == selected?.id) Lime else Muted, modifier = Modifier.size(16.dp))
-                Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                    Text(element.tag.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                    Text(element.type.displayName.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
-                }
-                Text(if (element.visible) "VISIBLE" else "HIDDEN", color = if (element.visible) Lime else Muted, style = MaterialTheme.typography.labelSmall)
-                IconButton(onClick = { onDelete(element.id) }, modifier = Modifier.size(30.dp)) {
-                    Icon(Icons.Default.Delete, "Delete element", tint = Muted, modifier = Modifier.size(16.dp))
-                }
-            }
-        }
+        Text("ELEMENT PROPERTIES", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
         if (selected != null) {
             Text("PROPERTIES / ${selected.tag.uppercase()}", color = Lime, style = MaterialTheme.typography.labelMedium)
             val specs = remember(selected.type) { ElementPropertyCatalog.forElement(selected.type) }

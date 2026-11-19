@@ -77,7 +77,6 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.vooc.visualizer.analyzer.AnalysisFrame
 import com.vooc.visualizer.analyzer.AudioAnalyzer
-import com.vooc.visualizer.analyzer.AudioProviderConfig
 import com.vooc.visualizer.analyzer.AudioProviderFrame
 import com.vooc.visualizer.analyzer.AudioProviderProcessor
 import com.vooc.visualizer.analyzer.applyTo
@@ -559,7 +558,7 @@ private fun VoocStudio(
                 ExportScreen(project, onProjectChange = { project = it; onSave(it) }, Modifier.weight(0.60f))
             }
             "TEMPLATES" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, providerFrame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 TemplateLibraryScreen(
                     project = project,

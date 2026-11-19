@@ -157,3 +157,38 @@ object ProjectStore {
     }.getOrNull()
 
 }
+
+
+/** Persistent user template library. Templates are stored as versioned project JSON in app-private preferences. */
+object TemplateStore {
+    private const val PREFS = "vooc_template_library"
+    private const val KEY = "templates"
+
+    fun load(context: Context): List<StudioProject> = runCatching {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "[]") ?: "[]"
+        val array = JSONArray(raw)
+        (0 until array.length()).mapNotNull { index ->
+            ProjectStore.decode(array.getJSONObject(index).toString())
+        }
+    }.getOrDefault(emptyList())
+
+    fun save(context: Context, project: StudioProject): List<StudioProject> {
+        val name = project.name.trim().ifBlank { "Untitled Template" }
+        val next = load(context).filterNot { it.name.equals(name, ignoreCase = true) } + project.copy(name = name)
+        persist(context, next)
+        return next
+    }
+
+    fun delete(context: Context, name: String): List<StudioProject> {
+        val next = load(context).filterNot { it.name.equals(name, ignoreCase = true) }
+        persist(context, next)
+        return next
+    }
+
+    private fun persist(context: Context, templates: List<StudioProject>) {
+        val array = JSONArray()
+        templates.forEach { template -> array.put(JSONObject(ProjectStore.encode(template))) }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY, array.toString()).apply()
+    }
+}

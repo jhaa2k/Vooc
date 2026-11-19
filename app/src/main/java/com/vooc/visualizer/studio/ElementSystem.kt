@@ -586,7 +586,7 @@ object ElementPropertyCatalog {
         text("Stroke Style", "Modifiers", "Solid", listOf("Solid", "Dashed", "Dotted")),
         text("Bar Color A", "Color", "#FF56D8FF"),
         text("Bar Color B", "Color", "#FF9B5CFF"),
-        text("Color Mode", "Color", "Gradient", listOf("Single", "Alternating", "Gradient", "By Amplitude")),
+        text("Color Mode", "Color", "Alternating", listOf("Single", "Alternating", "Gradient", "By Amplitude")),
         text("Peak Color", "Color", "#FFFFFFFF"),
         text("Cap Color", "Color", "#FFFFFFFF"),
         text("Custom Bar Image", "Design", ""),

@@ -371,6 +371,7 @@ private fun VoocStudio(
     var multiSelectedElementIds by remember { mutableStateOf(setOf<String>()) }
     var pendingElementImageProperty by remember { mutableStateOf<String?>(null) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
+    var presetStatus by remember { mutableStateOf("VOOC PRESETS: IMPORT OR EXPORT YOUR VISUALIZER DESIGN") }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && selectedId != 0L) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
@@ -390,20 +391,30 @@ private fun VoocStudio(
     }
     val projectExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) runCatching {
-            context.contentResolver.openOutputStream(uri)?.use { it.write(ProjectStore.encode(project).toByteArray(Charsets.UTF_8)) }
-        }
+            context.contentResolver.openOutputStream(uri)?.use { it.write(PresetFileCodec.exportVooc(project)) }
+            presetStatus = "EXPORTED VOOC PRESET"
+        }.onFailure { presetStatus = "EXPORT FAILED: ${it.message ?: "UNKNOWN ERROR"}" }
     }
     val projectImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) runCatching {
-            val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-            json?.let { ProjectStore.decode(it) }?.let { imported ->
+        if (uri != null) {
+            runCatching {
+                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "imported-preset"
+                val stream = context.contentResolver.openInputStream(uri) ?: error("Could not open selected file")
+                val result = PresetFileCodec.import(stream, name)
+                val imported = result.project
                 project = imported
                 selectedId = imported.layers.lastOrNull()?.id ?: 0L
+                activeSelection = "LAYER"
                 onSave(imported)
                 val created = ProjectRepository.create(context, imported)
                 currentProjectId = created?.id
                 projectEntries = ProjectRepository.list(context)
-            }
+                savedTemplates = TemplateStore.save(context, imported)
+                presetStatus = buildString {
+                    append(if (result.sourceFormat == "AVEE_VIZ") "IMPORTED AVEE .VIZ (BEST-EFFORT)" else "IMPORTED VOOC PRESET")
+                    if (result.warnings.isNotEmpty()) append(" • ${result.warnings.size} COMPATIBILITY NOTES")
+                }
+            }.onFailure { presetStatus = "IMPORT FAILED: ${it.message ?: "UNSUPPORTED FILE"}" }
         }
     }
     val selected = if (activeSelection == "LAYER") project.layers.firstOrNull { it.id == selectedId } ?: project.layers.firstOrNull() else null
@@ -601,6 +612,9 @@ private fun VoocStudio(
                     },
                     onSaveCurrent = { savedTemplates = TemplateStore.save(context, project) },
                     onDeleteSaved = { name -> savedTemplates = TemplateStore.delete(context, name) },
+                    onImportPreset = { projectImport.launch(arrayOf("*/*")) },
+                    onExportPreset = { projectExport.launch(project.name.replace(Regex("[^A-Za-z0-9_-]"), "_") + ".voocpreset") },
+                    presetStatus = presetStatus,
                     modifier = Modifier.weight(0.60f)
                 )
             }
@@ -1061,6 +1075,9 @@ private fun TemplateLibraryScreen(
     onApply: (StudioProject) -> Unit,
     onSaveCurrent: () -> Unit,
     onDeleteSaved: (String) -> Unit,
+    onImportPreset: () -> Unit,
+    onExportPreset: () -> Unit,
+    presetStatus: String,
     modifier: Modifier = Modifier
 ) {
     var deleteName by remember { mutableStateOf<String?>(null) }
@@ -1075,6 +1092,19 @@ private fun TemplateLibraryScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) {
                 Text("SAVE CURRENT PROJECT AS TEMPLATE")
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                OutlinedButton(onClick = onImportPreset, modifier = Modifier.weight(1f), shape = RectangleShape) {
+                    Icon(Icons.Outlined.FileUpload, null, tint = Lime)
+                    Spacer(Modifier.width(5.dp))
+                    Text("IMPORT .VIZ / VOOC", color = Lime)
+                }
+                OutlinedButton(onClick = onExportPreset, modifier = Modifier.weight(1f), shape = RectangleShape) {
+                    Icon(Icons.Default.Save, null, tint = Lime)
+                    Spacer(Modifier.width(5.dp))
+                    Text("EXPORT .VOOCPRESET", color = Lime)
+                }
+            }
+            Text(presetStatus, color = Muted, style = MaterialTheme.typography.labelSmall)
         }
         if (savedTemplates.isEmpty()) {
             item { Text("NO SAVED TEMPLATES YET. SAVE THE CURRENT PROJECT TO REUSE ITS LAYERS AND SETTINGS.", color = Muted, style = MaterialTheme.typography.labelSmall) }

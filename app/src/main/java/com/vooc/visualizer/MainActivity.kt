@@ -353,7 +353,7 @@ private fun VoocStudio(
                             project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = checked) else it })
                         }, colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
                         Column(Modifier.weight(1f)) {
-                            Text(layer.name, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                            Text(layer.name.uppercase(), color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             Text(layer.kind.name, color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
                         IconButton(onClick = {
@@ -430,7 +430,7 @@ private fun VoocStudio(
                         Text("PROPERTIES  /  ${selected.name.uppercase()}", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
                         OutlinedTextField(value = selected.name, onValueChange = { value ->
                             project = updateLayer(project, selectedId) { it.copy(name = value) }
-                        }, label = { Text("Layer name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        }, label = { Text("LAYER NAME") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
                     item {
                         EditorSection("TRANSFORM", expandedSection, { expandedSection = if (expandedSection == "TRANSFORM") "" else "TRANSFORM" }) {
@@ -518,7 +518,7 @@ private fun VoocStudio(
                             EditorSection("TEXT CONTENT", expandedSection, { expandedSection = if (expandedSection == "TEXT CONTENT") "" else "TEXT CONTENT" }) {
                                 var textValue by remember(selected.id, selected.textContent) { mutableStateOf(selected.textContent) }
                                 OutlinedTextField(value = textValue, onValueChange = { textValue = it; project = updateLayer(project, selectedId) { layer -> layer.copy(textContent = it) } },
-                                    label = { Text("Text") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                    label = { Text("TEXT CONTENT") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                             }
                         }
                     }
@@ -944,7 +944,7 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
         Text("UP NEXT", color = Lime, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp)
         Column(Modifier.weight(1f).fillMaxWidth().background(Panel)) {
             if (player.mediaItemCount == 0) {
-                Text("Your queue is empty. Import audio to add tracks.", color = Muted, modifier = Modifier.padding(14.dp))
+                Text("YOUR QUEUE IS EMPTY. IMPORT AUDIO TO ADD TRACKS.", color = Muted, modifier = Modifier.padding(14.dp))
             } else {
                 for (index in 0 until player.mediaItemCount) {
                     val item = player.getMediaItemAt(index)
@@ -996,7 +996,7 @@ private fun ExportScreen(project: StudioProject, onProjectChange: (StudioProject
         }
         Text("OUTPUT SUMMARY", color = Muted, style = MaterialTheme.typography.labelSmall)
         Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Color.White)
-        Text("Container: MP4  •  Video: H.264  •  Audio: AAC", color = Color.White)
+        Text("CONTAINER: MP4  •  VIDEO: H.264  •  AUDIO: AAC", color = Color.White)
         Spacer(Modifier.height(8.dp))
         Text("The export encoder and audio/video muxer are not implemented yet. These settings are saved with the project, but this build cannot render an MP4. No fake export action is shown.", color = Muted)
     }

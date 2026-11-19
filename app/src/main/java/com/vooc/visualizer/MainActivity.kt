@@ -11,8 +11,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,6 +40,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.RadioButtonChecked
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
@@ -660,24 +665,26 @@ private fun VoocStudio(
                     }
                 }
                 items(project.layers.reversed(), key = { it.id }) { layer ->
-                    Column(Modifier.fillMaxWidth().background(if (layer.id == selectedId) Color(0xFF29321F) else Panel).padding(horizontal = 9.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = layer.id in multiSelectedIds, onCheckedChange = { checked -> multiSelectedIds = if (checked) multiSelectedIds + layer.id else multiSelectedIds - layer.id }, modifier = Modifier.size(28.dp), colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
-                            Icon(Icons.Default.FolderOpen, null, tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(16.dp))
-                            Column(Modifier.weight(1f).padding(start = 8.dp).clickable { if (!layer.locked) selectedId = layer.id }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                Text(layer.kind.name.uppercase() + if (layer.groupId.isNotBlank()) "  •  GROUPED" else "", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                            }
-                            IconButton(onClick = { if (!layer.locked) selectedId = layer.id }, modifier = Modifier.size(28.dp), enabled = !layer.locked) { Icon(Icons.Default.RadioButtonChecked, "Select layer", tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(16.dp)) }
+                    Row(
+                        Modifier.fillMaxWidth().height(42.dp)
+                            .background(if (layer.id == selectedId) Color(0xFF29321F) else Panel)
+                            .padding(horizontal = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(24.dp).clickable { multiSelectedIds = if (layer.id in multiSelectedIds) multiSelectedIds - layer.id else multiSelectedIds + layer.id }, contentAlignment = Alignment.Center) {
+                            Icon(if (layer.id in multiSelectedIds) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, "Multi-select layer", tint = if (layer.id in multiSelectedIds) Lime else Muted, modifier = Modifier.size(16.dp))
                         }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it }) }, modifier = Modifier.size(28.dp)) { Icon(if (layer.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff, if (layer.enabled) "Hide layer" else "Show layer", tint = if (layer.enabled) Lime else Muted, modifier = Modifier.size(16.dp)) }
-                            IconButton(onClick = { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it }); if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L }, modifier = Modifier.size(28.dp)) { Icon(if (layer.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (layer.locked) "Unlock layer" else "Lock layer", tint = if (layer.locked) Lime else Muted, modifier = Modifier.size(16.dp)) }
-                            IconButton(onClick = { val index = project.layers.indexOfFirst { it.id == layer.id }; if (index > 0) { val list = project.layers.toMutableList(); val moved = list.removeAt(index); list.add(index - 1, moved); project = project.copy(layers = list) } }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.ArrowUpward, "Move layer up", tint = Muted, modifier = Modifier.size(16.dp)) }
-                            IconButton(onClick = { val index = project.layers.indexOfFirst { it.id == layer.id }; if (index in 0 until project.layers.lastIndex) { val list = project.layers.toMutableList(); val moved = list.removeAt(index); list.add(index + 1, moved); project = project.copy(layers = list) } }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.ArrowDownward, "Move layer down", tint = Muted, modifier = Modifier.size(16.dp)) }
-                            IconButton(onClick = { val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L; project = project.copy(layers = project.layers + layer.copy(id = id, name = layer.name + " Copy")); selectedId = id }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.ContentCopy, "Copy layer", tint = Lime, modifier = Modifier.size(16.dp)) }
-                            IconButton(onClick = { project = project.copy(layers = project.layers.filterNot { it.id == layer.id }, document = project.document.copy(keyframes = project.document.keyframes.filterNot { it.layerId == layer.id })); if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L; multiSelectedIds = multiSelectedIds - layer.id }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.Delete, "Delete layer", tint = Color(0xFFFF7777), modifier = Modifier.size(16.dp)) }
+                        Column(Modifier.weight(1f).padding(start = 5.dp).clickable { if (!layer.locked) selectedId = layer.id }, verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                            Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text(layer.kind.name.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
+                        Box(Modifier.size(24.dp).clickable { if (!layer.locked) selectedId = layer.id }, contentAlignment = Alignment.Center) { Icon(Icons.Default.RadioButtonChecked, "Select layer", tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                        Box(Modifier.size(24.dp).clickable { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it }) }, contentAlignment = Alignment.Center) { Icon(if (layer.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff, if (layer.enabled) "Hide layer" else "Show layer", tint = if (layer.enabled) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                        Box(Modifier.size(24.dp).clickable { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it }); if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L }, contentAlignment = Alignment.Center) { Icon(if (layer.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (layer.locked) "Unlock layer" else "Lock layer", tint = if (layer.locked) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                        Box(Modifier.size(24.dp).clickable { val index = project.layers.indexOfFirst { it.id == layer.id }; if (index > 0) { val list = project.layers.toMutableList(); val moved = list.removeAt(index); list.add(index - 1, moved); project = project.copy(layers = list) } }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowUpward, "Move layer up", tint = Muted, modifier = Modifier.size(15.dp)) }
+                        Box(Modifier.size(24.dp).clickable { val index = project.layers.indexOfFirst { it.id == layer.id }; if (index in 0 until project.layers.lastIndex) { val list = project.layers.toMutableList(); val moved = list.removeAt(index); list.add(index + 1, moved); project = project.copy(layers = list) } }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowDownward, "Move layer down", tint = Muted, modifier = Modifier.size(15.dp)) }
+                        Box(Modifier.size(24.dp).clickable { val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L; project = project.copy(layers = project.layers + layer.copy(id = id, name = layer.name + " Copy")); selectedId = id }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ContentCopy, "Copy layer", tint = Lime, modifier = Modifier.size(15.dp)) }
+                        Box(Modifier.size(24.dp).clickable { project = project.copy(layers = project.layers.filterNot { it.id == layer.id }, document = project.document.copy(keyframes = project.document.keyframes.filterNot { it.layerId == layer.id })); if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L; multiSelectedIds = multiSelectedIds - layer.id }, contentAlignment = Alignment.Center) { Icon(Icons.Default.Delete, "Delete layer", tint = Color(0xFFFF7777), modifier = Modifier.size(15.dp)) }
                     }
                 }
                 item {
@@ -745,18 +752,13 @@ private fun VoocStudio(
                 if (selected != null) {
                     item {
                         EditorSection("GENERAL", expandedSection, { expandedSection = if (expandedSection == "GENERAL") "" else "GENERAL" }) {
-                            OutlinedTextField(value = selected.name, onValueChange = { value ->
+                            CompactTextInput("NAME / TAG", selected.name) { value ->
                                 project = updateLayer(project, selectedId) { it.copy(name = value) }
-                            }, label = { Text("NAME / TAG") }, singleLine = true, textStyle = MaterialTheme.typography.labelMedium, modifier = Modifier.fillMaxWidth().height(42.dp))
+                            }
                             if (selected.kind == LayerKind.TEXT) {
-                                OutlinedTextField(
-                                    value = selected.textContent,
-                                    onValueChange = { value -> project = updateLayer(project, selectedId) { it.copy(textContent = value) } },
-                                    label = { Text("TEXT CONTENT") },
-                                    modifier = Modifier.fillMaxWidth().height(42.dp),
-                                    textStyle = MaterialTheme.typography.labelMedium,
-                                    singleLine = true
-                                )
+                                CompactTextInput("TEXT CONTENT", selected.textContent) { value ->
+                                    project = updateLayer(project, selectedId) { it.copy(textContent = value) }
+                                }
                             }
                         }
                     }
@@ -817,7 +819,7 @@ private fun VoocStudio(
                     }
                     item {
                         EditorSection("AUDIO / MEASURE", expandedSection, { expandedSection = if (expandedSection == "AUDIO / MEASURE") "" else "AUDIO / MEASURE" }) {
-                            OptionDropdown("MEASURE WHAT", selected.measureWhat, MeasureWhatEngine.options + listOf("Spectrum", "Bass", "Mid", "Treble", "RMS", "Peak", "Waveform")) { value ->
+                            MeasureWhatDropdown(selected.measureWhat, MeasureWhatEngine.options + listOf("Spectrum", "Bass", "Mid", "Treble", "RMS", "Peak", "Waveform")) { value ->
                                 project = updateLayer(project, selectedId) { it.copy(measureWhat = value) }
                             }
                             if (selected.measureWhat == "Spectrum") {
@@ -1119,7 +1121,7 @@ private fun ElementStudioEditor(
                             }
                             ElementValueType.TEXT, ElementValueType.COLOR -> {
                                 val current = (value as? ElementValue.Text)?.value.orEmpty()
-                                OutlinedTextField(value = current, onValueChange = { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }, label = { Text(spec.name.uppercase()) }, singleLine = true, textStyle = MaterialTheme.typography.labelMedium, modifier = Modifier.fillMaxWidth().height(42.dp))
+                                CompactTextInput(spec.name.uppercase(), current) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
                             }
                             ElementValueType.VECTOR2 -> {
                                 val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
@@ -1546,6 +1548,46 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
 }
 
 @Composable
+@Composable
+private fun CompactTextInput(label: String, value: String, onValueChange: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
+        BasicTextField(
+            value = value, onValueChange = onValueChange, singleLine = true,
+            textStyle = MaterialTheme.typography.labelMedium.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().height(40.dp)
+                .border(1.dp, Color(0xFF69705F), RectangleShape)
+                .padding(horizontal = 10.dp),
+            decorationBox = { inner -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { inner() } }
+        )
+    }
+}
+
+@Composable
+private fun MeasureWhatDropdown(value: String, options: List<String>, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text("MEASURE WHAT", color = Muted, style = MaterialTheme.typography.labelSmall)
+        Box {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp), shape = RectangleShape) {
+                Text(value.uppercase(), modifier = Modifier.weight(1f), color = Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text("▾", color = Lime)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Panel)) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(option.uppercase(), style = MaterialTheme.typography.labelMedium, color = Color.White)
+                            Text(MeasureWhatEngine.description(option), style = MaterialTheme.typography.labelSmall, color = Muted)
+                        } },
+                        onClick = { onSelect(option); expanded = false }
+                    )
+                }
+            }
+        }
+    }
+}
+
 private fun OptionDropdown(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -1627,7 +1669,6 @@ private fun LayerSlider(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ThinSlider(
     label: String,
@@ -1642,99 +1683,53 @@ private fun ThinSlider(
 ) {
     val safeValue = value.coerceIn(valueRange)
     val safeReset = resetValue.coerceIn(valueRange)
-    val resetAction by rememberUpdatedState(
-        onDoubleTapReset ?: { onValueChange(safeReset) }
-    )
-
-    Slider(
-        value = safeValue,
-        onValueChange = onValueChange,
-        onValueChangeFinished = onValueChangeFinished,
-        valueRange = valueRange,
-        steps = steps,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(34.dp)
-            .pointerInput(safeReset) {
-                var lastTapTime = 0L
-                var lastTapPosition = Offset.Zero
-                awaitEachGesture {
-                    val down = awaitFirstDown(
-                        requireUnconsumed = false,
-                        pass = PointerEventPass.Initial
-                    )
-                    var moved = false
-                    var releasedAt = 0L
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Final)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                            moved = true
-                        }
-                        if (!change.pressed) {
-                            releasedAt = change.uptimeMillis
-                            break
-                        }
-                    }
-                    if (!moved && releasedAt > 0L) {
-                        val isDoubleTap = lastTapTime > 0L &&
-                            releasedAt - lastTapTime <= viewConfiguration.doubleTapTimeoutMillis &&
-                            (down.position - lastTapPosition).getDistance() <= viewConfiguration.touchSlop * 2f
-                        if (isDoubleTap) {
-                            resetAction()
-                            lastTapTime = 0L
-                        } else {
-                            lastTapTime = releasedAt
-                            lastTapPosition = down.position
-                        }
-                    } else {
-                        lastTapTime = 0L
-                    }
+    val updateValue by rememberUpdatedState(onValueChange)
+    val resetAction by rememberUpdatedState(onDoubleTapReset ?: { onValueChange(safeReset) })
+    Canvas(
+        modifier.fillMaxWidth().height(24.dp)
+            .pointerInput(valueRange, safeReset) {
+                fun valueAt(x: Float): Float {
+                    val inset = 6.dp.toPx()
+                    val usable = (size.width - inset * 2f).coerceAtLeast(1f)
+                    val fraction = ((x - inset) / usable).coerceIn(0f, 1f)
+                    val raw = valueRange.start + fraction * (valueRange.endInclusive - valueRange.start)
+                    if (steps <= 0) return raw.coerceIn(valueRange)
+                    val count = steps + 1
+                    val step = (valueRange.endInclusive - valueRange.start) / count
+                    return (valueRange.start + kotlin.math.round((raw - valueRange.start) / step) * step).coerceIn(valueRange)
                 }
+                detectTapGestures(onTap = { updateValue(valueAt(it.x)) }, onDoubleTap = { resetAction() })
+            }
+            .pointerInput(valueRange) {
+                fun update(x: Float) {
+                    val inset = 6.dp.toPx()
+                    val usable = (size.width - inset * 2f).coerceAtLeast(1f)
+                    val fraction = ((x - inset) / usable).coerceIn(0f, 1f)
+                    updateValue((valueRange.start + fraction * (valueRange.endInclusive - valueRange.start)).coerceIn(valueRange))
+                }
+                detectDragGestures(
+                    onDragStart = { update(it.x) },
+                    onDrag = { change, _ -> change.consume(); update(change.position.x) },
+                    onDragEnd = { onValueChangeFinished?.invoke() }
+                )
             }
             .semantics {
                 contentDescription = label.uppercase()
                 stateDescription = safeValue.toString()
-            },
-        colors = SliderDefaults.colors(
-            thumbColor = Lime,
-            activeTrackColor = Lime,
-            inactiveTrackColor = Color.Transparent,
-            activeTickColor = Color.Transparent,
-            inactiveTickColor = Color.Transparent
-        ),
-        thumb = {
-            Box(
-                Modifier
-                    .size(10.dp)
-                    .background(Lime, CircleShape)
-                    .border(1.dp, Ink, CircleShape)
-            )
-        },
-        track = { sliderState ->
-            Canvas(Modifier.fillMaxWidth().height(34.dp)) {
-                val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)
-                val progress = ((sliderState.value - valueRange.start) / span).coerceIn(0f, 1f)
-                val centerY = size.height / 2f
-                drawLine(
-                    color = Color(0xFF3D4436),
-                    start = Offset(0f, centerY),
-                    end = Offset(size.width, centerY),
-                    strokeWidth = 1.25.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-                if (progress > 0f) {
-                    drawLine(
-                        color = Lime,
-                        start = Offset(0f, centerY),
-                        end = Offset(size.width * progress, centerY),
-                        strokeWidth = 1.6.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                }
+                progressBarRangeInfo = ProgressBarRangeInfo(safeValue, valueRange, steps)
             }
-        }
-    )
+    ) {
+        val inset = 6.dp.toPx()
+        val centerY = size.height / 2f
+        val startX = inset
+        val endX = (size.width - inset).coerceAtLeast(startX)
+        val fraction = ((safeValue - valueRange.start) / (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)).coerceIn(0f, 1f)
+        val thumbX = startX + (endX - startX) * fraction
+        drawLine(Color(0xFF3D4436), Offset(startX, centerY), Offset(endX, centerY), 1.25.dp.toPx(), cap = StrokeCap.Round)
+        if (fraction > 0f) drawLine(Lime, Offset(startX, centerY), Offset(thumbX, centerY), 1.6.dp.toPx(), cap = StrokeCap.Round)
+        drawCircle(Ink, 5.5.dp.toPx(), Offset(thumbX, centerY))
+        drawCircle(Lime, 4.5.dp.toPx(), Offset(thumbX, centerY))
+    }
 }
 
 @Composable

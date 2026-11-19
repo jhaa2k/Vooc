@@ -1648,8 +1648,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             }
             fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
             val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
-            val bass = providerFrame?.samples?.take((providerFrame.samples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: (frame?.band(0) ?: 0f)
-            val treble = providerFrame?.samples?.takeLast((providerFrame.samples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: (frame?.band(2) ?: 0f)
+            val elementSamples = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(0)
+            val bandSize = (elementSamples.size / 5).coerceAtLeast(1)
+            val bass = elementSamples.take(bandSize).average().toFloat().coerceIn(0f, 1f)
+            val treble = elementSamples.takeLast(bandSize).average().toFloat().coerceIn(0f, 1f)
             fun motionFor(property: String) = MeasureWhatEngine.evaluate(
                 mode = textValue(property, "Nothing"),
                 runtimeSeconds = phase,

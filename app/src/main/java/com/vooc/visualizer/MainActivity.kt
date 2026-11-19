@@ -1699,7 +1699,7 @@ private fun ExportScreen(project: StudioProject, onProjectChange: (StudioProject
             scope.launch {
                 try {
                     val result = withContext(Dispatchers.IO) {
-                        com.vooc.visualizer.export.VideoExportEngine.export(context.contentResolver, project, uri) { value ->
+                        com.vooc.visualizer.export.VideoExportEngine.export(context, context.contentResolver, project, uri) { value ->
                             exportProgress = value
                         }
                     }

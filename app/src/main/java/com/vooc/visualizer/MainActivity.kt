@@ -367,12 +367,24 @@ private fun VoocStudio(
     var timelineProperty by remember { mutableStateOf("X") }
     var multiSelectedIds by remember { mutableStateOf(setOf<Long>()) }
     var multiSelectedElementIds by remember { mutableStateOf(setOf<String>()) }
+    var pendingElementImageProperty by remember { mutableStateOf<String?>(null) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && selectedId != 0L) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             project = updateLayer(project, selectedId) { it.copy(imageUri = uri.toString()) }
         }
+    }
+    val elementImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val property = pendingElementImageProperty
+        val element = project.document.elements.firstOrNull { it.id == selectedElementId }
+        if (uri != null && property != null && element != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            val updated = element.withValue(property, ElementValue.Text(uri.toString()))
+            val next = project.copy(document = project.document.copy(elements = project.document.elements.map { if (it.id == updated.id) updated else it }))
+            project = next; onSave(next)
+        }
+        pendingElementImageProperty = null
     }
     val projectExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) runCatching {
@@ -649,7 +661,7 @@ private fun VoocStudio(
                                 project = project.copy(layers = project.layers.map { if (it.id in multiSelectedIds) it.copy(groupId = group) else it })
                                 multiSelectedIds = emptySet()
                             }) { Text("GROUP", color = Lime) }
-                            TextButton(enabled = multiSelectedIds.isNotEmpty(), onClick = {
+                            TextButton(enabled = multiSelectedIds.isNotEmpty() || multiSelectedElementIds.isNotEmpty(), onClick = {
                                 project = project.copy(layers = project.layers.map { if (it.id in multiSelectedIds) it.copy(groupId = "") else it })
                                 multiSelectedIds = emptySet()
                             }) { Text("UNGROUP", color = Muted) }
@@ -786,6 +798,7 @@ private fun VoocStudio(
                         elements = editableElements,
                         selectedId = selectedElementId,
                         onSelect = { selectedElementId = it },
+                        onPickImage = { property -> pendingElementImageProperty = property; elementImagePicker.launch(arrayOf("image/*")) },
                         onChange = { updated ->
                             val next = project.copy(document = project.document.copy(
                                 elements = project.document.elements.filterNot { it.id == updated.id } + updated
@@ -1111,6 +1124,7 @@ private fun ElementStudioEditor(
     elements: List<ElementDocument>,
     selectedId: String,
     onSelect: (String) -> Unit,
+    onPickImage: (String) -> Unit,
     onChange: (ElementDocument) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -1163,13 +1177,26 @@ private fun ElementStudioEditor(
                                 }
                             }
                             ElementValueType.TEXT, ElementValueType.COLOR -> {
-                                val current = (value as? ElementValue.Text)?.value.orEmpty()
+                                val current = when (value) {
+                                    is ElementValue.Text -> value.value
+                                    is ElementValue.Integer -> String.format("#%08X", value.value)
+                                    else -> ""
+                                }
                                 if (spec.name.contains("color", ignoreCase = true) && current.matches(Regex("#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"))) {
                                     ColorWheelField(spec.name.uppercase(), current) { hex ->
-                                        onChange(selected.withValue(spec.name, ElementValue.Text(hex)))
+                                        val nextValue = if (spec.type == ElementValueType.COLOR) ElementValue.Integer(android.graphics.Color.parseColor(hex).toLong() and 0xFFFFFFFFL) else ElementValue.Text(hex)
+                                        onChange(selected.withValue(spec.name, nextValue))
+                                    }
+                                } else if (spec.name.contains("image", ignoreCase = true) || spec.name.contains("target", ignoreCase = true)) {
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        CompactTextInput(spec.name.uppercase(), current) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
+                                        TextButton(onClick = { onPickImage(spec.name) }) { Text("BROWSE", color = Lime) }
                                     }
                                 } else {
-                                    CompactTextInput(spec.name.uppercase(), current) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
+                                    CompactTextInput(spec.name.uppercase(), current) {
+                                        val nextValue = if (spec.type == ElementValueType.COLOR) ElementValue.Integer(it.toLongOrNull() ?: 0L) else ElementValue.Text(it)
+                                        onChange(selected.withValue(spec.name, nextValue))
+                                    }
                                 }
                             }
                             ElementValueType.VECTOR2 -> {

@@ -19,7 +19,8 @@ enum class StudioElementType(val displayName: String) {
     BARS_SEGMENTS("Bars/Segments"),
     PARTICLES("Particles"),
     TEXT("Text"),
-    MOTION_BLUR_EFFECT("Motion Blur Effect")
+    MOTION_BLUR_EFFECT("Motion Blur Effect"),
+    SHAPE("Shape")
 }
 
 enum class ElementValueType { BOOLEAN, NUMBER, INTEGER, TEXT, COLOR, ENUM, VECTOR2 }
@@ -248,6 +249,67 @@ object ElementPropertyCatalog {
         number("Corner Radius", "Background", 0.0, 0.0, 512.0),
         text("Color Overlay", "Background", "#00000000"),
         number("Opacity / Alpha", "Background", 1.0, 0.0, 1.0)
+    )
+
+
+    private val shapeGeneral = listOf(
+        text("Tag", "General", "Shape"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Anchor Y", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val shapeAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        text("Color", "Appearance", "#FFFFFFFF"),
+        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
+        bool("Show Unblurred Content", "Appearance", false),
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
+    private val shapeSpecific = listOf(
+        text("Shape Type", "Shape", "Rectangle", listOf(
+            "Rectangle", "Circle/Oval", "Line", "Triangle", "Custom"
+        )),
+        number("Width", "Shape", 300.0, 0.0, 8192.0),
+        number("Height", "Shape", 300.0, 0.0, 8192.0),
+        number("Corner Radius", "Shape", 0.0, 0.0, 4096.0),
+        text("Fill / Color", "Shape", "#FFFFFFFF"),
+        number("Opacity / Alpha", "Shape", 1.0, 0.0, 1.0),
+        number("Stroke / Border Width", "Shape", 0.0, 0.0, 512.0),
+        text("Stroke Color", "Shape", "#FFFFFFFF"),
+        text("Stroke Style", "Shape", "Solid", listOf("Solid", "Dashed", "Dotted")),
+        number("Trim Paths / Progress", "Shape", 1.0, 0.0, 1.0),
+        bool("Gradient Fill", "Shape", false),
+        text("Gradient Type", "Shape", "Linear", listOf("Linear", "Radial")),
+        text("Gradient Start Color", "Shape", "#FFFFFFFF"),
+        text("Gradient End Color", "Shape", "#FF000000"),
+        number("Gradient Angle", "Shape", 0.0, -360.0, 360.0)
     )
 
     private val provider = listOf(
@@ -692,6 +754,10 @@ object ElementPropertyCatalog {
             return (motionBlurGeneral + motionBlurAppearance + motionBlur)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
+        if (type == StudioElementType.SHAPE) {
+            return (shapeGeneral + shapeAppearance + shapeSpecific)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
         val specific = when (type) {
             StudioElementType.BACKGROUND -> backgroundSpecific
             StudioElementType.IMAGE -> imageSpecific
@@ -701,6 +767,7 @@ object ElementPropertyCatalog {
             StudioElementType.PARTICLES -> particles
             StudioElementType.TEXT -> emptyList()
             StudioElementType.MOTION_BLUR_EFFECT -> motionBlur
+            StudioElementType.SHAPE -> shapeSpecific
             StudioElementType.AUDIO_PROVIDER -> emptyList()
         }
         return (sharedGeneral + specific).groupBy { it.name }.values.map { sameName -> sameName.last() }

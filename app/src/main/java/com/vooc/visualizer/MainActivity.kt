@@ -207,7 +207,7 @@ private fun VoocStudio(
     ) { padding ->
         when (screen) {
             "PLAYER" -> PlayerScreen(player, trackName, playing, position, duration, picker)
-            "EXPORT" -> ExportScreen(project)
+            "EXPORT" -> ExportScreen(project, onProjectChange = { project = it; onSave(it) })
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp),
@@ -500,13 +500,38 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
 }
 
 @Composable
-private fun ExportScreen(project: StudioProject) {
+private fun ExportScreen(project: StudioProject, onProjectChange: (StudioProject) -> Unit) {
     Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("VIDEO EXPORT", color = Lime, letterSpacing = 2.sp, style = MaterialTheme.typography.titleMedium)
-        Text("PROJECT OUTPUT", color = Muted, style = MaterialTheme.typography.labelSmall)
+        Text("OUTPUT RESOLUTION", color = Muted, style = MaterialTheme.typography.labelSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(1280 to 720, 1920 to 1080, 2560 to 1440).forEach { size ->
+                OutlinedButton(
+                    onClick = { onProjectChange(project.copy(width = size.first, height = size.second)) },
+                    shape = RectangleShape,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (project.width == size.first) Lime else Color.White
+                    )
+                ) { Text("${size.first}p") }
+            }
+        }
+        Text("FRAME RATE", color = Muted, style = MaterialTheme.typography.labelSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(30, 60).forEach { rate ->
+                OutlinedButton(
+                    onClick = { onProjectChange(project.copy(fps = rate)) },
+                    shape = RectangleShape,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (project.fps == rate) Lime else Color.White
+                    )
+                ) { Text("$rate FPS") }
+            }
+        }
+        Text("OUTPUT SUMMARY", color = Muted, style = MaterialTheme.typography.labelSmall)
         Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Color.White)
-        Text("MP4 / H.264", color = Color.White)
-        Text("Export rendering is not wired into this build yet. This screen is intentionally not showing a fake progress bar or a false success state.", color = Muted)
+        Text("Container: MP4  •  Video: H.264  •  Audio: AAC", color = Color.White)
+        Spacer(Modifier.height(8.dp))
+        Text("The export encoder and audio/video muxer are not implemented yet. These settings are saved with the project, but this build cannot render an MP4. No fake export action is shown.", color = Muted)
     }
 }
 

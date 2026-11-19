@@ -284,6 +284,8 @@ object VideoExportEngine {
     }
 
     private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float) {
+        canvas.save()
+        canvas.clipRect(0, 0, width, height)
         canvas.drawColor((project.document.backgroundArgb or (0xFFL shl 24)).toInt())
         val seconds = timeMs / 1000f
         project.layers.filter { it.enabled }.map { evaluateLayer(project, it, timeMs) }.forEach { layer ->
@@ -467,6 +469,7 @@ object VideoExportEngine {
             }
             canvas.restore()
         }
+        canvas.restore()
     }
 
     private fun writeYuv420(bitmap: Bitmap, output: ByteBuffer) {

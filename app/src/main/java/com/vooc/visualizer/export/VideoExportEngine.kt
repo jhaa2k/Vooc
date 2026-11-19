@@ -378,3 +378,42 @@ object VideoExportEngine {
                 val argb = rowPixels[col]
                 val r = argb shr 16 and 0xFF
                 val g = argb shr 8 and 0xFF
+                val b = argb and 0xFF
+                yPlane[yi++] = ((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).coerceIn(0, 255)).toByte()
+                if (row % 2 == 0 && col % 2 == 0) {
+                    uPlane[ui++] = ((((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
+                    vPlane[vi++] = ((((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
+                }
+            }
+        }
+        output.put(yPlane)
+        output.put(uPlane)
+        output.put(vPlane)
+    }
+
+    private fun evaluateLayer(project: StudioProject, layer: com.vooc.visualizer.studio.VisualLayer, timeMs: Long): com.vooc.visualizer.studio.VisualLayer {
+        fun value(property: String, base: Float): Float {
+            val points = project.document.keyframes.filter { it.layerId == layer.id && it.property == property }.sortedBy { it.timeMs }
+            if (points.isEmpty()) return base
+            if (timeMs <= points.first().timeMs) return points.first().value
+            if (timeMs >= points.last().timeMs) return points.last().value
+            val rightIndex = points.indexOfFirst { it.timeMs >= timeMs }.coerceAtLeast(1)
+            val left = points[rightIndex - 1]
+            val right = points[rightIndex]
+            var t = ((timeMs - left.timeMs).toFloat() / (right.timeMs - left.timeMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
+            t = when (right.interpolation) {
+                "STEP" -> 0f
+                "EASE_IN_OUT" -> t * t * (3f - 2f * t)
+                else -> t
+            }
+            return left.value + (right.value - left.value) * t
+        }
+        return layer.copy(
+            x = value("X", layer.x).coerceIn(-200f, 200f),
+            y = value("Y", layer.y).coerceIn(-200f, 200f),
+            scale = value("SCALE", layer.scale).coerceIn(0f, 400f),
+            rotation = value("ROTATION", layer.rotation).coerceIn(-3600f, 3600f),
+            opacity = value("OPACITY", layer.opacity).coerceIn(0f, 100f)
+        )
+    }
+}

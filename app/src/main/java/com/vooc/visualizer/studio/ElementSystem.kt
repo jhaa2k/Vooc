@@ -576,6 +576,8 @@ object ElementPropertyCatalog {
         text("Alignment", "Layout", "Bottom", listOf("Bottom", "Top", "Center", "Stretch")),
         text("Frequency Scale", "Audio", "Logarithmic", listOf("Linear", "Logarithmic")),
         number("Smoothing / Damping", "Behavior", 0.72, 0.0, 1.0),
+        number("Attack Smoothing", "Behavior", 0.12, 0.0, 1.0),
+        number("Release Smoothing", "Behavior", 0.72, 0.0, 1.0),
         bool("Flip Input", "Audio", false),
         bool("Mirror", "Modifiers", false),
         text("Mirror Mode", "Modifiers", "Horizontal", listOf("Off", "Horizontal", "Vertical", "Both")),

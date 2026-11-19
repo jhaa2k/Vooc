@@ -184,15 +184,15 @@ object ElementPropertyCatalog {
         bool("Visible", "General", true),
         text("Blend Mode", "General", "Normal", listOf("Normal", "Add", "Multiply", "Screen", "Overlay", "Soft Light", "Hard Light", "Difference", "Alpha Blend")),
         ElementPropertySpec("Position", "General", ElementValueType.VECTOR2, ElementValue.Vector2(0.0, 0.0)),
-        text("Measure Pos (Measure What)", "General", "None", listOf("None") + MeasureWhatEngine.options),
+        text("Measure Pos (Measure What)", "General", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options),
         text("Anchor X", "General", "Center", listOf("Left", "Center", "Right")),
         text("Anchor Y", "General", "Middle", listOf("Top", "Middle", "Bottom")),
         text("Alignment Position", "General", "Center", listOf("Left", "Center", "Right", "Top", "Middle", "Bottom")),
         bool("Scale Is Uniform", "General", true),
         number("Scale", "General", 100.0, 0.0, 1000.0),
-        text("Measure Scale (Measure What)", "General", "None", listOf("None") + MeasureWhatEngine.options),
+        text("Measure Scale (Measure What)", "General", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "None", listOf("None") + MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options)
     )
 
     private val provider = listOf(

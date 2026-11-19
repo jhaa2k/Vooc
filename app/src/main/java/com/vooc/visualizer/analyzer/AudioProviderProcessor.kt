@@ -14,27 +14,27 @@ import kotlin.math.pow
  * The processor is stateful only for temporal smoothing and beat-onset tracking; call reset() on seek/track change.
  */
 data class AudioProviderConfig(
-    val sampleOutCount: Int = 128,
+    val sampleOutCount: Int = 201,
     val mirrorSamples: Boolean = false,
-    val repeatSamples: Boolean = false,
+    val repeatSamples: Boolean = true,
     /** Equal start/end exclusion, matching the current single "Star And End Gap" editor property. */
     val startAndEndGap: Int = 0,
-    val smooth: Float = 0.35f,
-    val preSmooth: Float = 0f,
-    val filterRadius: Int = 0,
-    val filterStrength: Float = 0f,
-    val aWeight: Float = 0f,
-    val outputMultiplier: Float = 1f,
-    val lowerHz: Float = 30f,
-    val higherHz: Float = 16000f,
+    val smooth: Float = 0.595f,
+    val preSmooth: Float = 1f,
+    val filterRadius: Int = 1,
+    val filterStrength: Float = 1f,
+    val aWeight: Float = 0.2f,
+    val outputMultiplier: Float = 7f,
+    val lowerHz: Float = 20f,
+    val higherHz: Float = 18000f,
     /** -1..0 biases the log curve toward lower frequencies; 0 is logarithmic; 0..1 blends toward linear. */
-    val hzLinearFactor: Float = 0f,
+    val hzLinearFactor: Float = 0.06f,
     val freqShift: Float = 0f,
-    val beatSmooth: Float = 0.35f,
+    val beatSmooth: Float = 0.685f,
     val beatRangeBarFirst: Int = 0,
-    val beatRangeBarLast: Int = 127,
-    val beatRangeValueLower: Float = 0.08f,
-    val beatRangeValueHigher: Float = 0.8f,
+    val beatRangeBarLast: Int = 70,
+    val beatRangeValueLower: Float = 0f,
+    val beatRangeValueHigher: Float = 50f,
     val fftSize: Int = 2048
 ) {
     fun validated(nyquist: Float = 96000f): AudioProviderConfig {
@@ -49,6 +49,7 @@ data class AudioProviderConfig(
             filterRadius = filterRadius.coerceIn(0, 64),
             filterStrength = filterStrength.finiteClamp(0f, 1f),
             outputMultiplier = outputMultiplier.finiteClamp(0f, 32f),
+            aWeight = aWeight.finiteClamp(0f, 1f),
             lowerHz = low,
             higherHz = high,
             hzLinearFactor = hzLinearFactor.finiteClamp(-1f, 1f),

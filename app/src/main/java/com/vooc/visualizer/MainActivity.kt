@@ -420,6 +420,35 @@ private fun VoocStudio(
                                     }.border(if (selected.color == value) 2.dp else 0.dp, Color.White))
                                 }
                             }
+                            LayerSlider("RED", android.graphics.Color.red(selected.color.toInt()).toFloat(), 0f..255f) { value ->
+                                val r = value.toInt()
+                                val g = android.graphics.Color.green(selected.color.toInt())
+                                val b = android.graphics.Color.blue(selected.color.toInt())
+                                val argb = 0xFF000000L or (r.toLong() shl 16) or (g.toLong() shl 8) or b.toLong()
+                                project = updateLayer(project, selectedId) { it.copy(color = argb) }
+                            }
+                            LayerSlider("GREEN", android.graphics.Color.green(selected.color.toInt()).toFloat(), 0f..255f) { value ->
+                                val r = android.graphics.Color.red(selected.color.toInt())
+                                val g = value.toInt()
+                                val b = android.graphics.Color.blue(selected.color.toInt())
+                                val argb = 0xFF000000L or (r.toLong() shl 16) or (g.toLong() shl 8) or b.toLong()
+                                project = updateLayer(project, selectedId) { it.copy(color = argb) }
+                            }
+                            LayerSlider("BLUE", android.graphics.Color.blue(selected.color.toInt()).toFloat(), 0f..255f) { value ->
+                                val r = android.graphics.Color.red(selected.color.toInt())
+                                val g = android.graphics.Color.green(selected.color.toInt())
+                                val b = value.toInt()
+                                val argb = 0xFF000000L or (r.toLong() shl 16) or (g.toLong() shl 8) or b.toLong()
+                                project = updateLayer(project, selectedId) { it.copy(color = argb) }
+                            }
+                            Text("SECONDARY / GRADIENT COLOR", color = Muted, style = MaterialTheme.typography.labelSmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(0xFF55D6FF, 0xFFFFFFFF, 0xFFFF5F7A, 0xFFB58CFF, 0xFFFFB454, 0xFFC6F36A).forEach { value ->
+                                    Box(Modifier.size(28.dp).background(Color(value)).clickable {
+                                        project = updateLayer(project, selectedId) { it.copy(gradientColor = value) }
+                                    }.border(if (selected.gradientColor == value) 2.dp else 0.dp, Color.White))
+                                }
+                            }
                         }
                     }
                     item {

@@ -39,12 +39,12 @@ object VizLoader {
     private const val MAX_ENTRY_BYTES = 32 * 1024 * 1024
 
     fun load(input: InputStream): VizScene {
-        val sceneBytes = input.use { source ->
+        val extracted = input.use { source ->
             val all = source.readBytes()
             require(all.isNotEmpty() && all.size <= MAX_ARCHIVE_BYTES) { "VIZ archive is empty or exceeds 64 MB." }
             extract(all)
         }
-        val root = JSONObject(sceneBytes.toString(Charsets.UTF_8).trimStart('\uFEFF'))
+        val root = JSONObject(extracted.first.toString(Charsets.UTF_8).trimStart('\uFEFF'))
         require(root.optString("objType") == "Root") { "Unsupported VIZ scene root. Expected objType=Root." }
         val compositionsJson = root.optJSONArray("compositions")
             ?: throw IllegalArgumentException("VIZ scene has no compositions array.")
@@ -56,19 +56,16 @@ object VizLoader {
             }
         }
         require(compositions.isNotEmpty()) { "VIZ scene contains no readable compositions." }
-        val extracted = extractAssets
         return VizScene(
             version = root.optString("ver", ""),
             template = root.optInt("template", 0),
             compositions = compositions,
-            assets = extracted,
+            assets = extracted.second,
             unknownElementTypes = unknown
         )
     }
 
-    private var extractAssets: Map<String, ByteArray> = emptyMap()
-
-    private fun extract(archive: ByteArray): ByteArray {
+    private fun extract(archive: ByteArray): Pair<ByteArray, Map<String, ByteArray>> {
         var scene: ByteArray? = null
         val assets = linkedMapOf<String, ByteArray>()
         ZipInputStream(ByteArrayInputStream(archive)).use { zip ->
@@ -93,8 +90,7 @@ object VizLoader {
                 }
             }
         }
-        extractAssets = assets
-        return scene ?: throw IllegalArgumentException("VIZ archive does not contain scene.json.")
+        return (scene ?: throw IllegalArgumentException("VIZ archive does not contain scene.json.")) to assets
     }
 
     private fun parseNode(json: JSONObject, unknown: MutableSet<String>): VizNode {
@@ -110,7 +106,18 @@ object VizLoader {
             if (!p.has("v") || !p.has("t")) continue
             val typeCode = p.optString("t")
             val raw = p.opt("v")
-            val decoded = decode(raw, typeCode)
+            val decoded = if (typeCode.startsWith("_child")) {
+                val nested = linkedMapOf<String, Any?>()
+                val nestedKeys = p.keys()
+                while (nestedKeys.hasNext()) {
+                    val nestedName = nestedKeys.next()
+                    val nestedProp = p.optJSONObject(nestedName) ?: continue
+                    if (nestedProp.has("v") && nestedProp.has("t")) {
+                        nested[nestedName] = decode(nestedProp.opt("v"), nestedProp.optString("t"))
+                    }
+                }
+                mapOf("choice" to raw, "nested" to nested)
+            } else decode(raw, typeCode)
             properties[name] = VizProperty(
                 name = name,
                 rawValue = raw,
@@ -147,7 +154,6 @@ object VizLoader {
                 val (kind, _, id) = raw.toString().partition(":")
                 mapOf("kind" to kind, "id" to id)
             }
-            "_child" -> mapOf("choice" to raw, "nested" to emptyMap<String, Any?>())
             else -> raw // Enum/text/id and future types are retained exactly.
         }
     }

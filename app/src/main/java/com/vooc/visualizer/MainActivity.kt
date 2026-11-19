@@ -1648,9 +1648,26 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             }
             fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
             val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
-            val center = Offset(cx + position.x.toFloat() / 200f * size.width, cy + position.y.toFloat() / 200f * size.height)
-            val scale = (number("Scale", 100f) / 100f).coerceIn(0f, 10f)
-            val rotation = number("Rotation", 0f)
+            val bass = providerFrame?.samples?.take((providerFrame.samples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: (frame?.band(0) ?: 0f)
+            val treble = providerFrame?.samples?.takeLast((providerFrame.samples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: (frame?.band(2) ?: 0f)
+            fun motionFor(property: String) = MeasureWhatEngine.evaluate(
+                mode = textValue(property, "Nothing"),
+                runtimeSeconds = phase,
+                trackPositionSeconds = (frame?.timeSec ?: 0.0).toFloat(),
+                playing = playing,
+                beatPulse = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f,
+                bass = bass, treble = treble, bpm = frame?.beat?.bpm ?: 120f,
+                seed = element.id.hashCode().toLong(), playingSeconds = phase
+            )
+            val posMotion = motionFor("Measure Pos (Measure What)")
+            val scaleMotion = motionFor("Measure Scale (Measure What)")
+            val rotMotion = motionFor("Measure Rot (Measure What)")
+            val center = Offset(
+                cx + (position.x.toFloat() / 200f + posMotion.offsetX) * size.width,
+                cy + (position.y.toFloat() / 200f + posMotion.offsetY) * size.height
+            )
+            val scale = (number("Scale", 100f) / 100f * scaleMotion.scale).coerceIn(0f, 10f)
+            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation
             val opacity = (number("Opacity", 100f) / 100f).coerceIn(0f, 1f)
             val colorText = textValue("Color", "#FFFFFFFF")
             val elementColor = runCatching { Color(android.graphics.Color.parseColor(colorText)).copy(alpha = opacity) }.getOrDefault(Color.White.copy(alpha = opacity))

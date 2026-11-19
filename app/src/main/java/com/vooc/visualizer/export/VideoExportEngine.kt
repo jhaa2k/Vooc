@@ -482,6 +482,34 @@ object VideoExportEngine {
                     canvas.drawCircle(cx, cy, min(width, height) * 0.1f * scale, paint)
                     paint.style = Paint.Style.FILL
                 }
+                StudioElementType.SHAPE -> {
+                    val shapeWidth = number("Width", 300f) * scale * width / 1080f
+                    val shapeHeight = number("Height", 300f) * scale * width / 1080f
+                    val fill = runCatching { android.graphics.Color.parseColor(textValue("Fill / Color", textValue("Color", "#FFFFFFFF"))) }
+                        .getOrDefault(color)
+                    paint.color = fill
+                    paint.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
+                    val rect = RectF(cx - shapeWidth / 2f, cy - shapeHeight / 2f, cx + shapeWidth / 2f, cy + shapeHeight / 2f)
+                    when (textValue("Shape Type", "Rectangle")) {
+                        "Circle/Oval" -> canvas.drawOval(rect, paint)
+                        "Line" -> {
+                            paint.strokeWidth = max(1f, number("Stroke / Border Width", 3f) * width / 1080f)
+                            canvas.drawLine(rect.left, cy, rect.right, cy, paint)
+                        }
+                        "Triangle" -> {
+                            val path = android.graphics.Path().apply {
+                                moveTo(cx, rect.top); lineTo(rect.right, rect.bottom); lineTo(rect.left, rect.bottom); close()
+                            }
+                            canvas.drawPath(path, paint)
+                        }
+                        else -> canvas.drawRoundRect(rect, number("Corner Radius", 0f) * width / 1080f,
+                            number("Corner Radius", 0f) * width / 1080f, paint)
+                    }
+                    paint.color = color
+                    paint.alpha = alpha
+                    paint.style = Paint.Style.FILL
+                }
+                StudioElementType.BACKGROUND -> Unit
                 StudioElementType.AUDIO_PROVIDER -> Unit
             }
             canvas.restore()

@@ -6,8 +6,9 @@ on:
     branches: [main]
   workflow_dispatch:
 concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
+  # Keep each commit's validation independent; rapid pushes must not cancel builds.
+  group: android-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:

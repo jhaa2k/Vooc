@@ -393,14 +393,16 @@ object VideoExportEngine {
             }
             fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
             val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+            val safeElementSamples = providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+            val elementBandSize = (safeElementSamples.size / 5).coerceAtLeast(1)
             fun motionFor(property: String) = MeasureWhatEngine.evaluate(
                 mode = textValue(property, "Nothing"),
                 runtimeSeconds = seconds,
                 trackPositionSeconds = seconds,
                 playing = true,
                 beatPulse = providerBeat,
-                bass = providerSamples?.takeIf { it.isNotEmpty() }?.take((providerSamples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel,
-                treble = providerSamples?.takeIf { it.isNotEmpty() }?.takeLast((providerSamples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel,
+                bass = safeElementSamples.take(elementBandSize).average().toFloat(),
+                treble = safeElementSamples.takeLast(elementBandSize).average().toFloat(),
                 bpm = 120f,
                 seed = element.id.hashCode().toLong()
             )

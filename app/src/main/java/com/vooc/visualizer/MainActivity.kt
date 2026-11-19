@@ -45,6 +45,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.vooc.visualizer.analyzer.AnalysisFrame
+import com.vooc.visualizer.analyzer.AudioAnalyzer
 import com.vooc.visualizer.playback.VoocAudioEngine
 import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind

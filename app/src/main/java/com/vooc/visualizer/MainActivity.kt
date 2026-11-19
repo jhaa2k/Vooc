@@ -85,6 +85,7 @@ import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.ProjectStore
 import com.vooc.visualizer.studio.ProjectRepository
 import com.vooc.visualizer.studio.ProjectEntry
+import com.vooc.visualizer.studio.ProjectKeyframe
 import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.TemplateStore
@@ -331,6 +332,7 @@ private fun VoocStudio(
     var currentProjectId by remember { mutableStateOf(projectEntries.firstOrNull()?.id) }
     var repositoryReady by remember { mutableStateOf(false) }
     var showAudioPlayer by remember { mutableStateOf(false) }
+    var timelineProperty by remember { mutableStateOf("X") }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && selectedId != 0L) {
@@ -515,7 +517,7 @@ private fun VoocStudio(
                 }
             }
             "EXPORT" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 ExportScreen(project, onProjectChange = { project = it; onSave(it) }, Modifier.weight(0.60f))
             }
@@ -788,6 +790,65 @@ private fun VoocStudio(
                     }
                 }
                 item {
+                    EditorSection("TIMELINE / KEYFRAMES", expandedSection, {
+                        expandedSection = if (expandedSection == "TIMELINE / KEYFRAMES") "" else "TIMELINE / KEYFRAMES"
+                    }) {
+                        val timelineLength = maxOf(duration, project.document.durationMs, 30_000L).coerceAtLeast(1L)
+                        Text("PLAYHEAD  ${position / 1000f}s  /  ${timelineLength / 1000f}s",
+                            color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Slider(
+                            value = position.coerceIn(0L, timelineLength).toFloat(),
+                            onValueChange = { player.seekTo(it.toLong()) },
+                            valueRange = 0f..timelineLength.toFloat()
+                        )
+                        OptionDropdown("ANIMATED PROPERTY", timelineProperty,
+                            listOf("X", "Y", "SCALE", "ROTATION", "OPACITY")) { timelineProperty = it }
+                        val currentValue = when (timelineProperty) {
+                            "X" -> selected.x
+                            "Y" -> selected.y
+                            "SCALE" -> selected.scale
+                            "ROTATION" -> selected.rotation
+                            else -> selected.opacity
+                        }
+                        Button(
+                            onClick = {
+                                val keyframe = ProjectKeyframe(
+                                    id = "kf-${selectedId}-${timelineProperty}-${position}-${System.nanoTime()}",
+                                    layerId = selectedId,
+                                    property = timelineProperty,
+                                    timeMs = position.coerceAtLeast(0L),
+                                    value = currentValue,
+                                    interpolation = "LINEAR"
+                                )
+                                project = project.copy(document = project.document.copy(
+                                    keyframes = (project.document.keyframes.filterNot {
+                                        it.layerId == selectedId && it.property == timelineProperty && it.timeMs == keyframe.timeMs
+                                    } + keyframe).sortedBy { it.timeMs }
+                                ))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RectangleShape,
+                            colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)
+                        ) { Text("ADD KEYFRAME AT PLAYHEAD") }
+                        val tracks = project.document.keyframes.filter { it.layerId == selectedId }
+                            .sortedWith(compareBy<ProjectKeyframe> { it.property }.thenBy { it.timeMs })
+                        Text("${tracks.size} KEYFRAMES ON THIS LAYER", color = Muted,
+                            style = MaterialTheme.typography.labelSmall)
+                        tracks.forEach { key ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${key.property}  •  ${key.timeMs / 1000f}s  •  ${"%.2f".format(key.value)}",
+                                    color = Color.White, style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.weight(1f))
+                                TextButton(onClick = {
+                                    project = project.copy(document = project.document.copy(
+                                        keyframes = project.document.keyframes.filterNot { it.id == key.id }
+                                    ))
+                                }) { Text("REMOVE", color = Color(0xFFFF7777)) }
+                            }
+                        }
+                    }
+                }
+                item {
                     Button(onClick = { onSave(project) }, modifier = Modifier.fillMaxWidth(), shape = RectangleShape,
                         colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) {
                         Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("SAVE PROJECT")
@@ -800,8 +861,38 @@ private fun VoocStudio(
 }
 
 
+
+private fun evaluateAnimatedLayer(project: StudioProject, layer: VisualLayer, timeMs: Long): VisualLayer {
+    fun value(property: String, base: Float): Float {
+        val points = project.document.keyframes
+            .filter { it.layerId == layer.id && it.property == property }
+            .sortedBy { it.timeMs }
+        if (points.isEmpty()) return base
+        if (timeMs <= points.first().timeMs) return points.first().value
+        if (timeMs >= points.last().timeMs) return points.last().value
+        val rightIndex = points.indexOfFirst { it.timeMs >= timeMs }.coerceAtLeast(1)
+        val left = points[rightIndex - 1]
+        val right = points[rightIndex]
+        val span = (right.timeMs - left.timeMs).coerceAtLeast(1L)
+        var t = ((timeMs - left.timeMs).toFloat() / span).coerceIn(0f, 1f)
+        t = when (right.interpolation) {
+            "STEP" -> 0f
+            "EASE_IN_OUT" -> t * t * (3f - 2f * t)
+            else -> t
+        }
+        return left.value + (right.value - left.value) * t
+    }
+    return layer.copy(
+        x = value("X", layer.x).coerceIn(-200f, 200f),
+        y = value("Y", layer.y).coerceIn(-200f, 200f),
+        scale = value("SCALE", layer.scale).coerceIn(0f, 400f),
+        rotation = value("ROTATION", layer.rotation).coerceIn(-3600f, 3600f),
+        opacity = value("OPACITY", layer.opacity).coerceIn(0f, 100f)
+    )
+}
+
 @Composable
-private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, playing: Boolean, modifier: Modifier = Modifier) {
+private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, playing: Boolean, timeMs: Long, modifier: Modifier = Modifier) {
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(bottom = 5.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(project.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelLarge,
@@ -809,7 +900,7 @@ private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, playing: 
             Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
         VisualizerPreview(modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF343A2B)),
-            layers = project.layers.filter { it.enabled }, frame = frame, playing = playing)
+            layers = project.layers.filter { it.enabled }.map { evaluateAnimatedLayer(project, it, timeMs) }, frame = frame, playing = playing)
     }
 }
 

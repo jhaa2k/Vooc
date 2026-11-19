@@ -44,7 +44,8 @@ data class StudioProject(
     val layers: List<VisualLayer> = listOf(
         VisualLayer(1, LayerKind.BACKGROUND),
         VisualLayer(2, LayerKind.BARS)
-    )
+    ),
+    val document: ProjectDocument = ProjectDocument()
 )
 
 object ProjectStore {
@@ -66,7 +67,7 @@ object ProjectStore {
                 .put("particleCount", layer.particleCount).put("textContent", layer.textContent)
                 .put("imageUri", layer.imageUri).put("gradientColor", layer.gradientColor))
         }
-        root.put("layers", array)
+        root.put("layers", array).put("document", project.document.toJson())
         context.openFileOutput(FILE_NAME, Context.MODE_PRIVATE).use { it.write(root.toString().toByteArray()) }
     }
 
@@ -101,7 +102,8 @@ object ProjectStore {
             )
         }
         StudioProject(root.optString("name", "Untitled Project"), root.optInt("width", 1920),
-            root.optInt("height", 1080), root.optInt("fps", 30), layers)
+            root.optInt("height", 1080), root.optInt("fps", 30), layers,
+            projectDocumentFromJson(root.optJSONObject("document") ?: JSONObject()))
     }.getOrNull()
     fun encode(project: StudioProject): String {
         val root = JSONObject().put("name", project.name).put("width", project.width)
@@ -119,7 +121,7 @@ object ProjectStore {
                 .put("particleCount", layer.particleCount).put("textContent", layer.textContent)
                 .put("imageUri", layer.imageUri).put("gradientColor", layer.gradientColor))
         }
-        return root.put("layers", array).toString(2)
+        return root.put("layers", array).put("document", project.document.toJson()).toString(2)
     }
 
     fun decode(json: String): StudioProject? = runCatching {
@@ -153,7 +155,8 @@ object ProjectStore {
             )
         }
         StudioProject(root.optString("name", "Untitled Project"), root.optInt("width", 1920),
-            root.optInt("height", 1080), root.optInt("fps", 30), layers)
+            root.optInt("height", 1080), root.optInt("fps", 30), layers,
+            projectDocumentFromJson(root.optJSONObject("document") ?: JSONObject()))
     }.getOrNull()
 
 }

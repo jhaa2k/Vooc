@@ -90,6 +90,9 @@ import com.vooc.visualizer.playback.VoocAudioEngine
 import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.ElementPropertyCatalog
+import com.vooc.visualizer.studio.ElementDocument
+import com.vooc.visualizer.studio.ElementValue
+import com.vooc.visualizer.studio.ElementValueType
 import com.vooc.visualizer.studio.StudioElementType
 import com.vooc.visualizer.studio.ProjectStore
 import com.vooc.visualizer.studio.ProjectRepository
@@ -741,6 +744,17 @@ private fun VoocStudio(
                         }
                     }
                 }
+                item {
+                    AudioProviderPropertyEditor(providerElement) { updated ->
+                        val next = project.copy(
+                            document = project.document.copy(
+                                elements = project.document.elements.filterNot { it.id == updated.id } + updated
+                            )
+                        )
+                        project = next
+                        onSave(next)
+                    }
+                }
                 if (selected != null) {
                     item {
                         Text("PROPERTIES  /  ${selected.name.uppercase()}", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
@@ -1037,6 +1051,69 @@ private fun TemplateLibraryScreen(
             dismissButton = { TextButton(onClick = { deleteName = null }) { Text("CANCEL") } },
             containerColor = Panel
         )
+    }
+}
+
+@Composable
+private fun AudioProviderPropertyEditor(
+    element: ElementDocument,
+    onChange: (ElementDocument) -> Unit
+) {
+    var expandedCategory by remember(element.id) { mutableStateOf("Spectrum") }
+    val specs = remember { ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER) }
+    val categories = remember(specs) { specs.groupBy { it.category } }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("AUDIO PROVIDER", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
+        Text("Live spectrum source • saved in project", color = Muted, style = MaterialTheme.typography.labelSmall)
+        categories.forEach { (category, properties) ->
+            EditorSection(category.uppercase(), expandedCategory.uppercase(), {
+                expandedCategory = if (expandedCategory == category) "" else category
+            }) {
+                properties.forEach { spec ->
+                    val value = element.value(spec.name) ?: spec.defaultValue
+                    when (spec.type) {
+                        ElementValueType.BOOLEAN -> {
+                            val checked = (value as? ElementValue.Bool)?.value ?: false
+                            Row(Modifier.fillMaxWidth().heightIn(min = 38.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(spec.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                                Checkbox(checked = checked, onCheckedChange = { onChange(element.withValue(spec.name, ElementValue.Bool(it))) }, colors = CheckboxDefaults.colors(checkedColor = Lime))
+                            }
+                        }
+                        ElementValueType.ENUM -> {
+                            val selectedValue = (value as? ElementValue.Text)?.value ?: spec.options.firstOrNull().orEmpty()
+                            OptionDropdown(spec.name.uppercase(), selectedValue, spec.options) { onChange(element.withValue(spec.name, ElementValue.Text(it))) }
+                        }
+                        ElementValueType.NUMBER, ElementValueType.INTEGER -> {
+                            val current = when (value) {
+                                is ElementValue.Number -> value.value.toFloat()
+                                is ElementValue.Integer -> value.value.toFloat()
+                                else -> 0f
+                            }
+                            val minimum = (spec.min ?: 0.0).toFloat()
+                            val maximum = (spec.max ?: 100.0).toFloat().coerceAtLeast(minimum + 0.001f)
+                            val reset = when (val default = spec.defaultValue) {
+                                is ElementValue.Number -> default.value.toFloat()
+                                is ElementValue.Integer -> default.value.toFloat()
+                                else -> current
+                            }
+                            LayerSlider(spec.name.uppercase(), current, minimum..maximum, resetValue = reset) { next ->
+                                val nextValue = if (spec.type == ElementValueType.INTEGER) ElementValue.Integer(next.toLong()) else ElementValue.Number(next.toDouble())
+                                onChange(element.withValue(spec.name, nextValue))
+                            }
+                        }
+                        ElementValueType.TEXT, ElementValueType.COLOR -> {
+                            val current = (value as? ElementValue.Text)?.value.orEmpty()
+                            OutlinedTextField(value = current, onValueChange = { onChange(element.withValue(spec.name, ElementValue.Text(it))) }, label = { Text(spec.name.uppercase()) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        }
+                        ElementValueType.VECTOR2 -> {
+                            val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+                            LayerSlider("POSITION X", vector.x.toFloat(), -1000f..1000f) { x -> onChange(element.withValue(spec.name, ElementValue.Vector2(x.toDouble(), vector.y))) }
+                            LayerSlider("POSITION Y", vector.y.toFloat(), -1000f..1000f) { y -> onChange(element.withValue(spec.name, ElementValue.Vector2(vector.x, y.toDouble()))) }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

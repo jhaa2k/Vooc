@@ -24,13 +24,13 @@ object MeasureWhatEngine {
         mode: String,
         runtimeSeconds: Float,
         trackPositionSeconds: Float,
-        playingSeconds: Float = runtimeSeconds,
         playing: Boolean,
         beatPulse: Float,
         bass: Float,
         treble: Float,
         bpm: Float,
-        seed: Long
+        seed: Long,
+        playingSeconds: Float = runtimeSeconds
     ): MeasureMotion {
         val beat = beatPulse.coerceIn(0f, 1f)
         val low = bass.coerceIn(0f, 1f)

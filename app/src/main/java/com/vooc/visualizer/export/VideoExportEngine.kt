@@ -8,6 +8,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -27,8 +28,8 @@ object VideoExportEngine {
     data class Result(val frames: Int, val durationMs: Long, val audioMuxed: Boolean)
 
     fun export(resolver: ContentResolver, project: StudioProject, destination: Uri, onProgress: (Float) -> Unit = {}): Result {
-        val width = project.width.coerceIn(320, 3840)
-        val height = project.height.coerceIn(320, 3840)
+        val width = (project.width.coerceIn(320, 3840) / 2) * 2
+        val height = (project.height.coerceIn(320, 3840) / 2) * 2
         val fps = project.fps.coerceIn(15, 60)
         val audioUri = project.document.audioUri.takeIf { project.document.export.includeAudio && it.isNotBlank() }?.let(Uri::parse)
         val extractor = audioUri?.let { uri ->
@@ -70,6 +71,14 @@ object VideoExportEngine {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        val imageCache = mutableMapOf<String, Bitmap>()
+        project.layers.filter { it.kind == LayerKind.IMAGE && it.imageUri.isNotBlank() }.forEach { layer ->
+            runCatching {
+                resolver.openInputStream(Uri.parse(layer.imageUri))?.use { stream ->
+                    BitmapFactory.decodeStream(stream)?.let { imageCache[layer.imageUri] = it }
+                }
+            }
+        }
         val info = MediaCodec.BufferInfo()
         var audioTrack = -1
         var videoTrack = -1
@@ -98,7 +107,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(canvas, paint, project, width, height, timeMs)
+                            drawFrame(canvas, paint, project, width, height, timeMs, imageCache)
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -143,6 +152,7 @@ object VideoExportEngine {
             runCatching { encoder.stop() }
             encoder.release()
             bitmap.recycle()
+            imageCache.values.forEach { runCatching { it.recycle() } }
             if (muxerStarted) runCatching { muxer.stop() }
             muxer.release()
             extractor?.release()
@@ -173,10 +183,10 @@ object VideoExportEngine {
         }
     }
 
-    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long) {
+    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>) {
         canvas.drawColor((project.document.backgroundArgb or (0xFFL shl 24)).toInt())
         val seconds = timeMs / 1000f
-        project.layers.filter { it.enabled }.forEach { layer ->
+        project.layers.filter { it.enabled }.map { evaluateLayer(project, it, timeMs) }.forEach { layer ->
             val color = layer.color.toInt()
             paint.color = color
             paint.alpha = (layer.opacity.coerceIn(0f, 100f) * 2.55f).toInt()
@@ -244,7 +254,12 @@ object VideoExportEngine {
                     canvas.drawRect(cx - radius, cy - radius, cx + radius, cy + radius, paint)
                     paint.style = Paint.Style.FILL
                 }
-                LayerKind.IMAGE -> Unit // image URI rendering is added in the asset decoder stage
+                LayerKind.IMAGE -> imageCache[layer.imageUri]?.let { image ->
+                    val drawWidth = width * 0.42f * scale
+                    val drawHeight = drawWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
+                    val destination = RectF(cx - drawWidth / 2f, cy - drawHeight / 2f, cx + drawWidth / 2f, cy + drawHeight / 2f)
+                    canvas.drawBitmap(image, null, destination, paint)
+                }
             }
             canvas.restore()
         }
@@ -253,30 +268,58 @@ object VideoExportEngine {
     private fun writeYuv420(bitmap: Bitmap, output: ByteBuffer) {
         val width = bitmap.width
         val height = bitmap.height
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         val frameSize = width * height
         val chromaSize = frameSize / 4
         if (output.remaining() < frameSize + chromaSize * 2) throw IllegalStateException("Encoder input buffer is too small for this resolution.")
         val yPlane = ByteArray(frameSize)
         val uPlane = ByteArray(chromaSize)
         val vPlane = ByteArray(chromaSize)
+        val rowPixels = IntArray(width)
         var yi = 0
         var ui = 0
         var vi = 0
-        for (row in 0 until height) for (col in 0 until width) {
-            val argb = pixels[row * width + col]
-            val r = argb shr 16 and 0xFF
-            val g = argb shr 8 and 0xFF
-            val b = argb and 0xFF
-            yPlane[yi++] = ((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).coerceIn(0, 255)).toByte()
-            if (row % 2 == 0 && col % 2 == 0) {
-                uPlane[ui++] = ((((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
-                vPlane[vi++] = ((((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
+        for (row in 0 until height) {
+            bitmap.getPixels(rowPixels, 0, width, 0, row, width, 1)
+            for (col in 0 until width) {
+                val argb = rowPixels[col]
+                val r = argb shr 16 and 0xFF
+                val g = argb shr 8 and 0xFF
+                val b = argb and 0xFF
+                yPlane[yi++] = ((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).coerceIn(0, 255)).toByte()
+                if (row % 2 == 0 && col % 2 == 0) {
+                    uPlane[ui++] = ((((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
+                    vPlane[vi++] = ((((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
+                }
             }
         }
         output.put(yPlane)
         output.put(uPlane)
         output.put(vPlane)
+    }
+
+    private fun evaluateLayer(project: StudioProject, layer: com.vooc.visualizer.studio.VisualLayer, timeMs: Long): com.vooc.visualizer.studio.VisualLayer {
+        fun value(property: String, base: Float): Float {
+            val points = project.document.keyframes.filter { it.layerId == layer.id && it.property == property }.sortedBy { it.timeMs }
+            if (points.isEmpty()) return base
+            if (timeMs <= points.first().timeMs) return points.first().value
+            if (timeMs >= points.last().timeMs) return points.last().value
+            val rightIndex = points.indexOfFirst { it.timeMs >= timeMs }.coerceAtLeast(1)
+            val left = points[rightIndex - 1]
+            val right = points[rightIndex]
+            var t = ((timeMs - left.timeMs).toFloat() / (right.timeMs - left.timeMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
+            t = when (right.interpolation) {
+                "STEP" -> 0f
+                "EASE_IN_OUT" -> t * t * (3f - 2f * t)
+                else -> t
+            }
+            return left.value + (right.value - left.value) * t
+        }
+        return layer.copy(
+            x = value("X", layer.x).coerceIn(-200f, 200f),
+            y = value("Y", layer.y).coerceIn(-200f, 200f),
+            scale = value("SCALE", layer.scale).coerceIn(0f, 400f),
+            rotation = value("ROTATION", layer.rotation).coerceIn(-3600f, 3600f),
+            opacity = value("OPACITY", layer.opacity).coerceIn(0f, 100f)
+        )
     }
 }

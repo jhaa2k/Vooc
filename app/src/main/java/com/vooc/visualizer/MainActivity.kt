@@ -1183,6 +1183,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
             }.toMap()
         }
     }
+    val layerSmoothing = remember { mutableMapOf<Long, FloatArray>() }
     LaunchedEffect(playing) {
         while (playing) { phase = (phase + 0.08f) % (2f * PI.toFloat()); delay(16) }
     }
@@ -1234,6 +1235,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 }
                 (rawValue * layer.sensitivity / 100f).coerceIn(0f, 1f)
             }
+            val smoothed = layerSmoothing.getOrPut(layer.id) { FloatArray(count) }
+            val smoothingFactor = (1f - layer.smoothing / 100f * 0.95f).coerceIn(0.03f, 1f)
+            for (sampleIndex in 0 until count) {
+                val targetValue = valueAt(sampleIndex)
+                smoothed[sampleIndex] += (targetValue - smoothed[sampleIndex]) * smoothingFactor
+            }
+            val responsiveValueAt: (Int) -> Float = { sampleIndex ->
+                smoothed[sampleIndex.coerceIn(0, count - 1)]
+            }
             rotate(layer.rotation, center) {
                 when (layer.kind) {
                     LayerKind.BACKGROUND -> drawRect(Color(0xFF070906))
@@ -1241,7 +1251,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                         val gap = layer.spacing.dp.toPx()
                         val bw = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
                         for (i in 0 until count) {
-                            val v = valueAt(i)
+                            val v = responsiveValueAt(i)
                             val h = (size.height * (0.025f + v * 0.75f) * scale).coerceIn(1f, size.height)
                             val x = i * (bw + gap)
                             val barColor = if (i % 2 == 0) color else accent
@@ -1268,7 +1278,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                         val cols = count.coerceAtMost(80)
                         for (r in 0..rows) drawLine(color.copy(alpha = alpha * 0.35f), Offset(0f, r * size.height / rows), Offset(size.width, r * size.height / rows), layer.thickness.dp.toPx())
                         for (i in 0 until cols) {
-                            val v = valueAt(i)
+                            val v = responsiveValueAt(i)
                             val x = i * size.width / cols
                             drawLine(if (i % 2 == 0) color else accent, Offset(x, size.height), Offset(x, size.height - v * size.height * 0.7f), layer.thickness.dp.toPx())
                         }
@@ -1318,7 +1328,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                         }
                         if (layer.kind == LayerKind.CIRCLE) {
                             for (i in 0 until count) {
-                                val v = valueAt(i)
+                                val v = responsiveValueAt(i)
                                 val a = i * 2f * PI.toFloat() / count
                                 val r1 = radius
                                 val r2 = r1 + v * 44.dp.toPx()
@@ -1332,7 +1342,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                         val n = if (layer.kind == LayerKind.PARTICLES) layer.particleCount else count
                         repeat(n) { i ->
                             val a = i * 2f * PI.toFloat() / n + phase * (if (layer.kind == LayerKind.PARTICLES) 1f else 0f)
-                            val v = valueAt(i % count)
+                            val v = responsiveValueAt(i % count)
                             val r = size.minDimension * (0.08f + (i % 9) * 0.035f) * scale * (1f + v * 0.25f)
                             drawCircle(if (i % 2 == 0) color else accent, (layer.thickness * 0.55f + v * 3f).dp.toPx(),
                                 Offset(center.x + cos(a) * r, center.y + sin(a) * r))
@@ -1340,7 +1350,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                     }
                     LayerKind.LINES -> {
                         for (i in 0 until count) {
-                            val v = valueAt(i)
+                            val v = responsiveValueAt(i)
                             val x = i * size.width / count
                             drawLine(if (i % 2 == 0) color else accent, Offset(x, cy - v * cy), Offset(x, cy + v * cy), layer.thickness.dp.toPx())
                         }
@@ -1350,7 +1360,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                         val path = Path()
                         repeat(6) { i ->
                             val a = i * 2f * PI.toFloat() / 6f
-                            val r = radius * (1f + valueAt(i) * 0.35f)
+                            val r = radius * (1f + responsiveValueAt(i) * 0.35f)
                             val x = center.x + cos(a) * r
                             val y = center.y + sin(a) * r
                             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)

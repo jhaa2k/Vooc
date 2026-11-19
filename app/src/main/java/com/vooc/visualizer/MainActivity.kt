@@ -1749,7 +1749,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             peakFallSpeed = number("Peak Fall Speed", 0.8f),
                             logarithmicInput = providerFrame == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                             reactionDelayMs = number("Reaction Delay", 0f),
-                            accumulatedDelayMs = number("Accumulated Delay", 0f)
+                            accumulatedDelayMs = number("Accumulated Delay", 0f),
+                            attackSmoothing = number("Attack Smoothing", 0.12f),
+                            releaseSmoothing = number("Release Smoothing", number("Smoothing / Damping", 0.72f))
                         )
                         val levels = barFrame.levels
                         val peaks = barFrame.peaks

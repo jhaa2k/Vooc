@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RectangleShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -33,8 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -396,15 +394,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                         drawLine(color, Offset(x, 0f), Offset(size.width - x, size.height), 1.dp.toPx())
                     }
                 }
-                LayerKind.TEXT -> drawContext.canvas.nativeCanvas.drawText("VOOC", center.x, center.y, android.graphics.Paint().apply {
-                    this.color = color.toArgb(); textSize = 26.sp.toPx(); textAlign = android.graphics.Paint.Align.CENTER
-                })
+                LayerKind.TEXT -> drawLine(color, Offset(center.x - 28.dp.toPx(), center.y), Offset(center.x + 28.dp.toPx(), center.y), 2.dp.toPx())
                 LayerKind.IMAGE -> drawCircle(color.copy(alpha = 0.35f), radius = 22.dp.toPx(), center = center)
             }
         }
-        if (layers.isEmpty()) drawContext.canvas.nativeCanvas.drawText("ADD A LAYER TO START", cx, cy, android.graphics.Paint().apply {
-            color = android.graphics.Color.GRAY; textSize = 12.sp.toPx(); textAlign = android.graphics.Paint.Align.CENTER
-        })
+        if (layers.isEmpty()) drawCircle(Color.Gray, radius = 3.dp.toPx(), center = Offset(cx, cy))
     }
 }
 

@@ -220,27 +220,76 @@ object ElementPropertyCatalog {
         text("Fft Size", "Performance", "2048", listOf("256", "512", "1024", "2048", "4096", "8192"))
     )
 
+    private val imageGeneral = listOf(
+        text("Tag", "General", "Image"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Anchor Y", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val imageAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        text("Color", "Appearance", "#FFFFFFFF"),
+        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
+        bool("Show Unblurred Content", "Appearance", false),
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
     private val imageSpecific = listOf(
-        text("Custom Image", "Image", ""),
-        number("Measure Animation Speed", "Image", 0.0),
-        bool("Keep Aspect Ratio And Crop To Fit", "Image", false),
-        bool("Keep Aspect Ratio", "Image", true),
+        text("Image Source / File", "Image", ""),
+        text("Fit Mode (Scale Type)", "Image", "Fit (Contain)", listOf(
+            "Fit (Contain)", "Fill (Cover)", "Stretch"
+        )),
+        number("Crop Left", "Image", 0.0, 0.0, 1.0),
+        number("Crop Top", "Image", 0.0, 0.0, 1.0),
+        number("Crop Right", "Image", 0.0, 0.0, 1.0),
+        number("Crop Bottom", "Image", 0.0, 0.0, 1.0),
+        number("Corner Radius", "Image", 0.0, 0.0, 1000.0),
+        text("Mask / Shape", "Image", "Rectangle", listOf(
+            "Rectangle", "Circle", "Triangle", "Ellipse", "Custom"
+        )),
+        number("Edge Blur", "Image", 0.0, 0.0, 128.0),
+        text("Color Overlay", "Image", "#00FFFFFF"),
+        number("Opacity / Alpha", "Image", 1.0, 0.0, 1.0),
+        number("Measure Animation Speed", "Image", 0.0, -20.0, 20.0),
         bool("Blurred Border", "Image", false),
-        text("Shape", "Image", "Rectangle", listOf("Rectangle", "Square", "Circle", "Ellipse")),
-        text("Mask Image", "Image", ""),
         text("Mask Mode", "Image", "Alpha Mask", listOf("Alpha Mask", "Luminance Mask", "Inverted Mask", "Normal Mask")),
-        text("Color", "Color", "#FFFFFFFF"),
-        text("Color To", "Color", "#FFFFFFFF"),
-        number("Measure Color Blend", "Color", 0.0, 0.0, 1.0),
-        number("Saturation", "Color", 1.0, 0.0, 2.0),
-        bool("Color Key Enabled", "Color Key", false),
-        bool("Auto Detect Color Key", "Color Key", false),
-        text("Color Key", "Color Key", "#FF000000"),
-        number("Transparency Strength", "Color Key", 1.0, 0.0, 1.0),
-        number("Opacity Strength", "Color Key", 1.0, 0.0, 1.0),
-        bool("Blur Enabled", "Blur", false),
-        number("Blur Divider", "Blur", 2.0, 1.0, 32.0),
-        number("Blur Radius", "Blur", 8.0, 0.0, 128.0),
+        text("Color To", "Image", "#FFFFFFFF"),
+        number("Measure Color Blend", "Image", 0.0, 0.0, 1.0),
+        number("Saturation", "Image", 1.0, 0.0, 2.0),
+        bool("Color Key Enabled", "Image", false),
+        bool("Auto Detect Color Key", "Image", false),
+        text("Color Key", "Image", "#FF000000"),
+        number("Transparency Strength", "Image", 1.0, 0.0, 1.0),
+        number("Opacity Strength", "Image", 1.0, 0.0, 1.0),
+        bool("Blur Enabled", "Image", false),
+        number("Blur Divider", "Image", 2.0, 1.0, 32.0),
+        number("Blur Radius", "Image", 8.0, 0.0, 128.0),
         number("Generated Album Art Hint Shift Hue", "Generated Album Art", 0.0, -360.0, 360.0),
         bool("Generated Album Art Hint No Text", "Generated Album Art", false),
         bool("Generated Album Art Hint Force Gen", "Generated Album Art", false),
@@ -476,6 +525,10 @@ object ElementPropertyCatalog {
         }
         if (type == StudioElementType.TEXT) {
             return (textGeneral + textAppearance + textTypography)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
+        if (type == StudioElementType.IMAGE) {
+            return (imageGeneral + imageAppearance + imageSpecific)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         val specific = when (type) {

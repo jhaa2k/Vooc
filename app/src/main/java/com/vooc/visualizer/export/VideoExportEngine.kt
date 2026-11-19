@@ -296,7 +296,7 @@ object VideoExportEngine {
                     val baseY = cy + height * 0.34f * scale
                     for (i in 0 until count) {
                         val frequencyShape = 0.18f + 0.82f * abs(sin(i * 0.21f + seconds * 3.2f))
-                        val providerIndex = if (providerSamples.isNullOrEmpty()) -1 else (i.toLong() * providerSamples.size / count).toInt().coerceIn(0, providerSamples.lastIndex)
+                        val providerIndex = if ((providerSamples == null || providerSamples.isEmpty())) -1 else (i.toLong() * providerSamples.size / count).toInt().coerceIn(0, providerSamples.lastIndex)
                         val providerAmplitude = if (providerIndex >= 0) providerSamples!![providerIndex].coerceIn(0f, 1f) else 0f
                         val amplitude = if (providerIndex >= 0) providerAmplitude * (0.5f + layer.sensitivity.coerceIn(0f, 200f) / 100f) else frequencyShape * (0.12f + audioLevel.coerceIn(0f, 1f) * (0.45f + layer.sensitivity.coerceIn(0f, 200f) / 100f))
                         val barHeight = height * 0.42f * amplitude * scale
@@ -319,7 +319,7 @@ object VideoExportEngine {
                     val path = android.graphics.Path()
                     for (i in 0..240) {
                         val x = width * 0.08f + width * 0.84f * i / 240f
-                        val waveLevel = if (providerSamples.isNullOrEmpty()) (0.08f + audioLevel.coerceIn(0f, 1f)) else providerSamples[(i * providerSamples.size / 241).coerceIn(0, providerSamples.lastIndex)].coerceIn(0f, 1f)
+                        val waveLevel = if ((providerSamples == null || providerSamples.isEmpty())) (0.08f + audioLevel.coerceIn(0f, 1f)) else providerSamples[(i * providerSamples.size / 241).coerceIn(0, providerSamples.lastIndex)].coerceIn(0f, 1f)
                         val y = cy + sin(i * 0.075f + seconds * 4f) * height * 0.12f * waveLevel * scale
                         if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                     }
@@ -378,42 +378,3 @@ object VideoExportEngine {
                 val argb = rowPixels[col]
                 val r = argb shr 16 and 0xFF
                 val g = argb shr 8 and 0xFF
-                val b = argb and 0xFF
-                yPlane[yi++] = ((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).coerceIn(0, 255)).toByte()
-                if (row % 2 == 0 && col % 2 == 0) {
-                    uPlane[ui++] = ((((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
-                    vPlane[vi++] = ((((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
-                }
-            }
-        }
-        output.put(yPlane)
-        output.put(uPlane)
-        output.put(vPlane)
-    }
-
-    private fun evaluateLayer(project: StudioProject, layer: com.vooc.visualizer.studio.VisualLayer, timeMs: Long): com.vooc.visualizer.studio.VisualLayer {
-        fun value(property: String, base: Float): Float {
-            val points = project.document.keyframes.filter { it.layerId == layer.id && it.property == property }.sortedBy { it.timeMs }
-            if (points.isEmpty()) return base
-            if (timeMs <= points.first().timeMs) return points.first().value
-            if (timeMs >= points.last().timeMs) return points.last().value
-            val rightIndex = points.indexOfFirst { it.timeMs >= timeMs }.coerceAtLeast(1)
-            val left = points[rightIndex - 1]
-            val right = points[rightIndex]
-            var t = ((timeMs - left.timeMs).toFloat() / (right.timeMs - left.timeMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
-            t = when (right.interpolation) {
-                "STEP" -> 0f
-                "EASE_IN_OUT" -> t * t * (3f - 2f * t)
-                else -> t
-            }
-            return left.value + (right.value - left.value) * t
-        }
-        return layer.copy(
-            x = value("X", layer.x).coerceIn(-200f, 200f),
-            y = value("Y", layer.y).coerceIn(-200f, 200f),
-            scale = value("SCALE", layer.scale).coerceIn(0f, 400f),
-            rotation = value("ROTATION", layer.rotation).coerceIn(-3600f, 3600f),
-            opacity = value("OPACITY", layer.opacity).coerceIn(0f, 100f)
-        )
-    }
-}

@@ -442,7 +442,7 @@ object VideoExportEngine {
                     val gain = number("Amplitude Scale", 1f).coerceIn(0f, 16f)
                     val gamma = number("Amplitude Gamma", 1f).coerceIn(0.1f, 4f)
                     val input = FloatArray(source.size) { i ->
-                        (source[i].coerceAtLeast(0f) * gain).coerceIn(0f, 32f).let { it.toDouble().pow(gamma.toDouble()).toFloat().coerceIn(0f, 1f) }
+                        (source[i].coerceAtLeast(0f) * gain).coerceAtLeast(0f).let { (it / (1f + it)).toDouble().pow(gamma.toDouble()).toFloat().coerceIn(0f, 1f) }
                     }
                     val previous = barLastUpdateMs.put(element.id, timeMs) ?: (timeMs - 1000L / project.fps.coerceIn(15, 60))
                     val delta = ((timeMs - previous).coerceIn(1L, 100L) / 1000f)

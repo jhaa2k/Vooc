@@ -198,8 +198,7 @@ object ElementPropertyCatalog {
         integer("Beat Range Bar Last", "Beat", 127, 0.0, 2048.0),
         number("Beat Range Value Lower", "Beat", 0.08, 0.0, 1.0),
         number("Beat Range Value Higher", "Beat", 0.8, 0.0, 1.0),
-        integer("Fft Size", "Performance", 2048, 256.0, 8192.0,
-            listOf("256", "512", "1024", "2048", "4096", "8192"))
+        text("Fft Size", "Performance", "2048", listOf("256", "512", "1024", "2048", "4096", "8192"))
     )
 
     private val imageSpecific = listOf(

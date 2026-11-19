@@ -1034,7 +1034,7 @@ private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, providerF
             Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
         VisualizerPreview(modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF343A2B)),
-            layers = project.layers.filter { it.enabled }.map { evaluateAnimatedLayer(project, it, timeMs) }, frame = frame, providerFrame = providerFrame, playing = playing)
+            layers = project.layers.filter { it.enabled }.map { evaluateAnimatedLayer(project, it, timeMs) }, elements = project.document.elements, frame = frame, providerFrame = providerFrame, playing = playing)
     }
 }
 
@@ -1341,7 +1341,7 @@ private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLaye
     project.copy(layers = project.layers.map { if (it.id == id) transform(it) else it })
 
 @Composable
-private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, playing: Boolean) {
+private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, elements: List<ElementDocument>, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, playing: Boolean) {
     var phase by remember { mutableFloatStateOf(0f) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val poppinsTypeface = remember(context) {
@@ -1590,6 +1590,81 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                             drawCircle(color.copy(alpha = 0.3f), size.minDimension * 0.12f, center, style = Stroke(layer.thickness.dp.toPx()))
                         }
                     }
+                }
+            }
+        }
+        elements.filter { it.visible && it.type != StudioElementType.AUDIO_PROVIDER }.forEach { element ->
+            val props = element.properties
+            fun number(name: String, fallback: Float): Float = when (val value = props[name]) {
+                is ElementValue.Number -> value.value.toFloat()
+                is ElementValue.Integer -> value.value.toFloat()
+                else -> fallback
+            }
+            fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
+            val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+            val center = Offset(cx + position.x.toFloat() / 200f * size.width, cy + position.y.toFloat() / 200f * size.height)
+            val scale = (number("Scale", 100f) / 100f).coerceIn(0f, 10f)
+            val rotation = number("Rotation", 0f)
+            val opacity = (number("Opacity", 100f) / 100f).coerceIn(0f, 1f)
+            val colorText = textValue("Color", "#FFFFFFFF")
+            val elementColor = runCatching { Color(android.graphics.Color.parseColor(colorText)).copy(alpha = opacity) }.getOrDefault(Color.White.copy(alpha = opacity))
+            val label = textValue("Text", element.tag).take(120)
+            rotate(rotation, center) {
+                when (element.type) {
+                    StudioElementType.TEXT -> drawIntoCanvas { canvas ->
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = elementColor.toArgb()
+                            textSize = (number("Font Size", 48f) * scale).coerceAtLeast(6f).sp.toPx()
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            typeface = poppinsTypeface?.let { android.graphics.Typeface.create(it, android.graphics.Typeface.BOLD) } ?: android.graphics.Typeface.DEFAULT_BOLD
+                        }
+                        canvas.nativeCanvas.drawText(label, center.x, center.y, paint)
+                    }
+                    StudioElementType.BARS_SEGMENTS -> {
+                        val samples = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
+                        val count = number("Bar Count", 64f).toInt().coerceIn(1, 256)
+                        val maxHeight = number("Max Height", size.height * 0.35f).coerceAtLeast(1f) * scale
+                        val barWidth = (size.width * 0.72f / count).coerceAtLeast(1f)
+                        repeat(count) { index ->
+                            val sample = samples[(index * samples.size / count).coerceIn(0, samples.lastIndex)].coerceIn(0f, 1f)
+                            val height = (number("Min Height", 0f) + sample * maxHeight).coerceAtMost(size.height)
+                            val x = center.x - count * barWidth / 2f + index * barWidth
+                            drawRect(elementColor, Offset(x, center.y - height / 2f), androidx.compose.ui.geometry.Size(barWidth * 0.72f, height))
+                        }
+                    }
+                    StudioElementType.PARTICLES -> {
+                        val count = number("Count Limit", 64f).toInt().coerceIn(1, 300)
+                        val particleScale = number("Particle Scale", 100f) / 100f * scale
+                        val colorTo = runCatching { Color(android.graphics.Color.parseColor(textValue("Color To", colorText))) }.getOrDefault(elementColor)
+                        repeat(count) { index ->
+                            val angle = index * 2f * PI.toFloat() / count + phase * 0.35f
+                            val radius = size.minDimension * (0.06f + (index % 11) * 0.018f) * particleScale
+                            drawCircle(if (index % 2 == 0) elementColor else colorTo.copy(alpha = opacity),
+                                (2f + number("Start Size", 8f) * 0.08f).dp.toPx(),
+                                Offset(center.x + cos(angle) * radius, center.y + sin(angle) * radius))
+                        }
+                    }
+                    StudioElementType.IMAGE -> {
+                        drawCircle(elementColor.copy(alpha = 0.35f), size.minDimension * 0.11f * scale, center, style = Stroke(width = 2.dp.toPx()))
+                        drawLine(elementColor, Offset(center.x - 18.dp.toPx(), center.y), Offset(center.x + 18.dp.toPx(), center.y), 2.dp.toPx())
+                        drawLine(elementColor, Offset(center.x, center.y - 18.dp.toPx()), Offset(center.x, center.y + 18.dp.toPx()), 2.dp.toPx())
+                    }
+                    StudioElementType.RGB_SPLIT -> {
+                        val amount = number("Split Amount", 4f).coerceIn(0f, 64f).dp.toPx()
+                        listOf(Color.Red, Color.Green, Color.Blue).forEachIndexed { index, tint ->
+                            drawCircle(tint.copy(alpha = opacity * 0.65f), size.minDimension * (0.09f + index * 0.015f) * scale,
+                                Offset(center.x + (index - 1) * amount, center.y), style = Stroke(width = 2.dp.toPx()))
+                        }
+                    }
+                    StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT -> {
+                        val radius = (number("Blur Radius", 12f) * scale).coerceIn(1f, size.minDimension)
+                        drawCircle(elementColor.copy(alpha = opacity * 0.28f), radius, center, style = Stroke(width = maxOf(1f, radius * 0.12f)))
+                        if (element.type == StudioElementType.MOTION_BLUR_EFFECT) {
+                            drawLine(elementColor.copy(alpha = opacity * 0.4f), Offset(center.x - radius, center.y - radius * 0.25f),
+                                Offset(center.x + radius, center.y + radius * 0.25f), maxOf(1f, radius * 0.08f))
+                        }
+                    }
+                    StudioElementType.AUDIO_PROVIDER -> Unit
                 }
             }
         }

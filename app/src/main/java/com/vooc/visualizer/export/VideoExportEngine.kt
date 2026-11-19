@@ -9,6 +9,7 @@ import com.vooc.visualizer.analyzer.FftSize
 import com.vooc.visualizer.analyzer.AudioProviderProcessor
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.studio.ElementPropertyCatalog
+import com.vooc.visualizer.studio.ElementValue
 import com.vooc.visualizer.studio.StudioElementType
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
@@ -370,6 +371,82 @@ object VideoExportEngine {
                     val destination = RectF(cx - drawWidth / 2f, cy - drawHeight / 2f, cx + drawWidth / 2f, cy + drawHeight / 2f)
                     canvas.drawBitmap(image, null, destination, paint)
                 }
+            }
+            canvas.restore()
+        }
+        project.document.elements.filter { it.visible && it.type != StudioElementType.AUDIO_PROVIDER }.forEach { element ->
+            val props = element.properties
+            fun number(name: String, fallback: Float): Float = when (val value = props[name]) {
+                is ElementValue.Number -> value.value.toFloat()
+                is ElementValue.Integer -> value.value.toFloat()
+                else -> fallback
+            }
+            fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
+            val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+            val cx = width * (0.5f + position.x.toFloat() / 200f)
+            val cy = height * (0.5f + position.y.toFloat() / 200f)
+            val scale = (number("Scale", 100f) / 100f).coerceIn(0f, 10f)
+            val alpha = (number("Opacity", 100f).coerceIn(0f, 100f) * 2.55f).toInt()
+            val color = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+            paint.color = color
+            paint.alpha = alpha
+            paint.style = Paint.Style.FILL
+            canvas.save()
+            canvas.rotate(number("Rotation", 0f), cx, cy)
+            when (element.type) {
+                StudioElementType.TEXT -> {
+                    paint.textSize = (number("Font Size", min(width, height) * 0.06f) * scale).coerceAtLeast(6f)
+                    paint.typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                    paint.textAlign = Paint.Align.CENTER
+                    canvas.drawText(textValue("Text", element.tag).take(120), cx, cy, paint)
+                    paint.textAlign = Paint.Align.LEFT
+                }
+                StudioElementType.BARS_SEGMENTS -> {
+                    val count = number("Bar Count", 64f).toInt().coerceIn(1, 256)
+                    val gap = width * 0.28f / count
+                    val barWidth = (width * 0.72f / count).coerceAtLeast(1f)
+                    val maxHeight = number("Max Height", height * 0.32f).coerceAtLeast(1f) * scale
+                    repeat(count) { index ->
+                        val sample = providerSamples?.getOrNull((index * (providerSamples?.size ?: 1) / count).coerceIn(0, (providerSamples?.size ?: 1) - 1))?.coerceIn(0f, 1f) ?: audioLevel.coerceIn(0f, 1f)
+                        val barHeight = (number("Min Height", 0f) + sample * maxHeight).coerceAtMost(height.toFloat())
+                        val x = cx - width * 0.36f + index * (barWidth + gap)
+                        canvas.drawRect(x, cy - barHeight / 2f, x + barWidth, cy + barHeight / 2f, paint)
+                    }
+                }
+                StudioElementType.PARTICLES -> {
+                    val count = number("Count Limit", 64f).toInt().coerceIn(1, 300)
+                    val colorTo = runCatching { android.graphics.Color.parseColor(textValue("Color To", textValue("Color", "#FFFFFFFF"))) }.getOrDefault(color)
+                    repeat(count) { index ->
+                        paint.color = if (index % 2 == 0) color else colorTo
+                        paint.alpha = alpha
+                        val angle = index * 2f * PI.toFloat() / count + seconds * 0.35f
+                        val radius = min(width, height) * (0.06f + (index % 11) * 0.018f) * scale
+                        canvas.drawCircle(cx + cos(angle) * radius, cy + sin(angle) * radius, max(1f, number("Start Size", 8f) * width / 1080f * 0.5f), paint)
+                    }
+                }
+                StudioElementType.IMAGE -> {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = max(1f, width / 540f)
+                    canvas.drawCircle(cx, cy, min(width, height) * 0.1f * scale, paint)
+                    paint.style = Paint.Style.FILL
+                }
+                StudioElementType.RGB_SPLIT -> {
+                    val radius = min(width, height) * 0.09f * scale
+                    val offset = number("Split Amount", 4f) * width / 1080f
+                    listOf(android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE).forEachIndexed { index, tint ->
+                        paint.color = tint; paint.alpha = alpha; paint.style = Paint.Style.STROKE
+                        paint.strokeWidth = max(1f, width / 540f)
+                        canvas.drawCircle(cx + (index - 1) * offset, cy, radius, paint)
+                    }
+                    paint.style = Paint.Style.FILL
+                }
+                StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT -> {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = max(1f, number("Blur Radius", 12f) * scale * width / 1080f * 0.2f)
+                    canvas.drawCircle(cx, cy, min(width, height) * 0.1f * scale, paint)
+                    paint.style = Paint.Style.FILL
+                }
+                StudioElementType.AUDIO_PROVIDER -> Unit
             }
             canvas.restore()
         }

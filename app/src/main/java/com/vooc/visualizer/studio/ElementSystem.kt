@@ -21,13 +21,14 @@ enum class StudioElementType(val displayName: String) {
     MOTION_BLUR_EFFECT("Motion Blur Effect")
 }
 
-enum class ElementValueType { BOOLEAN, NUMBER, INTEGER, TEXT, COLOR, ENUM }
+enum class ElementValueType { BOOLEAN, NUMBER, INTEGER, TEXT, COLOR, ENUM, VECTOR2 }
 
 sealed interface ElementValue {
     data class Bool(val value: Boolean) : ElementValue
     data class Number(val value: Double) : ElementValue
     data class Integer(val value: Long) : ElementValue
     data class Text(val value: String) : ElementValue
+    data class Vector2(val x: Double, val y: Double) : ElementValue
 }
 
 data class ElementPropertySpec(
@@ -47,6 +48,7 @@ data class ElementPropertySpec(
                 if (type == ElementValueType.ENUM && options.isNotEmpty() && text.value !in options) null else text
             }
             ElementValueType.COLOR -> value as? ElementValue.Integer
+            ElementValueType.VECTOR2 -> (value as? ElementValue.Vector2)?.takeIf { it.x.isFinite() && it.y.isFinite() }
             ElementValueType.INTEGER -> {
                 val number = when (value) {
                     is ElementValue.Integer -> value.value.toDouble()
@@ -166,15 +168,16 @@ object ElementPropertyCatalog {
         text("Tag", "General", "Element"),
         bool("Visible", "General", true),
         text("Blend Mode", "General", "Normal", listOf("Normal", "Add", "Multiply", "Screen", "Overlay", "Soft Light", "Hard Light", "Difference", "Alpha Blend")),
-        number("Position X", "General", 0.0),
-        number("Position Y", "General", 0.0),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2, ElementValue.Vector2(0.0, 0.0)),
+        text("Measure Pos (Measure What)", "General", "None"),
         text("Anchor X", "General", "Center", listOf("Left", "Center", "Right")),
         text("Anchor Y", "General", "Middle", listOf("Top", "Middle", "Bottom")),
         text("Alignment Position", "General", "Center", listOf("Left", "Center", "Right", "Top", "Middle", "Bottom")),
         bool("Scale Is Uniform", "General", true),
-        number("Scale X", "General", 100.0, 0.0, 1000.0),
-        number("Scale Y", "General", 100.0, 0.0, 1000.0),
-        number("Rotation", "General", 0.0, -3600.0, 3600.0)
+        number("Scale", "General", 100.0, 0.0, 1000.0),
+        text("Measure Scale (Measure What)", "General", "None"),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "None")
     )
 
     private val provider = listOf(
@@ -344,6 +347,7 @@ internal fun ElementDocument.toJson(): JSONObject {
             is ElementValue.Number -> values.put(name, value.value)
             is ElementValue.Integer -> values.put(name, value.value)
             is ElementValue.Text -> values.put(name, value.value)
+            is ElementValue.Vector2 -> values.put(name, JSONObject().put("x", value.x).put("y", value.y))
         }
     }
     val mappings = JSONObject()
@@ -371,6 +375,7 @@ internal fun elementDocumentFromJson(json: JSONObject): ElementDocument? {
             ElementValueType.NUMBER -> ElementValue.Number(raw.optDouble(spec.name, Double.NaN))
             ElementValueType.INTEGER, ElementValueType.COLOR -> ElementValue.Integer(raw.optLong(spec.name, Long.MIN_VALUE))
             ElementValueType.TEXT, ElementValueType.ENUM -> ElementValue.Text(raw.optString(spec.name, ""))
+            ElementValueType.VECTOR2 -> raw.optJSONObject(spec.name)?.let { ElementValue.Vector2(it.optDouble("x", 0.0), it.optDouble("y", 0.0)) }
         }
         value?.let { spec.validate(it)?.let { safe -> properties[spec.name] = safe } }
     }

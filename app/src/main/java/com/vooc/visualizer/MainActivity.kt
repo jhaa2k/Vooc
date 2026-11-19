@@ -1773,7 +1773,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val colorB = runCatching { Color(android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF"))) }.getOrDefault(elementColor)
                         val peakColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Peak Color", "#FFFFFFFF"))) }.getOrDefault(strokeColor)
                         val capColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF"))) }.getOrDefault(strokeColor)
-                        val colorMode = textValue("Color Mode", if (props["Gradient Fill"] == ElementValue.Bool(true)) "Gradient" else "Alternating")
+                        val colorMode = if (props["Gradient Fill"] == ElementValue.Bool(true)) "Gradient" else textValue("Color Mode", "Alternating")
                         val capMode = textValue("Top/Bottom Cap", "None")
                         val capPlacement = textValue("Cap Placement", "Top")
                         val capSize = number("Cap Size", 4f).dp.toPx().coerceAtLeast(1f)
@@ -1789,7 +1789,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             else -> null
                         }
                         val shapeStyle = if (outline) Stroke(strokeWidth, pathEffect = dashEffect) else androidx.compose.ui.graphics.drawscope.Fill
-                        val gradientBrush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB))
+                        val gradientBrush = if (textValue("Gradient Direction", "Vertical") == "Horizontal") androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(colorA, colorB)) else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB))
                         val barOffset = number("Bar Offset", 0f).dp.toPx()
                         val extrusion = props["3D / Extrusion"] == ElementValue.Bool(true)
                         val extrusionDepth = number("Extrusion Depth", 5f).dp.toPx()
@@ -1819,7 +1819,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 drawPath(shifted, fill.copy(alpha = opacity * 0.32f), style = shapeStyle)
                             }
                             val modeBrush = when (colorMode) {
-                                "Gradient", "By Amplitude" -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
+                                "Gradient" -> if (textValue("Gradient Direction", "Vertical") == "Horizontal") gradientBrush
+                                    else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
+                                "By Amplitude" -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
                                 "Alternating" -> androidx.compose.ui.graphics.SolidColor(if (index % 2 == 0) colorA else colorB)
                                 else -> androidx.compose.ui.graphics.SolidColor(elementColor)
                             }
@@ -1864,7 +1866,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 if (capPlacement != "Top") capAt(capYBottom)
                             }
                             if (peakEnabled) {
-                                val peakY = top - peaks[index] * maxHeight
+                                val peakY = top - peakValue * maxHeight
                                 drawLine(peakColor.copy(alpha = opacity), Offset(left - peakWidth, peakY), Offset(left + width + peakWidth, peakY), peakWidth)
                             }
                         }
@@ -1873,6 +1875,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             var level = levels[sourceIndex].coerceIn(0f, 1f)
                             if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
                             val barHeight = (minHeight + level * maxHeight).coerceIn(0f, size.height * 0.95f)
+                            val drawHeight = if (centerSymmetry) barHeight / 2f else barHeight
                             val x = center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
                             val baseline = when (alignment) {
                                 "Top" -> center.y - size.height * 0.38f
@@ -1880,9 +1883,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 "Stretch" -> center.y + size.height * 0.44f
                                 else -> center.y + size.height * 0.38f
                             }
-                            val top = if (centerSymmetry || alignment == "Center") baseline - barHeight / 2f
+                            val top = if (centerSymmetry) baseline - drawHeight else if (alignment == "Center") baseline - barHeight / 2f
                                 else if (alignment == "Top") baseline else baseline - barHeight
-                            val height = if (alignment == "Stretch") (barHeight * 1.25f).coerceAtMost(size.height * 0.95f) else barHeight
+                            val height = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(size.height * 0.95f) else drawHeight
                             val colorForBar = when (colorMode) {
                                 "Alternating" -> if (index % 2 == 0) colorA else colorB
                                 "Gradient", "By Amplitude" -> Color(
@@ -1894,10 +1897,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 else -> elementColor
                             }
                             rotate(barRotation, Offset(x + barWidth / 2f, baseline)) {
-                                drawBarShape(x, top, barWidth, height, colorForBar, levels[index], index)
+                                drawBarShape(x, top, barWidth, height, colorForBar, peaks[sourceIndex], index)
                                 if (verticalMirror || centerSymmetry) {
-                                    val mirrorTop = if (top < baseline) baseline else baseline - height
-                                    drawBarShape(x, mirrorTop, barWidth, height, colorForBar, levels[index], index)
+                                    drawBarShape(x, baseline, barWidth, height, colorForBar, peaks[sourceIndex], index)
                                 }
                             }
                         }

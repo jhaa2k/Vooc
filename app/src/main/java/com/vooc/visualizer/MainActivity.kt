@@ -69,6 +69,7 @@ import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.ProjectStore
 import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.StudioPresets
+import com.vooc.visualizer.studio.TemplateStore
 import com.vooc.visualizer.studio.VisualLayer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -187,6 +188,7 @@ private fun VoocStudio(
     var frame by remember { mutableStateOf<AnalysisFrame?>(null) }
     var analyzerConfig by remember { mutableStateOf(analyzer.config) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && selectedId != 0L) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
@@ -284,11 +286,18 @@ private fun VoocStudio(
             "TEMPLATES" -> Column(Modifier.fillMaxSize().padding(padding)) {
                 PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
-                TemplateLibraryScreen(project, onApply = { next ->
-                    project = next
-                    selectedId = next.layers.lastOrNull()?.id ?: 0L
-                    onSave(next)
-                }, Modifier.weight(0.60f))
+                TemplateLibraryScreen(
+                    project = project,
+                    savedTemplates = savedTemplates,
+                    onApply = { next ->
+                        project = next
+                        selectedId = next.layers.lastOrNull()?.id ?: 0L
+                        onSave(next)
+                    },
+                    onSaveCurrent = { savedTemplates = TemplateStore.save(context, project) },
+                    onDeleteSaved = { name -> savedTemplates = TemplateStore.delete(context, name) },
+                    modifier = Modifier.weight(0.60f)
+                )
             }
             "SETTINGS" -> Column(Modifier.fillMaxSize().padding(padding)) {
                 PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
@@ -558,11 +567,46 @@ private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, playing: 
 }
 
 @Composable
-private fun TemplateLibraryScreen(project: StudioProject, onApply: (StudioProject) -> Unit, modifier: Modifier = Modifier) {
+private fun TemplateLibraryScreen(
+    project: StudioProject,
+    savedTemplates: List<StudioProject>,
+    onApply: (StudioProject) -> Unit,
+    onSaveCurrent: () -> Unit,
+    onDeleteSaved: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var deleteName by remember { mutableStateOf<String?>(null) }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp)) {
         item {
-            Text("BUILT-IN TEMPLATE LIBRARY", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("MY TEMPLATES", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
+                Text("${savedTemplates.size} SAVED", color = Muted, style = MaterialTheme.typography.labelSmall)
+            }
+            Button(onClick = onSaveCurrent, modifier = Modifier.fillMaxWidth(), shape = RectangleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) {
+                Text("SAVE CURRENT PROJECT AS TEMPLATE")
+            }
+        }
+        if (savedTemplates.isEmpty()) {
+            item { Text("NO SAVED TEMPLATES YET. SAVE THE CURRENT PROJECT TO REUSE ITS LAYERS AND SETTINGS.", color = Muted, style = MaterialTheme.typography.labelSmall) }
+        } else {
+            items(savedTemplates, key = { it.name }) { template ->
+                Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(template.name.uppercase(), color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text("${template.layers.size} LAYERS  •  ${template.width} × ${template.height}", color = Muted,
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                    TextButton(onClick = { onApply(template) }) { Text("APPLY", color = Lime) }
+                    TextButton(onClick = { deleteName = template.name }) { Text("DELETE", color = Muted) }
+                }
+            }
+        }
+        item {
+            Text("BUILT-IN TEMPLATES", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
             Text("SELECT A TEMPLATE TO UPDATE THE LIVE PREVIEW.", color = Muted, style = MaterialTheme.typography.labelSmall)
         }
         items(StudioPresets.names) { preset ->
@@ -575,6 +619,18 @@ private fun TemplateLibraryScreen(project: StudioProject, onApply: (StudioProjec
                 Text(if (project.name.equals("$preset Preset", true)) "APPLIED" else "APPLY", color = Lime, style = MaterialTheme.typography.labelSmall)
             }
         }
+    }
+    if (deleteName != null) {
+        AlertDialog(
+            onDismissRequest = { deleteName = null },
+            title = { Text("DELETE TEMPLATE?") },
+            text = { Text("THIS WILL REMOVE ${deleteName!!.uppercase()} FROM YOUR SAVED TEMPLATE LIBRARY.") },
+            confirmButton = {
+                TextButton(onClick = { onDeleteSaved(deleteName!!); deleteName = null }) { Text("DELETE", color = Color(0xFFFF7777)) }
+            },
+            dismissButton = { TextButton(onClick = { deleteName = null }) { Text("CANCEL") } },
+            containerColor = Panel
+        )
     }
 }
 

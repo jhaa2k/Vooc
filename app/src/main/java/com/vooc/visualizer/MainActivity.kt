@@ -603,7 +603,10 @@ private fun VoocStudio(
                                 multiSelectedIds = emptySet()
                             }) { Text("UNGROUP", color = Muted) }
                             TextButton(enabled = multiSelectedIds.isNotEmpty(), onClick = {
-                                project = project.copy(layers = project.layers.filterNot { it.id in multiSelectedIds })
+                                project = project.copy(
+                                    layers = project.layers.filterNot { it.id in multiSelectedIds },
+                                    document = project.document.copy(keyframes = project.document.keyframes.filterNot { it.layerId in multiSelectedIds })
+                                )
                                 if (selectedId in multiSelectedIds) selectedId = project.layers.lastOrNull()?.id ?: 0L
                                 multiSelectedIds = emptySet()
                             }) { Text("DELETE", color = Color(0xFFFF7777)) }
@@ -614,7 +617,6 @@ private fun VoocStudio(
                     Row(
                         Modifier.fillMaxWidth()
                             .background(if (layer.id == selectedId) Color(0xFF29321D) else Panel)
-                            .clickable { selectedId = layer.id }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -635,7 +637,10 @@ private fun VoocStudio(
                             if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L
                         }) { Icon(if (layer.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (layer.locked) "Unlock layer" else "Lock layer", tint = if (layer.locked) Lime else Muted) }
                         IconButton(onClick = {
-                            project = project.copy(layers = project.layers.filterNot { it.id == layer.id })
+                            project = project.copy(
+                                layers = project.layers.filterNot { it.id == layer.id },
+                                document = project.document.copy(keyframes = project.document.keyframes.filterNot { it.layerId == layer.id })
+                            )
                             if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L
                         }) { Icon(Icons.Default.Delete, "Delete layer", tint = Muted) }
                         TextButton(onClick = {

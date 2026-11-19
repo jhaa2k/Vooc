@@ -59,6 +59,7 @@ import com.vooc.visualizer.analyzer.FftSize
 import com.vooc.visualizer.analyzer.ChannelMode
 import com.vooc.visualizer.analyzer.WindowFunction
 import com.vooc.visualizer.analyzer.Overlap
+import com.vooc.visualizer.analyzer.BeatAlgorithm
 import com.vooc.visualizer.playback.VoocAudioEngine
 import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind
@@ -339,6 +340,26 @@ private fun VoocStudio(
                         OptionDropdown("OVERLAP", analyzerConfig.overlap.name, Overlap.entries.map { it.name }) { value ->
                             analyzerConfig = analyzerConfig.copy(overlap = Overlap.valueOf(value))
                             analyzer.updateConfig(analyzerConfig)
+                        }
+                        OptionDropdown("BEAT DETECTOR", analyzerConfig.beat.algorithm.name, BeatAlgorithm.entries.map { it.name }) { value ->
+                            analyzerConfig = analyzerConfig.copy(beat = analyzerConfig.beat.copy(algorithm = BeatAlgorithm.valueOf(value)))
+                            analyzer.updateConfig(analyzerConfig)
+                        }
+                        LayerSlider("BEAT SENSITIVITY", analyzerConfig.beat.sensitivity * 100f, 0f..100f) { value ->
+                            analyzerConfig = analyzerConfig.copy(beat = analyzerConfig.beat.copy(sensitivity = value / 100f))
+                            analyzer.updateConfig(analyzerConfig)
+                        }
+                        LayerSlider("MANUAL BPM (0 = AUTO)", analyzerConfig.beat.manualBpm ?: 0f, 0f..240f) { value ->
+                            val bpm = if (value < 40f) null else value
+                            analyzerConfig = analyzerConfig.copy(beat = analyzerConfig.beat.copy(manualBpm = bpm))
+                            analyzer.updateConfig(analyzerConfig)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = analyzerConfig.outputDb, onCheckedChange = { checked ->
+                                analyzerConfig = analyzerConfig.copy(outputDb = checked)
+                                analyzer.updateConfig(analyzerConfig)
+                            }, colors = CheckboxDefaults.colors(checkedColor = Lime))
+                            Text("DECIBEL DISPLAY", color = Color.White)
                         }
                     }
                 }

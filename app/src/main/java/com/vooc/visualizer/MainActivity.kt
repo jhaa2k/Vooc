@@ -522,7 +522,7 @@ private fun VoocStudio(
                 ExportScreen(project, onProjectChange = { project = it; onSave(it) }, Modifier.weight(0.60f))
             }
             "TEMPLATES" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 TemplateLibraryScreen(
                     project = project,
@@ -538,7 +538,7 @@ private fun VoocStudio(
                 )
             }
             "SETTINGS" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 AnalyzerSettingsScreen(analyzerConfig, onConfigChange = { next ->
                     analyzerConfig = next
@@ -546,7 +546,7 @@ private fun VoocStudio(
                 }, Modifier.weight(0.60f))
             }
             else -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 LazyColumn(
                     modifier = Modifier.weight(0.60f).fillMaxWidth(),

@@ -142,7 +142,25 @@ private fun VoocTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(primary = Lime, onPrimary = Ink, background = Ink,
             surface = Panel, onSurface = Color(0xFFE8EBDD), secondary = Color(0xFF9DAA85)),
-        typography = Typography(defaultFontFamily = Poppins),
+        typography = Typography().let { base ->
+            base.copy(
+                displayLarge = base.displayLarge.copy(fontFamily = Poppins),
+                displayMedium = base.displayMedium.copy(fontFamily = Poppins),
+                displaySmall = base.displaySmall.copy(fontFamily = Poppins),
+                headlineLarge = base.headlineLarge.copy(fontFamily = Poppins),
+                headlineMedium = base.headlineMedium.copy(fontFamily = Poppins),
+                headlineSmall = base.headlineSmall.copy(fontFamily = Poppins),
+                titleLarge = base.titleLarge.copy(fontFamily = Poppins),
+                titleMedium = base.titleMedium.copy(fontFamily = Poppins),
+                titleSmall = base.titleSmall.copy(fontFamily = Poppins),
+                bodyLarge = base.bodyLarge.copy(fontFamily = Poppins),
+                bodyMedium = base.bodyMedium.copy(fontFamily = Poppins),
+                bodySmall = base.bodySmall.copy(fontFamily = Poppins),
+                labelLarge = base.labelLarge.copy(fontFamily = Poppins),
+                labelMedium = base.labelMedium.copy(fontFamily = Poppins),
+                labelSmall = base.labelSmall.copy(fontFamily = Poppins)
+            )
+        },
         content = content
     )
 }

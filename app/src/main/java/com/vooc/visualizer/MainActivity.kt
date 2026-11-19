@@ -46,6 +46,8 @@ import android.graphics.BitmapFactory
 import com.vooc.visualizer.analyzer.ChannelSelect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
@@ -79,6 +81,7 @@ private val Lime = Color(0xFFC6F36A)
 private val Ink = Color(0xFF0C0E0B)
 private val Panel = Color(0xFF171A14)
 private val Muted = Color(0xFF92998A)
+private val Poppins = FontFamily(Font(com.vooc.visualizer.R.font.poppins_regular))
 
 class MainActivity : ComponentActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -139,6 +142,7 @@ private fun VoocTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(primary = Lime, onPrimary = Ink, background = Ink,
             surface = Panel, onSurface = Color(0xFFE8EBDD), secondary = Color(0xFF9DAA85)),
+        typography = Typography(defaultFontFamily = Poppins),
         content = content
     )
 }
@@ -250,25 +254,31 @@ private fun VoocStudio(
         when (screen) {
             "PLAYER" -> PlayerScreen(player, trackName, playing, position, duration, picker)
             "EXPORT" -> ExportScreen(project, onProjectChange = { project = it; onSave(it) })
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(project.name.uppercase(), color = Color.White, style = MaterialTheme.typography.titleSmall, letterSpacing = 1.5.sp)
+            else -> Column(Modifier.fillMaxSize().padding(padding)) {
+                Column(
+                    Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(bottom = 5.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(project.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.4.sp)
                         Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
-                }
-                item {
                     VisualizerPreview(
-                        modifier = Modifier.fillMaxWidth().height(220.dp).border(1.dp, Color(0xFF343A2B)),
+                        modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF343A2B)),
                         layers = project.layers.filter { it.enabled },
                         frame = frame,
                         playing = playing
                     )
                 }
+                HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
+                LazyColumn(
+                    modifier = Modifier.weight(0.60f).fillMaxWidth(),
+                    contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 7.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
                 item {
                     Text("START WITH A PRESET", color = Muted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp)
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -501,6 +511,7 @@ private fun VoocStudio(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -727,11 +738,11 @@ private fun OptionDropdown(label: String, value: String, options: List<String>, 
 @Composable
 private fun EditorSection(title: String, expanded: String, onToggle: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth().background(Panel)) {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 10.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(title, color = Color.White, style = MaterialTheme.typography.labelMedium, letterSpacing = 1.2.sp)
             Text(if (expanded == title) "−" else "+", color = Lime)
         }
-        if (expanded == title) Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), content = content)
+        if (expanded == title) Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), content = content)
     }
 }
 
@@ -743,6 +754,7 @@ private fun LayerSlider(label: String, value: Float, range: ClosedFloatingPointR
             Text(value.toInt().toString(), color = Lime, style = MaterialTheme.typography.labelSmall)
         }
         Slider(value = value.coerceIn(range), onValueChange = onChange, valueRange = range,
+            modifier = Modifier.fillMaxWidth().height(24.dp),
             colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime, inactiveTrackColor = Color(0xFF42483A)))
     }
 }
@@ -765,6 +777,7 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
             }
         }
         Slider(value = seek.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+            modifier = Modifier.fillMaxWidth().height(24.dp),
             onValueChange = { seek = it },
             onValueChangeFinished = { player.seekTo(seek.toLong()) },
             valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
@@ -786,6 +799,7 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
                 Text(String.format("%.2fx", speed), color = Lime, style = MaterialTheme.typography.labelSmall)
             }
             Slider(value = speed, onValueChange = { speed = it; player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it, 1f)) },
+                modifier = Modifier.fillMaxWidth().height(24.dp),
                 valueRange = 0.5f..2f, steps = 5,
                 colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime))
         }

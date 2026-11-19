@@ -623,11 +623,11 @@ private fun VoocStudio(
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("LAYERS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 2.sp)
+                            Text("OBJECTS & LAYERS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
                             Box {
                             OutlinedButton(onClick = { showLayerMenu = true }, shape = RectangleShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 5.dp)) {
-                                Icon(Icons.Default.Add, null, tint = Lime); Text("ADD LAYER")
+                                Icon(Icons.Default.Add, null, tint = Lime); Text("ADD OBJECT")
                             }
                             DropdownMenu(expanded = showLayerMenu, onDismissRequest = { showLayerMenu = false },
                                 modifier = Modifier.background(Panel)) {
@@ -818,6 +818,7 @@ private fun VoocStudio(
                     )
                 }
                 if (selected != null && activeSelection == "LAYER") {
+                    item { Text("PROPERTIES / ${selected.name.uppercase()}", color = Lime, style = MaterialTheme.typography.labelMedium) }
                     item {
                         EditorSection("GENERAL", expandedSection, { expandedSection = if (expandedSection == "GENERAL") "" else "GENERAL" }) {
                             CompactTextInput("NAME / TAG", selected.name) { value ->
@@ -1133,7 +1134,7 @@ private fun ElementStudioEditor(
     var expandedCategory by remember(selectedId) { mutableStateOf("General") }
     val selected = elements.firstOrNull { it.id == selectedId } ?: elements.firstOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("ELEMENT PROPERTIES", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
+        Text("PROPERTIES", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
         if (selected != null) {
             Text("PROPERTIES / ${selected.tag.uppercase()}", color = Lime, style = MaterialTheme.typography.labelMedium)
             val specs = remember(selected.type) { ElementPropertyCatalog.forElement(selected.type) }

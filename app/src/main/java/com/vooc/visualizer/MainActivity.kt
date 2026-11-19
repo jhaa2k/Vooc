@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.graphics.CircleShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -93,6 +94,7 @@ private val Lime = Color(0xFFC6F36A)
 private val Ink = Color(0xFF0C0E0B)
 private val Panel = Color(0xFF171A14)
 private val Muted = Color(0xFF92998A)
+@OptIn(ExperimentalTextApi::class)
 private fun poppinsVariableFont(weight: Int) = Font(
     com.vooc.visualizer.R.font.poppins_variable,
     weight = FontWeight(weight),

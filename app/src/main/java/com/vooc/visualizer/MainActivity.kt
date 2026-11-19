@@ -1115,7 +1115,7 @@ private fun ElementStudioEditor(
                     .padding(horizontal = 9.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Tune, null, tint = if (element.id == selected?.id) Lime else Muted, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.Tune, null, tint = if (element.id == selected?.id) Lime else Muted, modifier = Modifier.size(16.dp))
                 Column(Modifier.weight(1f).padding(start = 8.dp)) {
                     Text(element.tag.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1)
                     Text(element.type.displayName.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)

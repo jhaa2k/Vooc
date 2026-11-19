@@ -167,6 +167,21 @@ private fun VoocStudio(
             project = updateLayer(project, selectedId) { it.copy(imageUri = uri.toString()) }
         }
     }
+    val projectExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { it.write(ProjectStore.encode(project).toByteArray(Charsets.UTF_8)) }
+        }
+    }
+    val projectImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            json?.let { ProjectStore.decode(it) }?.let { imported ->
+                project = imported
+                selectedId = imported.layers.lastOrNull()?.id ?: 0L
+                onSave(imported)
+            }
+        }
+    }
     val selected = project.layers.firstOrNull { it.id == selectedId }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
@@ -206,6 +221,8 @@ private fun VoocStudio(
                     }
                 },
                 actions = {
+                    TextButton(onClick = { projectImport.launch(arrayOf("application/json", "text/*")) }) { Text("OPEN", color = Lime) }
+                    TextButton(onClick = { projectExport.launch("vooc-project.json") }) { Text("JSON OUT", color = Lime) }
                     IconButton(onClick = { onSave(project) }) { Icon(Icons.Default.Save, "Save project", tint = Lime) }
                     IconButton(onClick = { picker.launch(arrayOf("audio/*")) }) { Icon(Icons.Default.FolderOpen, "Import audio", tint = Lime) }
                 },

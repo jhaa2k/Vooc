@@ -613,9 +613,15 @@ private fun VoocStudio(
                         }, modifier = Modifier.size(30.dp), colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
                         Column(Modifier.weight(1f).clickable {
                             if (!layer.locked) selectedId = layer.id
-                        }) {
-                            Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Text(layer.kind.name.uppercase() + if (layer.groupId.isNotBlank()) "  •  GROUPED" else "", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Icon(Icons.Outlined.Layers, null, tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(15.dp))
+                                Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White,
+                                    style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                            Text(layer.kind.name.uppercase() + if (layer.groupId.isNotBlank()) "  •  GROUPED" else "",
+                                color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
                         IconButton(
                             onClick = {
@@ -641,7 +647,7 @@ private fun VoocStudio(
                             )
                             if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L
                         }) { Icon(Icons.Default.Delete, "Delete layer", tint = Muted) }
-                        TextButton(onClick = {
+                        IconButton(onClick = {
                             val index = project.layers.indexOfFirst { it.id == layer.id }
                             if (index > 0) {
                                 val list = project.layers.toMutableList()
@@ -649,8 +655,8 @@ private fun VoocStudio(
                                 list.add(index - 1, item)
                                 project = project.copy(layers = list)
                             }
-                        }) { Text("↑", color = Muted) }
-                        TextButton(onClick = {
+                        }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Move layer up", tint = Muted) }
+                        IconButton(onClick = {
                             val index = project.layers.indexOfFirst { it.id == layer.id }
                             if (index in 0 until project.layers.lastIndex) {
                                 val list = project.layers.toMutableList()
@@ -658,12 +664,12 @@ private fun VoocStudio(
                                 list.add(index + 1, item)
                                 project = project.copy(layers = list)
                             }
-                        }) { Text("↓", color = Muted) }
-                        TextButton(onClick = {
+                        }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Move layer down", tint = Muted) }
+                        IconButton(onClick = {
                             val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
                             project = project.copy(layers = project.layers + layer.copy(id = id, name = layer.name + " Copy"))
                             selectedId = id
-                        }) { Text("DUP", color = Lime) }
+                        }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.ContentCopy, "Duplicate layer", tint = Lime, modifier = Modifier.size(16.dp)) }
                     }
                 }
                 item {

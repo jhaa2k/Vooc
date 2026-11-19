@@ -427,6 +427,11 @@ private fun VoocStudio(
                             }
                             OptionDropdown("CHANNEL", selected.channel, listOf("MIX", "LEFT", "RIGHT", "MID", "SIDE")) { value ->
                                 project = updateLayer(project, selectedId) { it.copy(channel = value) }
+                                val mode = if (value == "SIDE") ChannelMode.MID_SIDE else if (value == "LEFT" || value == "RIGHT") ChannelMode.STEREO_SPLIT else analyzerConfig.channelMode
+                                if (mode != analyzerConfig.channelMode) {
+                                    analyzerConfig = analyzerConfig.copy(channelMode = mode)
+                                    analyzer.updateConfig(analyzerConfig)
+                                }
                             }
                             LayerSlider("BAR / SAMPLE COUNT", selected.barCount.toFloat(), 8f..256f) { v ->
                                 project = updateLayer(project, selectedId) { it.copy(barCount = v.toInt()) }

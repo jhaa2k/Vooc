@@ -331,6 +331,7 @@ private fun VoocStudio(
 ) {
     var project by remember { mutableStateOf(initialProject) }
     var selectedId by remember { mutableLongStateOf(project.layers.lastOrNull()?.id ?: 0L) }
+    var selectedElementId by remember { mutableStateOf(project.document.elements.firstOrNull()?.id ?: "audio-provider-default") }
     var expandedSection by remember { mutableStateOf("TRANSFORM") }
     var showLayerMenu by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf("STUDIO") }
@@ -745,15 +746,34 @@ private fun VoocStudio(
                     }
                 }
                 item {
-                    AudioProviderPropertyEditor(providerElement) { updated ->
-                        val next = project.copy(
-                            document = project.document.copy(
+                    val editableElements = project.document.elements.ifEmpty { listOf(providerElement) }
+                    ElementStudioEditor(
+                        elements = editableElements,
+                        selectedId = selectedElementId,
+                        onSelect = { selectedElementId = it },
+                        onAdd = { type ->
+                            val id = "${type.name.lowercase()}-${System.currentTimeMillis()}"
+                            val created = ElementPropertyCatalog.create(type, id)
+                            val next = project.copy(document = project.document.copy(elements = project.document.elements + created))
+                            project = next
+                            selectedElementId = id
+                            onSave(next)
+                        },
+                        onChange = { updated ->
+                            val next = project.copy(document = project.document.copy(
                                 elements = project.document.elements.filterNot { it.id == updated.id } + updated
-                            )
-                        )
-                        project = next
-                        onSave(next)
-                    }
+                            ))
+                            project = next
+                            onSave(next)
+                        },
+                        onDelete = { id ->
+                            val nextElements = project.document.elements.filterNot { it.id == id }
+                            val next = project.copy(document = project.document.copy(elements = nextElements))
+                            project = next
+                            selectedElementId = nextElements.firstOrNull()?.id ?: "audio-provider-default"
+                            onSave(next)
+                        }
+                    )
                 }
                 if (selected != null) {
                     item {
@@ -1055,60 +1075,106 @@ private fun TemplateLibraryScreen(
 }
 
 @Composable
-private fun AudioProviderPropertyEditor(
-    element: ElementDocument,
-    onChange: (ElementDocument) -> Unit
+private fun ElementStudioEditor(
+    elements: List<ElementDocument>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+    onAdd: (StudioElementType) -> Unit,
+    onChange: (ElementDocument) -> Unit,
+    onDelete: (String) -> Unit
 ) {
-    var expandedCategory by remember(element.id) { mutableStateOf("Spectrum") }
-    val specs = remember { ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER) }
-    val categories = remember(specs) { specs.groupBy { it.category } }
+    var expandedCategory by remember(selectedId) { mutableStateOf("General") }
+    var showAddMenu by remember { mutableStateOf(false) }
+    val selected = elements.firstOrNull { it.id == selectedId } ?: elements.firstOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("AUDIO PROVIDER", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
-        Text("Live spectrum source • saved in project", color = Muted, style = MaterialTheme.typography.labelSmall)
-        categories.forEach { (category, properties) ->
-            EditorSection(category.uppercase(), expandedCategory.uppercase(), {
-                expandedCategory = if (expandedCategory == category) "" else category
-            }) {
-                properties.forEach { spec ->
-                    val value = element.value(spec.name) ?: spec.defaultValue
-                    when (spec.type) {
-                        ElementValueType.BOOLEAN -> {
-                            val checked = (value as? ElementValue.Bool)?.value ?: false
-                            Row(Modifier.fillMaxWidth().heightIn(min = 38.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(spec.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
-                                Checkbox(checked = checked, onCheckedChange = { onChange(element.withValue(spec.name, ElementValue.Bool(it))) }, colors = CheckboxDefaults.colors(checkedColor = Lime))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text("COMPOSITION ELEMENTS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
+                Text("${elements.size} ELEMENTS • SPECIFICATION-DRIVEN CONTROLS", color = Muted, style = MaterialTheme.typography.labelSmall)
+            }
+            Box {
+                OutlinedButton(onClick = { showAddMenu = true }, shape = RectangleShape) {
+                    Icon(Icons.Default.Add, null, tint = Lime)
+                    Text("ADD", color = Lime)
+                }
+                DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }, modifier = Modifier.background(Panel)) {
+                    StudioElementType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.displayName.uppercase(), color = Color.White) },
+                            onClick = { showAddMenu = false; onAdd(type) }
+                        )
+                    }
+                }
+            }
+        }
+        elements.forEach { element ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .background(if (element.id == selected?.id) Color(0xFF29321F) else Panel)
+                    .clickable { onSelect(element.id) }
+                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Tune, null, tint = if (element.id == selected?.id) Lime else Muted, modifier = Modifier.size(16.dp))
+                Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                    Text(element.tag.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    Text(element.type.displayName.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
+                }
+                Text(if (element.visible) "VISIBLE" else "HIDDEN", color = if (element.visible) Lime else Muted, style = MaterialTheme.typography.labelSmall)
+                IconButton(onClick = { onDelete(element.id) }, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Default.Delete, "Delete element", tint = Muted, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+        if (selected != null) {
+            Text("PROPERTIES / ${selected.tag.uppercase()}", color = Lime, style = MaterialTheme.typography.labelMedium)
+            val specs = remember(selected.type) { ElementPropertyCatalog.forElement(selected.type) }
+            val categories = remember(specs) { specs.groupBy { it.category } }
+            categories.forEach { (category, properties) ->
+                EditorSection(category.uppercase(), expandedCategory.uppercase(), {
+                    expandedCategory = if (expandedCategory == category) "" else category
+                }) {
+                    properties.forEach { spec ->
+                        val value = selected.value(spec.name) ?: spec.defaultValue
+                        when (spec.type) {
+                            ElementValueType.BOOLEAN -> {
+                                val checked = (value as? ElementValue.Bool)?.value ?: false
+                                Row(Modifier.fillMaxWidth().heightIn(min = 38.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(spec.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                                    Checkbox(checked = checked, onCheckedChange = { onChange(selected.withValue(spec.name, ElementValue.Bool(it))) }, colors = CheckboxDefaults.colors(checkedColor = Lime))
+                                }
                             }
-                        }
-                        ElementValueType.ENUM -> {
-                            val selectedValue = (value as? ElementValue.Text)?.value ?: spec.options.firstOrNull().orEmpty()
-                            OptionDropdown(spec.name.uppercase(), selectedValue, spec.options) { onChange(element.withValue(spec.name, ElementValue.Text(it))) }
-                        }
-                        ElementValueType.NUMBER, ElementValueType.INTEGER -> {
-                            val current = when (value) {
-                                is ElementValue.Number -> value.value.toFloat()
-                                is ElementValue.Integer -> value.value.toFloat()
-                                else -> 0f
+                            ElementValueType.ENUM -> {
+                                val selectedValue = (value as? ElementValue.Text)?.value ?: spec.options.firstOrNull().orEmpty()
+                                OptionDropdown(spec.name.uppercase(), selectedValue, spec.options) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
                             }
-                            val minimum = (spec.min ?: 0.0).toFloat()
-                            val maximum = (spec.max ?: 100.0).toFloat().coerceAtLeast(minimum + 0.001f)
-                            val reset = when (val default = spec.defaultValue) {
-                                is ElementValue.Number -> default.value.toFloat()
-                                is ElementValue.Integer -> default.value.toFloat()
-                                else -> current
+                            ElementValueType.NUMBER, ElementValueType.INTEGER -> {
+                                val current = when (value) {
+                                    is ElementValue.Number -> value.value.toFloat()
+                                    is ElementValue.Integer -> value.value.toFloat()
+                                    else -> 0f
+                                }
+                                val minimum = (spec.min ?: 0.0).toFloat()
+                                val maximum = (spec.max ?: 100.0).toFloat().coerceAtLeast(minimum + 0.001f)
+                                val reset = when (val default = spec.defaultValue) {
+                                    is ElementValue.Number -> default.value.toFloat()
+                                    is ElementValue.Integer -> default.value.toFloat()
+                                    else -> current
+                                }
+                                LayerSlider(spec.name.uppercase(), current, minimum..maximum, resetValue = reset) { next ->
+                                    val nextValue = if (spec.type == ElementValueType.INTEGER) ElementValue.Integer(next.toLong()) else ElementValue.Number(next.toDouble())
+                                    onChange(selected.withValue(spec.name, nextValue))
+                                }
                             }
-                            LayerSlider(spec.name.uppercase(), current, minimum..maximum, resetValue = reset) { next ->
-                                val nextValue = if (spec.type == ElementValueType.INTEGER) ElementValue.Integer(next.toLong()) else ElementValue.Number(next.toDouble())
-                                onChange(element.withValue(spec.name, nextValue))
+                            ElementValueType.TEXT, ElementValueType.COLOR -> {
+                                val current = (value as? ElementValue.Text)?.value.orEmpty()
+                                OutlinedTextField(value = current, onValueChange = { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }, label = { Text(spec.name.uppercase()) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             }
-                        }
-                        ElementValueType.TEXT, ElementValueType.COLOR -> {
-                            val current = (value as? ElementValue.Text)?.value.orEmpty()
-                            OutlinedTextField(value = current, onValueChange = { onChange(element.withValue(spec.name, ElementValue.Text(it))) }, label = { Text(spec.name.uppercase()) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        }
-                        ElementValueType.VECTOR2 -> {
-                            val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
-                            LayerSlider("POSITION X", vector.x.toFloat(), -1000f..1000f) { x -> onChange(element.withValue(spec.name, ElementValue.Vector2(x.toDouble(), vector.y))) }
-                            LayerSlider("POSITION Y", vector.y.toFloat(), -1000f..1000f) { y -> onChange(element.withValue(spec.name, ElementValue.Vector2(vector.x, y.toDouble()))) }
+                            ElementValueType.VECTOR2 -> {
+                                val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+                                LayerSlider("${spec.name.uppercase()} X", vector.x.toFloat(), -1000f..1000f) { x -> onChange(selected.withValue(spec.name, ElementValue.Vector2(x.toDouble(), vector.y))) }
+                                LayerSlider("${spec.name.uppercase()} Y", vector.y.toFloat(), -1000f..1000f) { y -> onChange(selected.withValue(spec.name, ElementValue.Vector2(vector.x, y.toDouble()))) }
+                            }
                         }
                     }
                 }

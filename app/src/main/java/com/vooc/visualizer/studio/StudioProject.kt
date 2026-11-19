@@ -36,7 +36,9 @@ data class VisualLayer(
     val gradientColor: Long = 0xFF55D6FF,
     val spectrumScale: String = "LOGARITHMIC",
     val spectrumMinHz: Float = 30f,
-    val spectrumMaxHz: Float = 16000f
+    val spectrumMaxHz: Float = 16000f,
+    val locked: Boolean = false,
+    val groupId: String = ""
 )
 
 data class StudioProject(
@@ -70,7 +72,7 @@ object ProjectStore {
                 .put("particleCount", layer.particleCount).put("textContent", layer.textContent)
                 .put("imageUri", layer.imageUri).put("gradientColor", layer.gradientColor)
                 .put("spectrumScale", layer.spectrumScale).put("spectrumMinHz", layer.spectrumMinHz)
-                .put("spectrumMaxHz", layer.spectrumMaxHz))
+                .put("spectrumMaxHz", layer.spectrumMaxHz).put("locked", layer.locked).put("groupId", layer.groupId))
         }
         root.put("layers", array).put("document", project.document.toJson())
         context.openFileOutput(FILE_NAME, Context.MODE_PRIVATE).use { it.write(root.toString().toByteArray()) }
@@ -107,7 +109,9 @@ object ProjectStore {
                 spectrumScale = o.optString("spectrumScale", "LOGARITHMIC").takeIf { it in listOf("LINEAR", "LOGARITHMIC") } ?: "LOGARITHMIC",
                 spectrumMinHz = o.optDouble("spectrumMinHz", 30.0).toFloat().coerceIn(10f, 1000f),
                 spectrumMaxHz = o.optDouble("spectrumMaxHz", 16000.0).toFloat().coerceIn(100f, 24000f)
-                    .coerceAtLeast(o.optDouble("spectrumMinHz", 30.0).toFloat().coerceIn(10f, 1000f) + 1f)
+                    .coerceAtLeast(o.optDouble("spectrumMinHz", 30.0).toFloat().coerceIn(10f, 1000f) + 1f),
+                locked = o.optBoolean("locked", false),
+                groupId = o.optString("groupId", "")
             )
         }
         StudioProject(root.optString("name", "Untitled Project"), root.optInt("width", 1920),
@@ -128,7 +132,9 @@ object ProjectStore {
                 .put("barCount", layer.barCount).put("thickness", layer.thickness)
                 .put("spacing", layer.spacing).put("radius", layer.radius)
                 .put("particleCount", layer.particleCount).put("textContent", layer.textContent)
-                .put("imageUri", layer.imageUri).put("gradientColor", layer.gradientColor))
+                .put("imageUri", layer.imageUri).put("gradientColor", layer.gradientColor)
+                .put("spectrumScale", layer.spectrumScale).put("spectrumMinHz", layer.spectrumMinHz)
+                .put("spectrumMaxHz", layer.spectrumMaxHz).put("locked", layer.locked).put("groupId", layer.groupId))
         }
         return root.put("layers", array).put("document", project.document.toJson()).toString(2)
     }
@@ -160,7 +166,12 @@ object ProjectStore {
                 particleCount = o.optInt("particleCount", 48).coerceIn(4, 256),
                 textContent = o.optString("textContent", "VOOC"),
                 imageUri = o.optString("imageUri", ""),
-                gradientColor = o.optLong("gradientColor", 0xFF55D6FF)
+                gradientColor = o.optLong("gradientColor", 0xFF55D6FF),
+                spectrumScale = o.optString("spectrumScale", "LOGARITHMIC").takeIf { it in listOf("LINEAR", "LOGARITHMIC") } ?: "LOGARITHMIC",
+                spectrumMinHz = o.optDouble("spectrumMinHz", 30.0).toFloat().coerceIn(10f, 1000f),
+                spectrumMaxHz = o.optDouble("spectrumMaxHz", 16000.0).toFloat().coerceIn(100f, 24000f),
+                locked = o.optBoolean("locked", false),
+                groupId = o.optString("groupId", "")
             )
         }
         StudioProject(root.optString("name", "Untitled Project"), root.optInt("width", 1920),

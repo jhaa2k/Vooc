@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -333,6 +335,7 @@ private fun VoocStudio(
     var repositoryReady by remember { mutableStateOf(false) }
     var showAudioPlayer by remember { mutableStateOf(false) }
     var timelineProperty by remember { mutableStateOf("X") }
+    var multiSelectedIds by remember { mutableStateOf(setOf<Long>()) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && selectedId != 0L) {
@@ -567,9 +570,10 @@ private fun VoocStudio(
                     }
                 }
                 item {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("LAYERS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 2.sp)
-                        Box {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("LAYERS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 2.sp)
+                            Box {
                             OutlinedButton(onClick = { showLayerMenu = true }, shape = RectangleShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 5.dp)) {
                                 Icon(Icons.Default.Add, null, tint = Lime); Text("ADD LAYER")
@@ -587,6 +591,23 @@ private fun VoocStudio(
                                 }
                             }
                         }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("${multiSelectedIds.size} SELECTED", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterVertically).weight(1f))
+                            TextButton(enabled = multiSelectedIds.size >= 2, onClick = {
+                                val group = "group-${System.nanoTime()}"
+                                project = project.copy(layers = project.layers.map { if (it.id in multiSelectedIds) it.copy(groupId = group) else it })
+                                multiSelectedIds = emptySet()
+                            }) { Text("GROUP", color = Lime) }
+                            TextButton(enabled = multiSelectedIds.isNotEmpty(), onClick = {
+                                project = project.copy(layers = project.layers.map { if (it.id in multiSelectedIds) it.copy(groupId = "") else it })
+                                multiSelectedIds = emptySet()
+                            }) { Text("UNGROUP", color = Muted) }
+                            TextButton(enabled = multiSelectedIds.isNotEmpty(), onClick = {
+                                project = project.copy(layers = project.layers.filterNot { it.id in multiSelectedIds })
+                                if (selectedId in multiSelectedIds) selectedId = project.layers.lastOrNull()?.id ?: 0L
+                                multiSelectedIds = emptySet()
+                            }) { Text("DELETE", color = Color(0xFFFF7777)) }
+                        }
                     }
                 }
                 items(project.layers.reversed(), key = { it.id }) { layer ->
@@ -597,13 +618,22 @@ private fun VoocStudio(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(checked = layer.enabled, onCheckedChange = { checked ->
-                            project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = checked) else it })
+                        Checkbox(checked = layer.id in multiSelectedIds, onCheckedChange = { checked ->
+                            multiSelectedIds = if (checked) multiSelectedIds + layer.id else multiSelectedIds - layer.id
                         }, colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
-                        Column(Modifier.weight(1f)) {
-                            Text(layer.name.uppercase(), color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Text(layer.kind.name.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Column(Modifier.weight(1f).clickable {
+                            if (!layer.locked) selectedId = layer.id
+                        }) {
+                            Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text(layer.kind.name.uppercase() + if (layer.groupId.isNotBlank()) "  •  GROUPED" else "", color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
+                        IconButton(onClick = {
+                            project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it })
+                        }) { Text(if (layer.enabled) "EYE" else "OFF", color = if (layer.enabled) Lime else Muted, style = MaterialTheme.typography.labelSmall) }
+                        IconButton(onClick = {
+                            project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it })
+                            if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L
+                        }) { Icon(if (layer.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (layer.locked) "Unlock layer" else "Lock layer", tint = if (layer.locked) Lime else Muted) }
                         IconButton(onClick = {
                             project = project.copy(layers = project.layers.filterNot { it.id == layer.id })
                             if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L

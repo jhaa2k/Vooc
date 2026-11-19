@@ -650,6 +650,7 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
     var shuffle by remember { mutableStateOf(player.shuffleModeEnabled) }
     var repeat by remember { mutableIntStateOf(player.repeatMode) }
     var seek by remember { mutableFloatStateOf(position.toFloat()) }
+    var speed by remember { mutableFloatStateOf(player.playbackParameters.speed) }
     LaunchedEffect(position) { if (!player.isPlaying) seek = position.toFloat() }
     Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("MUSIC PLAYER", color = Lime, letterSpacing = 2.sp)
@@ -665,12 +666,25 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
             onValueChangeFinished = { player.seekTo(seek.toLong()) },
             valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
             colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatTime(position), color = Muted, style = MaterialTheme.typography.labelSmall)
+            Text(formatTime(duration), color = Muted, style = MaterialTheme.typography.labelSmall)
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { player.seekToPreviousMediaItem() }) { Icon(Icons.Default.SkipPrevious, null, tint = Color.White) }
             IconButton(onClick = { if (player.isPlaying) player.pause() else player.play() }) {
                 Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Lime, modifier = Modifier.size(42.dp))
             }
             IconButton(onClick = { player.seekToNextMediaItem() }) { Icon(Icons.Default.SkipNext, null, tint = Color.White) }
+        }
+        Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("PLAYBACK SPEED", color = Muted, style = MaterialTheme.typography.labelSmall)
+                Text(String.format("%.2fx", speed), color = Lime, style = MaterialTheme.typography.labelSmall)
+            }
+            Slider(value = speed, onValueChange = { speed = it; player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it, 1f)) },
+                valueRange = 0.5f..2f, steps = 5,
+                colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = { shuffle = !shuffle; player.shuffleModeEnabled = shuffle }) {
@@ -699,7 +713,10 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
                         ?: item.localConfiguration?.uri?.lastPathSegment ?: "Track ${index + 1}"
                     Row(Modifier.fillMaxWidth().clickable { player.seekTo(index, 0L); player.play() }.padding(horizontal = 12.dp, vertical = 9.dp)) {
                         Text("${index + 1}.", color = Muted, modifier = Modifier.width(28.dp))
-                        Text(title, color = if (index == player.currentMediaItemIndex) Lime else Color.White, maxLines = 1)
+                        Text(title, color = if (index == player.currentMediaItemIndex) Lime else Color.White, maxLines = 1, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { player.removeMediaItem(index) }) {
+                            Icon(Icons.Default.Delete, "Remove track", tint = Muted)
+                        }
                     }
                 }
             }

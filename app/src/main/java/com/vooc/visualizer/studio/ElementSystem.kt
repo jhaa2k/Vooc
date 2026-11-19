@@ -354,7 +354,9 @@ object ElementPropertyCatalog {
         bool("Show Unblurred Content", "Appearance", false),
         bool("Show Unblurred Content Under", "Appearance", false),
         text("Texture / Image", "Appearance", ""),
-        text("Color Over Life", "Appearance", "#FFFFFFFF"),
+        text("Color Over Life", "Appearance", "Gradient", listOf("Constant", "Gradient", "Fade To Transparent")),
+        text("Color Over Life Start", "Appearance", "#FFFFFFFF"),
+        text("Color Over Life End", "Appearance", "#00FFFFFF"),
         text("Alpha Over Life", "Appearance", "Fade In Out", listOf("Constant", "Fade In", "Fade Out", "Fade In Out"))
     )
 

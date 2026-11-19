@@ -332,7 +332,7 @@ private fun VoocStudio(
     var project by remember { mutableStateOf(initialProject) }
     var selectedId by remember { mutableLongStateOf(project.layers.lastOrNull()?.id ?: 0L) }
     var selectedElementId by remember { mutableStateOf(project.document.elements.firstOrNull()?.id ?: "audio-provider-default") }
-    var expandedSection by remember { mutableStateOf("TRANSFORM") }
+    var expandedSection by remember { mutableStateOf("GENERAL") }
     var showLayerMenu by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf("STUDIO") }
     var playing by remember { mutableStateOf(false) }
@@ -777,10 +777,20 @@ private fun VoocStudio(
                 }
                 if (selected != null) {
                     item {
-                        Text("PROPERTIES  /  ${selected.name.uppercase()}", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
-                        OutlinedTextField(value = selected.name, onValueChange = { value ->
-                            project = updateLayer(project, selectedId) { it.copy(name = value) }
-                        }, label = { Text("LAYER NAME") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        EditorSection("GENERAL", expandedSection, { expandedSection = if (expandedSection == "GENERAL") "" else "GENERAL" }) {
+                            OutlinedTextField(value = selected.name, onValueChange = { value ->
+                                project = updateLayer(project, selectedId) { it.copy(name = value) }
+                            }, label = { Text("NAME / TAG") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            if (selected.kind == LayerKind.TEXT) {
+                                OutlinedTextField(
+                                    value = selected.textContent,
+                                    onValueChange = { value -> project = updateLayer(project, selectedId) { it.copy(textContent = value) } },
+                                    label = { Text("TEXT CONTENT") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+                            }
+                        }
                     }
                     item {
                         EditorSection("TRANSFORM", expandedSection, { expandedSection = if (expandedSection == "TRANSFORM") "" else "TRANSFORM" }) {
@@ -872,15 +882,6 @@ private fun VoocStudio(
                             LayerSlider("SPACING", selected.spacing, 0f..12f) { v -> project = updateLayer(project, selectedId) { it.copy(spacing = v) } }
                             LayerSlider("RADIUS", selected.radius, 2f..48f) { v -> project = updateLayer(project, selectedId) { it.copy(radius = v) } }
                             LayerSlider("PARTICLE COUNT", selected.particleCount.toFloat(), 4f..256f) { v -> project = updateLayer(project, selectedId) { it.copy(particleCount = v.toInt()) } }
-                        }
-                    }
-                    if (selected.kind == LayerKind.TEXT) {
-                        item {
-                            EditorSection("TEXT CONTENT", expandedSection, { expandedSection = if (expandedSection == "TEXT CONTENT") "" else "TEXT CONTENT" }) {
-                                var textValue by remember(selected.id, selected.textContent) { mutableStateOf(selected.textContent) }
-                                OutlinedTextField(value = textValue, onValueChange = { textValue = it; project = updateLayer(project, selectedId) { layer -> layer.copy(textContent = it) } },
-                                    label = { Text("TEXT CONTENT") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                            }
                         }
                     }
                     if (selected.kind == LayerKind.IMAGE) {

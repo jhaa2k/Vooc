@@ -143,13 +143,17 @@ data class ElementDocument(
 
     fun normalized(): ElementDocument {
         val specs = ElementPropertyCatalog.forElement(type).associateBy { it.name }
+        // Validate known properties, but retain unknown serialized values. This keeps projects
+        // forward-compatible when a newer app version adds properties an older build cannot edit.
         val normalizedProperties = properties.mapNotNull { (name, value) ->
-            val spec = specs[name] ?: return@mapNotNull null
+            val spec = specs[name] ?: return@mapNotNull (name to value)
             spec.validate(value)?.let { name to it }
         }.toMap()
         val defaults = specs.mapValues { (name, spec) ->
             normalizedProperties[name] ?: spec.defaultValue
         }.toMutableMap()
+        val unknownProperties = normalizedProperties.filterKeys { it !in specs }
+        defaults.putAll(unknownProperties)
         val safeTag = (defaults["Tag"] as? ElementValue.Text)?.value?.trim()?.take(80)
             ?.ifEmpty { type.displayName } ?: tag.trim().take(80).ifEmpty { type.displayName }
         val safeVisible = (defaults["Visible"] as? ElementValue.Bool)?.value ?: visible

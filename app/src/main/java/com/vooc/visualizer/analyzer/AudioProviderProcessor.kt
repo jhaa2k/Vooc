@@ -23,7 +23,7 @@ data class AudioProviderConfig(
     val preSmooth: Float = 0f,
     val filterRadius: Int = 0,
     val filterStrength: Float = 0f,
-    val aWeight: Boolean = false,
+    val aWeight: Float = 0f,
     val outputMultiplier: Float = 1f,
     val lowerHz: Float = 30f,
     val higherHz: Float = 16000f,
@@ -56,8 +56,8 @@ data class AudioProviderConfig(
             beatSmooth = beatSmooth.finiteClamp(0f, 1f),
             beatRangeBarFirst = beatRangeBarFirst.coerceAtLeast(0),
             beatRangeBarLast = beatRangeBarLast.coerceAtLeast(0),
-            beatRangeValueLower = beatRangeValueLower.finiteClamp(0f, 1f),
-            beatRangeValueHigher = beatRangeValueHigher.finiteClamp(0f, 1f),
+            beatRangeValueLower = beatRangeValueLower.finiteClamp(0f, 100f),
+            beatRangeValueHigher = beatRangeValueHigher.finiteClamp(0f, 100f),
             fftSize = fftSize.takeIf { it in setOf(256, 512, 1024, 2048, 4096, 8192) } ?: 2048
         )
     }
@@ -111,7 +111,10 @@ class AudioProviderProcessor {
             val t = if (effectiveCount == 1) 0.5f else i.toFloat() / (effectiveCount - 1)
             val frequency = frequencyAt(t, low, high, cfg.hzLinearFactor)
             var magnitude = SpectrumMapper.sample(pre, frequency / binHz, Interpolation.LINEAR)
-            if (cfg.aWeight) magnitude *= aWeightAmplitude(frequency)
+            if (cfg.aWeight > 0f) {
+                val weighted = aWeightAmplitude(frequency)
+                magnitude *= 1f + (weighted - 1f) * cfg.aWeight.coerceIn(0f, 1f)
+            }
             generated[i] = magnitude.coerceAtLeast(0f)
         }
 
@@ -209,7 +212,12 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
     fun number(name: String, fallback: Double) = (value(name) as? ElementValue.Number)?.value
         ?: (value(name) as? ElementValue.Integer)?.value?.toDouble() ?: fallback
     fun integer(name: String, fallback: Int) = number(name, fallback.toDouble()).toInt()
-    fun boolean(name: String, fallback: Boolean) = (value(name) as? ElementValue.Bool)?.value ?: fallback
+    fun boolean(name: String, fallback: Boolean) = when (val v = value(name)) {
+        is ElementValue.Bool -> v.value
+        is ElementValue.Integer -> v.value != 0
+        is ElementValue.Number -> v.value != 0.0
+        else -> fallback
+    }
     return AudioProviderConfig(
         sampleOutCount = integer("Sample Out Count", 128),
         mirrorSamples = boolean("Mirror Samples", false),
@@ -219,18 +227,26 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
         preSmooth = number("Pre Smooth", 0.0).toFloat(),
         filterRadius = integer("Filter Radius", 0),
         filterStrength = number("Filter Strength", 0.0).toFloat(),
-        aWeight = boolean("AWeight", false),
+        aWeight = number("AWeight", 0.0).toFloat(),
         outputMultiplier = number("Output Multiplier", 1.0).toFloat(),
         lowerHz = number("Lower Hz", 30.0).toFloat(),
         higherHz = number("Higher Hz", 16000.0).toFloat(),
         hzLinearFactor = number("Hz Linear Factor", 0.0).toFloat(),
         freqShift = number("Freq Shift", 0.0).toFloat(),
         beatSmooth = number("Beat Smooth", 0.35).toFloat(),
-        beatRangeBarFirst = integer("Beat Range Bar First", 0),
-        beatRangeBarLast = integer("Beat Range Bar Last", 127),
+        beatRangeBarFirst = number("Beat Range Bar First", 0.0).let { if (it in 0.0..1.0) (it * (integer("Sample Out Count", 128) - 1)).toInt() else it.toInt() },
+        beatRangeBarLast = number("Beat Range Bar Last", 127.0).let { if (it in 0.0..1.0) (it * (integer("Sample Out Count", 128) - 1)).toInt() else it.toInt() },
         beatRangeValueLower = number("Beat Range Value Lower", 0.08).toFloat(),
         beatRangeValueHigher = number("Beat Range Value Higher", 0.8).toFloat(),
-        fftSize = (value("Fft Size") as? ElementValue.Text)?.value?.toIntOrNull() ?: 2048
+        fftSize = run {
+            val raw = when (val fft = value("Fft Size")) {
+                is ElementValue.Text -> fft.value.toIntOrNull() ?: 2048
+                is ElementValue.Integer -> fft.value
+                is ElementValue.Number -> fft.value.toInt()
+                else -> 2048
+            }
+            if (raw in 7..13) 1 shl raw else raw
+        }
     )
 }
 

@@ -203,6 +203,7 @@ private fun VoocStudio(
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
+    LaunchedEffect(project) { delay(500); onSave(project) }
     LaunchedEffect(player, analyzer) {
         while (true) {
             position = player.currentPosition.coerceAtLeast(0L)
@@ -321,6 +322,29 @@ private fun VoocStudio(
                             project = project.copy(layers = project.layers.filterNot { it.id == layer.id })
                             if (selectedId == layer.id) selectedId = project.layers.lastOrNull()?.id ?: 0L
                         }) { Icon(Icons.Default.Delete, "Delete layer", tint = Muted) }
+                        TextButton(onClick = {
+                            val index = project.layers.indexOfFirst { it.id == layer.id }
+                            if (index > 0) {
+                                val list = project.layers.toMutableList()
+                                val item = list.removeAt(index)
+                                list.add(index - 1, item)
+                                project = project.copy(layers = list)
+                            }
+                        }) { Text("↑", color = Muted) }
+                        TextButton(onClick = {
+                            val index = project.layers.indexOfFirst { it.id == layer.id }
+                            if (index in 0 until project.layers.lastIndex) {
+                                val list = project.layers.toMutableList()
+                                val item = list.removeAt(index)
+                                list.add(index + 1, item)
+                                project = project.copy(layers = list)
+                            }
+                        }) { Text("↓", color = Muted) }
+                        TextButton(onClick = {
+                            val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
+                            project = project.copy(layers = project.layers + layer.copy(id = id, name = layer.name + " Copy"))
+                            selectedId = id
+                        }) { Text("DUP", color = Lime) }
                     }
                 }
                 item {
@@ -366,6 +390,9 @@ private fun VoocStudio(
                 if (selected != null) {
                     item {
                         Text("PROPERTIES  /  ${selected.name.uppercase()}", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
+                        OutlinedTextField(value = selected.name, onValueChange = { value ->
+                            project = updateLayer(project, selectedId) { it.copy(name = value) }
+                        }, label = { Text("Layer name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
                     item {
                         EditorSection("TRANSFORM", expandedSection, { expandedSection = if (expandedSection == "TRANSFORM") "" else "TRANSFORM" }) {

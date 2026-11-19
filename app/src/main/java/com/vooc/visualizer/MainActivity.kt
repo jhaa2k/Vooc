@@ -150,15 +150,15 @@ private fun VoocTheme(content: @Composable () -> Unit) {
                 headlineLarge = base.headlineLarge.copy(fontFamily = Poppins),
                 headlineMedium = base.headlineMedium.copy(fontFamily = Poppins),
                 headlineSmall = base.headlineSmall.copy(fontFamily = Poppins),
-                titleLarge = base.titleLarge.copy(fontFamily = Poppins),
-                titleMedium = base.titleMedium.copy(fontFamily = Poppins),
-                titleSmall = base.titleSmall.copy(fontFamily = Poppins),
-                bodyLarge = base.bodyLarge.copy(fontFamily = Poppins),
-                bodyMedium = base.bodyMedium.copy(fontFamily = Poppins),
-                bodySmall = base.bodySmall.copy(fontFamily = Poppins),
-                labelLarge = base.labelLarge.copy(fontFamily = Poppins),
-                labelMedium = base.labelMedium.copy(fontFamily = Poppins),
-                labelSmall = base.labelSmall.copy(fontFamily = Poppins)
+                titleLarge = base.titleLarge.copy(fontFamily = Poppins, fontSize = 18.sp, lineHeight = 22.sp),
+                titleMedium = base.titleMedium.copy(fontFamily = Poppins, fontSize = 16.sp, lineHeight = 20.sp),
+                titleSmall = base.titleSmall.copy(fontFamily = Poppins, fontSize = 14.sp, lineHeight = 18.sp),
+                bodyLarge = base.bodyLarge.copy(fontFamily = Poppins, fontSize = 14.sp, lineHeight = 18.sp),
+                bodyMedium = base.bodyMedium.copy(fontFamily = Poppins, fontSize = 13.sp, lineHeight = 17.sp),
+                bodySmall = base.bodySmall.copy(fontFamily = Poppins, fontSize = 11.sp, lineHeight = 14.sp),
+                labelLarge = base.labelLarge.copy(fontFamily = Poppins, fontSize = 12.sp, lineHeight = 16.sp),
+                labelMedium = base.labelMedium.copy(fontFamily = Poppins, fontSize = 11.sp, lineHeight = 14.sp),
+                labelSmall = base.labelSmall.copy(fontFamily = Poppins, fontSize = 10.sp, lineHeight = 12.sp)
             )
         },
         content = content
@@ -257,11 +257,11 @@ private fun VoocStudio(
         },
         bottomBar = {
             NavigationBar(containerColor = Panel, tonalElevation = 0.dp) {
-                listOf("STUDIO", "PLAYER", "EXPORT").forEach { item ->
+                listOf("LIBRARY", "STUDIO", "TEMPLATES", "EXPORT", "SETTINGS").forEach { item ->
                     NavigationBarItem(
                         selected = screen == item,
                         onClick = { screen = item },
-                        icon = { Text(when(item) { "STUDIO" -> "◈"; "PLAYER" -> "♫"; else -> "⇧" }, color = if (screen == item) Lime else Muted) },
+                        icon = { Text(when(item) { "LIBRARY" -> "♫"; "STUDIO" -> "◈"; "TEMPLATES" -> "▦"; "EXPORT" -> "⇧"; else -> "⚙" }, color = if (screen == item) Lime else Muted) },
                         label = { Text(item, letterSpacing = 1.sp) },
                         colors = NavigationBarItemDefaults.colors(selectedTextColor = Lime, indicatorColor = Color(0xFF303A20))
                     )
@@ -270,27 +270,35 @@ private fun VoocStudio(
         }
     ) { padding ->
         when (screen) {
-            "PLAYER" -> PlayerScreen(player, trackName, playing, position, duration, picker)
-            "EXPORT" -> ExportScreen(project, onProjectChange = { project = it; onSave(it) })
+            "LIBRARY" -> Column(Modifier.fillMaxSize().padding(padding)) {
+                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
+                PlayerScreen(player, trackName, playing, position, duration, picker, Modifier.weight(0.60f))
+            }
+            "EXPORT" -> Column(Modifier.fillMaxSize().padding(padding)) {
+                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
+                ExportScreen(project, onProjectChange = { project = it; onSave(it) }, Modifier.weight(0.60f))
+            }
+            "TEMPLATES" -> Column(Modifier.fillMaxSize().padding(padding)) {
+                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
+                TemplateLibraryScreen(project, onApply = { next ->
+                    project = next
+                    selectedId = next.layers.lastOrNull()?.id ?: 0L
+                    onSave(next)
+                }, Modifier.weight(0.60f))
+            }
+            "SETTINGS" -> Column(Modifier.fillMaxSize().padding(padding)) {
+                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
+                AnalyzerSettingsScreen(analyzerConfig, onConfigChange = { next ->
+                    analyzerConfig = next
+                    analyzer.updateConfig(next)
+                }, Modifier.weight(0.60f))
+            }
             else -> Column(Modifier.fillMaxSize().padding(padding)) {
-                Column(
-                    Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(bottom = 5.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(project.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.4.sp)
-                        Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                    VisualizerPreview(
-                        modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF343A2B)),
-                        layers = project.layers.filter { it.enabled },
-                        frame = frame,
-                        playing = playing
-                    )
-                }
+                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 LazyColumn(
                     modifier = Modifier.weight(0.60f).fillMaxWidth(),
@@ -534,6 +542,102 @@ private fun VoocStudio(
     }
 }
 
+
+@Composable
+private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, playing: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 5.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(project.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelLarge,
+                letterSpacing = 1.1.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        }
+        VisualizerPreview(modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF343A2B)),
+            layers = project.layers.filter { it.enabled }, frame = frame, playing = playing)
+    }
+}
+
+@Composable
+private fun TemplateLibraryScreen(project: StudioProject, onApply: (StudioProject) -> Unit, modifier: Modifier = Modifier) {
+    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        item {
+            Text("BUILT-IN TEMPLATE LIBRARY", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
+            Text("SELECT A TEMPLATE TO UPDATE THE LIVE PREVIEW.", color = Muted, style = MaterialTheme.typography.labelSmall)
+        }
+        items(StudioPresets.names) { preset ->
+            Row(Modifier.fillMaxWidth().background(Panel).clickable { onApply(StudioPresets.create(preset)) }
+                .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(preset.uppercase(), color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                    Text("${StudioPresets.create(preset).layers.size} LAYERS", color = Muted, style = MaterialTheme.typography.labelSmall)
+                }
+                Text(if (project.name.equals("$preset Preset", true)) "APPLIED" else "APPLY", color = Lime, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.AnalyzerConfig,
+    onConfigChange: (com.vooc.visualizer.analyzer.AnalyzerConfig) -> Unit, modifier: Modifier = Modifier) {
+    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            Text("AUDIO ANALYZER SETTINGS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
+            OptionDropdown("FFT SIZE", config.fftSize.size.toString(), FftSize.entries.map { it.size.toString() }) {
+                onConfigChange(config.copy(fftSize = FftSize.fromSize(it.toInt())))
+            }
+            OptionDropdown("WINDOW FUNCTION", config.window.name, WindowFunction.entries.map { it.name }) {
+                onConfigChange(config.copy(window = WindowFunction.valueOf(it)))
+            }
+            OptionDropdown("OVERLAP", config.overlap.name, Overlap.entries.map { it.name }) {
+                onConfigChange(config.copy(overlap = Overlap.valueOf(it)))
+            }
+            OptionDropdown("CHANNEL MODE", config.channelMode.name, ChannelMode.entries.map { it.name }) {
+                onConfigChange(config.copy(channelMode = ChannelMode.valueOf(it)))
+            }
+            OptionDropdown("BEAT ALGORITHM", config.beat.algorithm.name, BeatAlgorithm.entries.map { it.name }) {
+                onConfigChange(config.copy(beat = config.beat.copy(algorithm = BeatAlgorithm.valueOf(it))))
+            }
+            LayerSlider("BEAT SENSITIVITY", config.beat.sensitivity * 100f, 0f..100f) {
+                onConfigChange(config.copy(beat = config.beat.copy(sensitivity = it / 100f)))
+            }
+            LayerSlider("BEAT COOLDOWN", config.beat.cooldownMs.toFloat(), 50f..500f) {
+                onConfigChange(config.copy(beat = config.beat.copy(cooldownMs = it.toInt())))
+            }
+            LayerSlider("BEAT THRESHOLD", config.beat.threshold, 1f..5f) {
+                onConfigChange(config.copy(beat = config.beat.copy(threshold = it)))
+            }
+            OptionDropdown("TIME SIGNATURE", config.beat.timeSignature.label, com.vooc.visualizer.analyzer.TimeSignature.entries.map { it.label }) {
+                val sig = com.vooc.visualizer.analyzer.TimeSignature.entries.first { item -> item.label == it }
+                onConfigChange(config.copy(beat = config.beat.copy(timeSignature = sig)))
+            }
+            OptionDropdown("NORMALIZATION", config.normalization.name, com.vooc.visualizer.analyzer.Normalization.entries.map { it.name }) {
+                onConfigChange(config.copy(normalization = com.vooc.visualizer.analyzer.Normalization.valueOf(it)))
+            }
+            OptionDropdown("INTERPOLATION", config.interpolation.name, com.vooc.visualizer.analyzer.Interpolation.entries.map { it.name }) {
+                onConfigChange(config.copy(interpolation = com.vooc.visualizer.analyzer.Interpolation.valueOf(it)))
+            }
+            LayerSlider("TEMPORAL SMOOTHING", config.smoothing.temporal * 100f, 0f..99f) {
+                onConfigChange(config.copy(smoothing = config.smoothing.copy(temporal = it / 100f, asymmetric = false)))
+            }
+            LayerSlider("ATTACK", config.smoothing.attackMs, 0f..1000f) {
+                onConfigChange(config.copy(smoothing = config.smoothing.copy(attackMs = it)))
+            }
+            LayerSlider("RELEASE", config.smoothing.releaseMs, 0f..1000f) {
+                onConfigChange(config.copy(smoothing = config.smoothing.copy(releaseMs = it)))
+            }
+            LayerSlider("RING BUFFER", config.ringBufferSamples.toFloat(), 4096f..16384f) {
+                onConfigChange(config.copy(ringBufferSamples = (it.toInt() / 1024 * 1024).coerceIn(4096, 16384)))
+            }
+            LayerSlider("WAVEFORM SAMPLES", config.waveformSamples.toFloat(), 256f..8192f) {
+                onConfigChange(config.copy(waveformSamples = (it.toInt() / 256 * 256).coerceIn(256, 8192)))
+            }
+        }
+    }
+}
+
+
 private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLayer) -> VisualLayer): StudioProject =
     project.copy(layers = project.layers.map { if (it.id == id) transform(it) else it })
 
@@ -741,12 +845,12 @@ private fun OptionDropdown(label: String, value: String, options: List<String>, 
         Text(label, color = Muted, style = MaterialTheme.typography.labelSmall)
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RectangleShape) {
-                Text(value, modifier = Modifier.weight(1f), color = Color.White)
+                Text(value.uppercase(), modifier = Modifier.weight(1f), color = Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text("▾", color = Lime)
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Panel)) {
                 options.forEach { option ->
-                    DropdownMenuItem(text = { Text(option) }, onClick = { onSelect(option); expanded = false })
+                    DropdownMenuItem(text = { Text(option.uppercase(), maxLines = 1) }, onClick = { onSelect(option); expanded = false })
                 }
             }
         }
@@ -779,18 +883,18 @@ private fun LayerSlider(label: String, value: Float, range: ClosedFloatingPointR
 
 @Composable
 private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, position: Long, duration: Long,
-                         picker: androidx.activity.result.ActivityResultLauncher<Array<String>>) {
+                         picker: androidx.activity.result.ActivityResultLauncher<Array<String>>, modifier: Modifier = Modifier) {
     var shuffle by remember { mutableStateOf(player.shuffleModeEnabled) }
     var repeat by remember { mutableIntStateOf(player.repeatMode) }
     var seek by remember { mutableFloatStateOf(position.toFloat()) }
     var speed by remember { mutableFloatStateOf(player.playbackParameters.speed) }
     LaunchedEffect(position) { if (!player.isPlaying) seek = position.toFloat() }
-    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("MUSIC PLAYER", color = Lime, letterSpacing = 2.sp)
+    Column(modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text("MUSIC LIBRARY / PLAYER", color = Lime, letterSpacing = 2.sp)
         Box(Modifier.fillMaxWidth().height(150.dp).background(Panel), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("♫", color = Lime, style = MaterialTheme.typography.displayLarge)
-                Text(trackName, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text(trackName.uppercase(), color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text("QUEUE  •  ${player.mediaItemCount} TRACKS", color = Muted, style = MaterialTheme.typography.labelSmall)
             }
         }
@@ -863,8 +967,8 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
 }
 
 @Composable
-private fun ExportScreen(project: StudioProject, onProjectChange: (StudioProject) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+private fun ExportScreen(project: StudioProject, onProjectChange: (StudioProject) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("VIDEO EXPORT", color = Lime, letterSpacing = 2.sp, style = MaterialTheme.typography.titleMedium)
         Text("OUTPUT RESOLUTION", color = Muted, style = MaterialTheme.typography.labelSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -16,7 +16,7 @@ enum class DeviceTier {
 }
 
 enum class FftSize(val size: Int) {
-    S512(512), S1024(1024), S2048(2048), S4096(4096), S8192(8192);
+    S256(256), S512(512), S1024(1024), S2048(2048), S4096(4096), S8192(8192);
 
     companion object {
         fun auto(tier: DeviceTier): FftSize = when (tier) {

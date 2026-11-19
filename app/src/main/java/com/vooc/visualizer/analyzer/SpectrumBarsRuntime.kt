@@ -32,7 +32,9 @@ class SpectrumBarsRuntime {
         peakFallSpeed: Float,
         logarithmicInput: Boolean = false,
         reactionDelayMs: Float = 0f,
-        accumulatedDelayMs: Float = 0f
+        accumulatedDelayMs: Float = 0f,
+        attackSmoothing: Float = damping,
+        releaseSmoothing: Float = damping
     ): Frame {
         val n = count.coerceIn(1, 512)
         if (envelope.size != n) {
@@ -43,8 +45,6 @@ class SpectrumBarsRuntime {
         val source = input.takeIf { it.isNotEmpty() } ?: FloatArray(1)
         val dt = deltaSeconds.takeIf { it.isFinite() }?.coerceIn(0.001f, 0.1f) ?: (1f / 60f)
         val smooth = damping.coerceIn(0f, 1f)
-        val tau = 0.008f + smooth * 0.32f
-        val coefficient = exp(-dt / tau)
         val wasPrimed = primed
         clockSeconds += dt
         val reactionSeconds = reactionDelayMs.coerceIn(0f, 5000f) / 1000f
@@ -72,6 +72,9 @@ class SpectrumBarsRuntime {
             val hi = (lo + 1).coerceAtMost(delayedSource.lastIndex)
             val fraction = sourcePosition - lo
             val target = (delayedSource[lo] + (delayedSource[hi] - delayedSource[lo]) * fraction).coerceIn(0f, 1f)
+            val response = if (target > envelope[i]) attackSmoothing else releaseSmoothing
+            val tau = 0.008f + response.coerceIn(0f, 1f) * 0.32f
+            val coefficient = exp(-dt / tau)
             envelope[i] = if (!wasPrimed) target else coefficient * envelope[i] + (1f - coefficient) * target
             if (envelope[i] >= peaks[i]) {
                 peaks[i] = envelope[i]

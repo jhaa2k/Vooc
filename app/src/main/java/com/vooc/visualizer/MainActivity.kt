@@ -1,6 +1,9 @@
 package com.vooc.visualizer
 
 import android.net.Uri
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.ComponentName
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -71,6 +74,10 @@ class MainActivity : ComponentActivity() {
                     Text("CONNECTING TO VOOC PLAYER…", color = Lime, letterSpacing = 2.sp)
                 }
             }
+        }
+        val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         val token = SessionToken(this, ComponentName(this, VoocPlaybackService::class.java))
         val future = MediaController.Builder(this, token).buildAsync()

@@ -21,6 +21,7 @@ data class ProjectDocument(
     val compositions: List<CompositionDocument> = listOf(CompositionDocument()),
     val assets: List<ProjectAsset> = emptyList(),
     val keyframes: List<ProjectKeyframe> = emptyList(),
+    val elements: List<ElementDocument> = emptyList(),
     val export: ExportDocument = ExportDocument(),
     val editor: EditorDocument = EditorDocument()
 ) {
@@ -106,11 +107,14 @@ internal fun ProjectDocument.toJson(): JSONObject {
         k.control2?.let { item.put("control2", it) }
         keyframeArray.put(item)
     }
+    val elementArray = JSONArray()
+    elements.forEach { elementArray.put(it.toJson()) }
     return JSONObject().put("schemaVersion", schemaVersion).put("aspectRatio", aspectRatio)
         .put("durationMs", durationMs).put("backgroundArgb", backgroundArgb)
         .put("audioUri", audioUri).put("audioOffsetMs", audioOffsetMs)
         .put("trimStartMs", trimStartMs).put("trimEndMs", trimEndMs)
         .put("compositions", compositionArray).put("assets", assetArray).put("keyframes", keyframeArray)
+        .put("elements", elementArray)
         .put("export", JSONObject().put("width", export.width).put("height", export.height)
             .put("fps", export.fps).put("videoCodec", export.videoCodec)
             .put("videoBitrate", export.videoBitrate).put("audioBitrate", export.audioBitrate)
@@ -157,6 +161,10 @@ internal fun projectDocumentFromJson(root: JSONObject): ProjectDocument {
             if (k.has("control1")) k.optDouble("control1").toFloat() else null,
             if (k.has("control2")) k.optDouble("control2").toFloat() else null)
     }
+    val elementJson = root.optJSONArray("elements") ?: JSONArray()
+    val elements = (0 until elementJson.length()).mapNotNull { index ->
+        elementDocumentFromJson(elementJson.optJSONObject(index) ?: return@mapNotNull null)
+    }
     val e = root.optJSONObject("export") ?: JSONObject()
     val editorJson = root.optJSONObject("editor") ?: JSONObject()
     return ProjectDocument(
@@ -171,6 +179,7 @@ internal fun projectDocumentFromJson(root: JSONObject): ProjectDocument {
         compositions = compositions,
         assets = assets,
         keyframes = keyframes,
+        elements = elements,
         export = ExportDocument(
             width = e.optInt("width", 1920).coerceIn(160, 7680),
             height = e.optInt("height", 1080).coerceIn(160, 7680),

@@ -35,6 +35,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import android.graphics.BitmapFactory
+import com.vooc.visualizer.analyzer.ChannelSelect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -401,84 +410,197 @@ private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLaye
 @Composable
 private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, frame: AnalysisFrame?, playing: Boolean) {
     var phase by remember { mutableFloatStateOf(0f) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imageBitmaps = remember(layers.map { it.imageUri }) {
+        layers.mapNotNull { layer ->
+            if (layer.kind != LayerKind.IMAGE || layer.imageUri.isBlank()) null
+            else runCatching {
+                context.contentResolver.openInputStream(Uri.parse(layer.imageUri))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+            }.getOrNull()?.let { layer.id to it }
+        }.toMap()
+    }
     LaunchedEffect(playing) {
-        while (playing) { phase += 0.09f; delay(16) }
+        while (playing) { phase = (phase + 0.08f) % (2f * PI.toFloat()); delay(16) }
     }
     Canvas(modifier.background(Color.Black)) {
         val cx = size.width / 2f
         val cy = size.height / 2f
-        val spectrum = frame?.spectrum ?: FloatArray(64)
-        val waveform = frame?.waveform ?: FloatArray(64)
         layers.forEach { layer ->
-            val color = Color(layer.color).copy(alpha = (layer.opacity / 100f).coerceIn(0f, 1f))
-            val scale = layer.scale / 100f
+            val alpha = (layer.opacity / 100f).coerceIn(0f, 1f)
+            val color = Color(layer.color).copy(alpha = alpha)
+            val accent = Color(layer.gradientColor).copy(alpha = alpha)
+            val scale = (layer.scale / 100f).coerceIn(0f, 4f)
             val center = Offset(cx + layer.x / 100f * size.width, cy + layer.y / 100f * size.height)
-            when (layer.kind) {
-                LayerKind.BACKGROUND -> drawRect(Color(0xFF070906))
-                LayerKind.BARS, LayerKind.BARSH, LayerKind.BLOCKS, LayerKind.GRID -> {
-                    val n = if (layer.kind == LayerKind.GRID) 32 else 64
-                    val gap = size.width * 0.004f
-                    val bw = (size.width - gap * (n - 1)) / n
-                    for (i in 0 until n) {
-                        val v = if (spectrum.isNotEmpty()) spectrum[i * spectrum.size / n].coerceIn(0f, 1f) else 0f
-                        val h = (size.height * (0.03f + v * 0.72f * layer.sensitivity / 100f) * scale).coerceAtMost(size.height)
-                        val x = i * (bw + gap)
-                        if (layer.kind == LayerKind.BARSH) {
-                            drawLine(color, Offset(x + bw/2, cy - h/2), Offset(x + bw/2, cy + h/2), bw.coerceAtLeast(1f))
+            val channel = runCatching { frame?.channel(ChannelSelect.valueOf(layer.channel)) }.getOrNull()
+            val spectrum = channel?.spectrum ?: frame?.spectrum ?: FloatArray(64)
+            val waveform = frame?.waveform ?: FloatArray(64)
+            val band = when (layer.measureWhat) {
+                "Bass" -> frame?.band(0) ?: 0f
+                "Mid" -> frame?.band(1) ?: 0f
+                "Treble" -> frame?.band(2) ?: 0f
+                "RMS" -> channel?.rms ?: 0f
+                "Peak" -> channel?.peak ?: 0f
+                "Beat" -> frame?.beat?.pulse ?: 0f
+                "Waveform" -> waveform.maxOfOrNull { kotlin.math.abs(it) } ?: 0f
+                else -> 0f
+            }.coerceIn(0f, 1f)
+            val count = layer.barCount.coerceIn(8, 256)
+            val values = when (layer.measureWhat) {
+                "Bass", "Mid", "Treble", "RMS", "Peak", "Beat" -> FloatArray(count) { band }
+                "Waveform" -> waveform
+                else -> spectrum
+            }
+            val valueAt: (Int) -> Float = { i ->
+                if (values.isEmpty()) 0f else values[(i * values.size / count).coerceIn(0, values.lastIndex)].coerceIn(0f, 1f) * layer.sensitivity / 100f
+            }
+            rotate(layer.rotation, center) {
+                when (layer.kind) {
+                    LayerKind.BACKGROUND -> drawRect(Color(0xFF070906))
+                    LayerKind.BARS, LayerKind.BARSH, LayerKind.BLOCKS -> {
+                        val gap = layer.spacing.dp.toPx()
+                        val bw = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+                        for (i in 0 until count) {
+                            val v = valueAt(i)
+                            val h = (size.height * (0.025f + v * 0.75f) * scale).coerceIn(1f, size.height)
+                            val x = i * (bw + gap)
+                            val barColor = if (i % 2 == 0) color else accent
+                            when (layer.kind) {
+                                LayerKind.BARSH -> {
+                                    drawRect(barColor, Offset(x, cy - h / 2f), androidx.compose.ui.geometry.Size(bw, h))
+                                }
+                                LayerKind.BLOCKS -> {
+                                    val segments = 12
+                                    val segGap = 2.dp.toPx()
+                                    val segH = (h - segGap * (segments - 1)) / segments
+                                    for (s in 0 until segments) {
+                                        if (s.toFloat() / segments <= v) drawRect(barColor,
+                                            Offset(x, size.height - (s + 1) * (segH + segGap)),
+                                            androidx.compose.ui.geometry.Size(bw, segH.coerceAtLeast(1f)))
+                                    }
+                                }
+                                else -> drawRect(barColor, Offset(x, size.height - h), androidx.compose.ui.geometry.Size(bw, h))
+                            }
+                        }
+                    }
+                    LayerKind.GRID -> {
+                        val rows = 10
+                        val cols = count.coerceAtMost(80)
+                        for (r in 0..rows) drawLine(color.copy(alpha = alpha * 0.35f), Offset(0f, r * size.height / rows), Offset(size.width, r * size.height / rows), layer.thickness.dp.toPx())
+                        for (i in 0 until cols) {
+                            val v = valueAt(i)
+                            val x = i * size.width / cols
+                            drawLine(if (i % 2 == 0) color else accent, Offset(x, size.height), Offset(x, size.height - v * size.height * 0.7f), layer.thickness.dp.toPx())
+                        }
+                    }
+                    LayerKind.WAVE, LayerKind.WAVEC -> {
+                        val vals = if (layer.kind == LayerKind.WAVE && values.isNotEmpty()) values else waveform
+                        val step = size.width / (vals.size - 1).coerceAtLeast(1)
+                        val path = Path()
+                        vals.forEachIndexed { i, v ->
+                            val x = i * step
+                            val y = cy + v * cy * 0.9f * scale
+                            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        drawPath(path, color, style = Stroke(width = layer.thickness.dp.toPx()))
+                        if (layer.kind == LayerKind.WAVE) {
+                            val mirror = Path()
+                            vals.forEachIndexed { i, v ->
+                                val x = i * step
+                                val y = cy - v * cy * 0.9f * scale
+                                if (i == 0) mirror.moveTo(x, y) else mirror.lineTo(x, y)
+                            }
+                            drawPath(mirror, accent, style = Stroke(width = layer.thickness.dp.toPx()))
+                        }
+                    }
+                    LayerKind.SCOPE -> {
+                        val radius = size.minDimension * 0.22f * scale
+                        val path = Path()
+                        waveform.forEachIndexed { i, v ->
+                            val a = i * 2f * PI.toFloat() / waveform.size.coerceAtLeast(1)
+                            val r = radius * (1f + v * 0.45f)
+                            val x = center.x + cos(a) * r
+                            val y = center.y + sin(a) * r
+                            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        path.close()
+                        drawPath(path, color, style = Stroke(width = layer.thickness.dp.toPx()))
+                    }
+                    LayerKind.CIRCLE, LayerKind.RING, LayerKind.MULTIRING, LayerKind.CONCENTRIC, LayerKind.PULSE -> {
+                        val bass = frame?.band(0) ?: band
+                        val baseRadius = size.minDimension * layer.radius / 100f * scale
+                        val radius = if (layer.kind == LayerKind.PULSE) baseRadius * (1f + (frame?.beat?.pulse ?: 0f) * 0.5f) else baseRadius
+                        val rings = when (layer.kind) { LayerKind.MULTIRING -> 6; LayerKind.CONCENTRIC -> 4; else -> 1 }
+                        repeat(rings) { i ->
+                            val ringRadius = radius + i * (layer.spacing + layer.thickness).dp.toPx()
+                            drawCircle(if (i % 2 == 0) color else accent, ringRadius, center,
+                                style = Stroke(width = layer.thickness.dp.toPx()))
+                        }
+                        if (layer.kind == LayerKind.CIRCLE) {
+                            for (i in 0 until count) {
+                                val v = valueAt(i)
+                                val a = i * 2f * PI.toFloat() / count
+                                val r1 = radius
+                                val r2 = r1 + v * 44.dp.toPx()
+                                drawLine(if (i % 2 == 0) color else accent,
+                                    Offset(center.x + cos(a) * r1, center.y + sin(a) * r1),
+                                    Offset(center.x + cos(a) * r2, center.y + sin(a) * r2), layer.thickness.dp.toPx())
+                            }
+                        }
+                    }
+                    LayerKind.DOTS, LayerKind.PARTICLES -> {
+                        val n = if (layer.kind == LayerKind.PARTICLES) layer.particleCount else count
+                        repeat(n) { i ->
+                            val a = i * 2f * PI.toFloat() / n + phase * (if (layer.kind == LayerKind.PARTICLES) 1f else 0f)
+                            val v = valueAt(i % count)
+                            val r = size.minDimension * (0.08f + (i % 9) * 0.035f) * scale * (1f + v * 0.25f)
+                            drawCircle(if (i % 2 == 0) color else accent, (layer.thickness * 0.55f + v * 3f).dp.toPx(),
+                                Offset(center.x + cos(a) * r, center.y + sin(a) * r))
+                        }
+                    }
+                    LayerKind.LINES -> {
+                        for (i in 0 until count) {
+                            val v = valueAt(i)
+                            val x = i * size.width / count
+                            drawLine(if (i % 2 == 0) color else accent, Offset(x, cy - v * cy), Offset(x, cy + v * cy), layer.thickness.dp.toPx())
+                        }
+                    }
+                    LayerKind.SHAPE -> {
+                        val radius = size.minDimension * layer.radius / 100f * scale
+                        val path = Path()
+                        repeat(6) { i ->
+                            val a = i * 2f * PI.toFloat() / 6f
+                            val r = radius * (1f + valueAt(i) * 0.35f)
+                            val x = center.x + cos(a) * r
+                            val y = center.y + sin(a) * r
+                            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        path.close()
+                        drawPath(path, color, style = Stroke(width = layer.thickness.dp.toPx()))
+                    }
+                    LayerKind.TEXT -> drawIntoCanvas { canvas ->
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            this.color = color.toArgb()
+                            textSize = (24f * scale).coerceAtLeast(8f).sp.toPx()
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+                        }
+                        canvas.nativeCanvas.drawText(layer.textContent, center.x, center.y, paint)
+                    }
+                    LayerKind.IMAGE -> {
+                        val bitmap = imageBitmaps[layer.id]
+                        if (bitmap != null) {
+                            val side = (size.minDimension * 0.45f * scale).coerceAtLeast(1f)
+                            drawImage(bitmap, dstOffset = androidx.compose.ui.unit.IntOffset((center.x - side / 2).toInt(), (center.y - side / 2).toInt()),
+                                dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt()))
                         } else {
-                            drawRect(color, Offset(x, size.height - h), androidx.compose.ui.geometry.Size(bw.coerceAtLeast(1f), h))
+                            drawCircle(color.copy(alpha = 0.3f), size.minDimension * 0.12f, center, style = Stroke(layer.thickness.dp.toPx()))
                         }
                     }
                 }
-                LayerKind.WAVE, LayerKind.WAVEC, LayerKind.SCOPE -> {
-                    val values = if (waveform.isNotEmpty()) waveform else FloatArray(64)
-                    val step = size.width / (values.size - 1).coerceAtLeast(1)
-                    for (i in 1 until values.size) {
-                        drawLine(color, Offset((i-1)*step, cy + values[i-1]*cy*0.85f*scale),
-                            Offset(i*step, cy + values[i]*cy*0.85f*scale), 2.dp.toPx(), cap = StrokeCap.Round)
-                    }
-                }
-                LayerKind.CIRCLE, LayerKind.RING, LayerKind.MULTIRING, LayerKind.CONCENTRIC, LayerKind.PULSE -> {
-                    val bass = frame?.band(0) ?: 0f
-                    val radius = size.minDimension * 0.18f * scale * (1f + bass * 0.35f)
-                    val rings = if (layer.kind == LayerKind.MULTIRING || layer.kind == LayerKind.CONCENTRIC) 4 else 1
-                    repeat(rings) { i ->
-                        drawCircle(color.copy(alpha = color.alpha / (i + 1)), radius = radius + i * 12.dp.toPx(),
-                            center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
-                    }
-                    if (layer.kind == LayerKind.CIRCLE || layer.kind == LayerKind.PULSE) {
-                        for (i in 0 until 64) {
-                            val v = spectrum.getOrElse(i * spectrum.size / 64) { 0f }
-                            val a = i * (2f * PI.toFloat() / 64f)
-                            val r1 = radius + 3.dp.toPx()
-                            val r2 = r1 + v * 46.dp.toPx() * layer.sensitivity / 100f
-                            drawLine(color, Offset(center.x + cos(a)*r1, center.y + sin(a)*r1),
-                                Offset(center.x + cos(a)*r2, center.y + sin(a)*r2), 2.dp.toPx())
-                        }
-                    }
-                }
-                LayerKind.DOTS, LayerKind.PARTICLES -> {
-                    for (i in 0 until 48) {
-                        val a = i * 0.41f + phase
-                        val r = (size.minDimension * (0.08f + (i % 7) * 0.035f)) * scale
-                        val v = spectrum.getOrElse(i * spectrum.size / 48) { 0f }
-                        drawCircle(color, radius = (1.5f + v * 4f).dp.toPx(), center = Offset(center.x + cos(a)*r, center.y + sin(a)*r))
-                    }
-                }
-                LayerKind.LINES, LayerKind.SHAPE -> {
-                    for (i in 0 until 8) {
-                        val x = size.width * i / 8f
-                        drawLine(color, Offset(x, 0f), Offset(size.width - x, size.height), 1.dp.toPx())
-                    }
-                }
-                LayerKind.TEXT -> drawLine(color, Offset(center.x - 28.dp.toPx(), center.y), Offset(center.x + 28.dp.toPx(), center.y), 2.dp.toPx())
-                LayerKind.IMAGE -> drawCircle(color.copy(alpha = 0.35f), radius = 22.dp.toPx(), center = center)
             }
         }
-        if (layers.isEmpty()) drawCircle(Color.Gray, radius = 3.dp.toPx(), center = Offset(cx, cy))
     }
 }
-
 
 @Composable
 private fun OptionDropdown(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {

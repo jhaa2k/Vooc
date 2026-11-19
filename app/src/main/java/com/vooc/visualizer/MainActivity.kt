@@ -46,6 +46,10 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.vooc.visualizer.analyzer.AnalysisFrame
 import com.vooc.visualizer.analyzer.AudioAnalyzer
+import com.vooc.visualizer.analyzer.FftSize
+import com.vooc.visualizer.analyzer.ChannelMode
+import com.vooc.visualizer.analyzer.WindowFunction
+import com.vooc.visualizer.analyzer.Overlap
 import com.vooc.visualizer.playback.VoocAudioEngine
 import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind
@@ -146,6 +150,14 @@ private fun VoocStudio(
     var duration by remember { mutableLongStateOf(0L) }
     var position by remember { mutableLongStateOf(0L) }
     var frame by remember { mutableStateOf<AnalysisFrame?>(null) }
+    var analyzerConfig by remember { mutableStateOf(analyzer.config) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null && selectedId != 0L) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            project = updateLayer(project, selectedId) { it.copy(imageUri = uri.toString()) }
+        }
+    }
     val selected = project.layers.firstOrNull { it.id == selectedId }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
@@ -284,6 +296,26 @@ private fun VoocStudio(
                         }) { Icon(Icons.Default.Delete, "Delete layer", tint = Muted) }
                     }
                 }
+                item {
+                    EditorSection("AUDIO ANALYZER", expandedSection, { expandedSection = if (expandedSection == "AUDIO ANALYZER") "" else "AUDIO ANALYZER" }) {
+                        OptionDropdown("FFT SIZE", analyzerConfig.fftSize.size.toString(), FftSize.entries.map { it.size.toString() }) { value ->
+                            analyzerConfig = analyzerConfig.copy(fftSize = FftSize.fromSize(value.toInt()))
+                            analyzer.updateConfig(analyzerConfig)
+                        }
+                        OptionDropdown("CHANNEL MODE", analyzerConfig.channelMode.name, ChannelMode.entries.map { it.name }) { value ->
+                            analyzerConfig = analyzerConfig.copy(channelMode = ChannelMode.valueOf(value))
+                            analyzer.updateConfig(analyzerConfig)
+                        }
+                        OptionDropdown("WINDOW", analyzerConfig.window.name, WindowFunction.entries.map { it.name }) { value ->
+                            analyzerConfig = analyzerConfig.copy(window = WindowFunction.valueOf(value))
+                            analyzer.updateConfig(analyzerConfig)
+                        }
+                        OptionDropdown("OVERLAP", analyzerConfig.overlap.name, Overlap.entries.map { it.name }) { value ->
+                            analyzerConfig = analyzerConfig.copy(overlap = Overlap.valueOf(value))
+                            analyzer.updateConfig(analyzerConfig)
+                        }
+                    }
+                }
                 if (selected != null) {
                     item {
                         Text("PROPERTIES  /  ${selected.name.uppercase()}", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
@@ -311,6 +343,43 @@ private fun VoocStudio(
                                         project = updateLayer(project, selectedId) { it.copy(color = value) }
                                     }.border(if (selected.color == value) 2.dp else 0.dp, Color.White))
                                 }
+                            }
+                        }
+                    }
+                    item {
+                        EditorSection("AUDIO / MEASURE", expandedSection, { expandedSection = if (expandedSection == "AUDIO / MEASURE") "" else "AUDIO / MEASURE" }) {
+                            OptionDropdown("MEASURE WHAT", selected.measureWhat, listOf("Spectrum", "Bass", "Mid", "Treble", "RMS", "Peak", "Beat", "Waveform")) { value ->
+                                project = updateLayer(project, selectedId) { it.copy(measureWhat = value) }
+                            }
+                            OptionDropdown("CHANNEL", selected.channel, listOf("MIX", "LEFT", "RIGHT", "MID", "SIDE")) { value ->
+                                project = updateLayer(project, selectedId) { it.copy(channel = value) }
+                            }
+                            LayerSlider("BAR / SAMPLE COUNT", selected.barCount.toFloat(), 8f..256f) { v ->
+                                project = updateLayer(project, selectedId) { it.copy(barCount = v.toInt()) }
+                            }
+                        }
+                    }
+                    item {
+                        EditorSection("STYLE / GEOMETRY", expandedSection, { expandedSection = if (expandedSection == "STYLE / GEOMETRY") "" else "STYLE / GEOMETRY" }) {
+                            LayerSlider("THICKNESS", selected.thickness, 0.5f..16f) { v -> project = updateLayer(project, selectedId) { it.copy(thickness = v) } }
+                            LayerSlider("SPACING", selected.spacing, 0f..12f) { v -> project = updateLayer(project, selectedId) { it.copy(spacing = v) } }
+                            LayerSlider("RADIUS", selected.radius, 2f..48f) { v -> project = updateLayer(project, selectedId) { it.copy(radius = v) } }
+                            LayerSlider("PARTICLE COUNT", selected.particleCount.toFloat(), 4f..256f) { v -> project = updateLayer(project, selectedId) { it.copy(particleCount = v.toInt()) } }
+                        }
+                    }
+                    if (selected.kind == LayerKind.TEXT) {
+                        item {
+                            EditorSection("TEXT CONTENT", expandedSection, { expandedSection = if (expandedSection == "TEXT CONTENT") "" else "TEXT CONTENT" }) {
+                                var textValue by remember(selected.id, selected.textContent) { mutableStateOf(selected.textContent) }
+                                OutlinedTextField(value = textValue, onValueChange = { textValue = it; project = updateLayer(project, selectedId) { layer -> layer.copy(textContent = it) } },
+                                    label = { Text("Text") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                            }
+                        }
+                    }
+                    if (selected.kind == LayerKind.IMAGE) {
+                        item {
+                            OutlinedButton(onClick = { imagePicker.launch(arrayOf("image/*")) }, shape = RectangleShape) {
+                                Icon(Icons.Default.FolderOpen, null); Text(if (selected.imageUri.isBlank()) "CHOOSE IMAGE" else "CHANGE IMAGE")
                             }
                         }
                     }
@@ -407,6 +476,26 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
             }
         }
         if (layers.isEmpty()) drawCircle(Color.Gray, radius = 3.dp.toPx(), center = Offset(cx, cy))
+    }
+}
+
+
+@Composable
+private fun OptionDropdown(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(label, color = Muted, style = MaterialTheme.typography.labelSmall)
+        Box {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RectangleShape) {
+                Text(value, modifier = Modifier.weight(1f), color = Color.White)
+                Text("▾", color = Lime)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Panel)) {
+                options.forEach { option ->
+                    DropdownMenuItem(text = { Text(option) }, onClick = { onSelect(option); expanded = false })
+                }
+            }
+        }
     }
 }
 

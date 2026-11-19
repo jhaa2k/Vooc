@@ -641,7 +641,7 @@ private fun VoocStudio(
                                         showLayerMenu = false
                                     })
                                 }
-                                StudioElementType.entries.forEach { type ->
+                                StudioElementType.entries.filter { it != StudioElementType.AUDIO_PROVIDER && it != StudioElementType.BARS_SEGMENTS }.forEach { type ->
                                     DropdownMenuItem(text = { Text(type.displayName.uppercase()) }, onClick = {
                                         val id = "${type.name.lowercase()}-${System.currentTimeMillis()}"
                                         val created = ElementPropertyCatalog.create(type, id)
@@ -686,7 +686,7 @@ private fun VoocStudio(
                 }
                 item(key = "composition-layer-rows") {
                     project.document.elements.reversed().forEach { element ->
-                        Row(Modifier.fillMaxWidth().height(42.dp).background(if (element.id == selectedElementId) Color(0xFF29321F) else Panel).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().height(42.dp).background(if (activeSelection == "ELEMENT" && element.id == selectedElementId) Color(0xFF29321F) else Panel).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(24.dp).clickable { multiSelectedElementIds = if (element.id in multiSelectedElementIds) multiSelectedElementIds - element.id else multiSelectedElementIds + element.id }, contentAlignment = Alignment.Center) {
                                 Icon(if (element.id in multiSelectedElementIds) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, "Multi-select composition layer", tint = if (element.id in multiSelectedElementIds) Lime else Muted, modifier = Modifier.size(16.dp))
                             }
@@ -694,7 +694,7 @@ private fun VoocStudio(
                                 Text(element.tag.uppercase(), color = if (element.locked) Muted else Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                 Text(element.type.displayName.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
-                            Box(Modifier.size(24.dp).clickable { if (!element.locked) { selectedElementId = element.id; activeSelection = "ELEMENT" } }, contentAlignment = Alignment.Center) { Icon(Icons.Default.RadioButtonChecked, "Select composition layer", tint = if (element.id == selectedElementId) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                            Box(Modifier.size(24.dp).clickable { if (!element.locked) { selectedElementId = element.id; activeSelection = "ELEMENT" } }, contentAlignment = Alignment.Center) { Icon(Icons.Default.RadioButtonChecked, "Select composition layer", tint = if (activeSelection == "ELEMENT" && element.id == selectedElementId) Lime else Muted, modifier = Modifier.size(15.dp)) }
                             Box(Modifier.size(24.dp).clickable {
                                 val updated = element.withValue("Visible", ElementValue.Bool(!element.visible))
                                 val next = project.copy(document = project.document.copy(elements = project.document.elements.map { if (it.id == element.id) updated else it }))
@@ -734,7 +734,7 @@ private fun VoocStudio(
                 items(project.layers.reversed(), key = { it.id }) { layer ->
                     Row(
                         Modifier.fillMaxWidth().height(42.dp)
-                            .background(if (layer.id == selectedId) Color(0xFF29321F) else Panel)
+                            .background(if (activeSelection == "LAYER" && layer.id == selectedId) Color(0xFF29321F) else Panel)
                             .padding(horizontal = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -745,7 +745,7 @@ private fun VoocStudio(
                             Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             Text(layer.kind.name.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
-                        Box(Modifier.size(24.dp).clickable { if (!layer.locked) { selectedId = layer.id; activeSelection = "LAYER" } }, contentAlignment = Alignment.Center) { Icon(Icons.Default.RadioButtonChecked, "Select layer", tint = if (layer.id == selectedId) Lime else Muted, modifier = Modifier.size(15.dp)) }
+                        Box(Modifier.size(24.dp).clickable { if (!layer.locked) { selectedId = layer.id; activeSelection = "LAYER" } }, contentAlignment = Alignment.Center) { Icon(Icons.Default.RadioButtonChecked, "Select layer", tint = if (activeSelection == "LAYER" && layer.id == selectedId) Lime else Muted, modifier = Modifier.size(15.dp)) }
                         Box(Modifier.size(24.dp).clickable { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it }) }, contentAlignment = Alignment.Center) { Icon(if (layer.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff, if (layer.enabled) "Hide layer" else "Show layer", tint = if (layer.enabled) Lime else Muted, modifier = Modifier.size(15.dp)) }
                         Box(Modifier.size(24.dp).clickable { project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it }); if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L }, contentAlignment = Alignment.Center) { Icon(if (layer.locked) Icons.Default.Lock else Icons.Default.LockOpen, if (layer.locked) "Unlock layer" else "Lock layer", tint = if (layer.locked) Lime else Muted, modifier = Modifier.size(15.dp)) }
                         Box(Modifier.size(24.dp).clickable { val index = project.layers.indexOfFirst { it.id == layer.id }; if (index > 0) { val list = project.layers.toMutableList(); val moved = list.removeAt(index); list.add(index - 1, moved); project = project.copy(layers = list) } }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowUpward, "Move layer up", tint = Muted, modifier = Modifier.size(15.dp)) }

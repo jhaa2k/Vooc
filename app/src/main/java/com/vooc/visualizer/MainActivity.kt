@@ -1382,14 +1382,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 ?.average()?.toFloat() ?: (frame?.band(2) ?: 0f)
             val motion = MeasureWhatEngine.evaluate(
                 mode = layer.measureWhat,
-                runtimeSeconds = phase,
+                runtimeSeconds = android.os.SystemClock.elapsedRealtime() / 1000f,
                 trackPositionSeconds = (frame?.timeSec ?: 0.0).toFloat(),
                 playing = playing,
                 beatPulse = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f,
                 bass = bassLevel,
                 treble = trebleLevel,
                 bpm = frame?.beat?.bpm ?: 120f,
-                seed = layer.id
+                seed = layer.id,
+                playingSeconds = phase
             )
             val center = Offset(
                 baseCenter.x + motion.offsetX * size.width,

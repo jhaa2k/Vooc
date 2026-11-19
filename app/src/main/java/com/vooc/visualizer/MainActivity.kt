@@ -738,6 +738,17 @@ private fun VoocStudio(
                             OptionDropdown("MEASURE WHAT", selected.measureWhat, listOf("Spectrum", "Bass", "Mid", "Treble", "RMS", "Peak", "Beat", "Waveform")) { value ->
                                 project = updateLayer(project, selectedId) { it.copy(measureWhat = value) }
                             }
+                            if (selected.measureWhat == "Spectrum") {
+                                OptionDropdown("FREQUENCY SCALE", selected.spectrumScale, listOf("LOGARITHMIC", "LINEAR")) { value ->
+                                    project = updateLayer(project, selectedId) { it.copy(spectrumScale = value) }
+                                }
+                                LayerSlider("MIN FREQUENCY HZ", selected.spectrumMinHz, 10f..1000f) { value ->
+                                    project = updateLayer(project, selectedId) { it.copy(spectrumMinHz = value.coerceAtMost(selected.spectrumMaxHz - 1f)) }
+                                }
+                                LayerSlider("MAX FREQUENCY HZ", selected.spectrumMaxHz, 100f..20000f) { value ->
+                                    project = updateLayer(project, selectedId) { it.copy(spectrumMaxHz = value.coerceAtLeast(selected.spectrumMinHz + 1f)) }
+                                }
+                            }
                             OptionDropdown("CHANNEL", selected.channel, listOf("MIX", "LEFT", "RIGHT", "MID", "SIDE")) { value ->
                                 project = updateLayer(project, selectedId) { it.copy(channel = value) }
                                 val mode = if (value == "SIDE") ChannelMode.MID_SIDE else if (value == "LEFT" || value == "RIGHT") ChannelMode.STEREO_SPLIT else analyzerConfig.channelMode
@@ -1046,8 +1057,19 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 else -> spectrum
             }
             val valueAt: (Int) -> Float = { i ->
-                if (values.isEmpty()) 0f else values[(i * values.size / count).coerceIn(0, values.lastIndex)].coerceIn(0f, 1f) * layer.sensitivity / 100f
-            }
+                if (values.isEmpty()) 0f else if (layer.measureWhat == "Spectrum" && frame != null) {
+                    val x = i.toFloat() / (count - 1).coerceAtLeast(1)
+                    val minHz = layer.spectrumMinHz.coerceIn(10f, frame.sampleRate * 0.45f)
+                    val maxHz = layer.spectrumMaxHz.coerceIn(minHz + 1f, frame.sampleRate * 0.49f)
+                    val hz = if (layer.spectrumScale == "LOGARITHMIC")
+                        minHz * kotlin.math.exp(kotlin.math.ln(maxHz / minHz) * x)
+                    else minHz + (maxHz - minHz) * x
+                    val bin = (hz / frame.binWidthHz).coerceIn(0f, (values.lastIndex).toFloat())
+                    val lo = bin.toInt()
+                    val hi = (lo + 1).coerceAtMost(values.lastIndex)
+                    (values[lo] + (values[hi] - values[lo]) * (bin - lo))
+                } else values[(i * values.size / count).coerceIn(0, values.lastIndex)].coerceIn(0f, 1f)
+            }.let { sample -> { i: Int -> (sample(i) * layer.sensitivity / 100f).coerceIn(0f, 1f) } }
             rotate(layer.rotation, center) {
                 when (layer.kind) {
                     LayerKind.BACKGROUND -> drawRect(Color(0xFF070906))

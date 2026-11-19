@@ -45,6 +45,7 @@ import com.vooc.visualizer.analyzer.player.VoocPlayer
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.ProjectStore
 import com.vooc.visualizer.studio.StudioProject
+import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.VisualLayer
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -207,6 +208,19 @@ private fun VoocStudio(
                         frame = frame,
                         playing = playing
                     )
+                }
+                item {
+                    Text("START WITH A PRESET", color = Muted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp)
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        StudioPresets.names.forEach { preset ->
+                            OutlinedButton(onClick = {
+                                project = StudioPresets.create(preset)
+                                selectedId = project.layers.lastOrNull()?.id ?: 0L
+                            }, shape = RectangleShape, contentPadding = PaddingValues(horizontal = 11.dp, vertical = 5.dp)) {
+                                Text(preset, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
                 }
                 item {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {

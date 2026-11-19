@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.vooc.visualizer.analyzer.AudioAnalyzer
+import com.vooc.visualizer.analyzer.player.VoocPlayer
 import kotlinx.coroutines.delay
 
 private val Lime = Color(0xFFC6F36A)
@@ -34,15 +36,17 @@ private val Ink = Color(0xFF10120E)
 private val Panel = Color(0xFF1A1D17)
 
 class MainActivity : ComponentActivity() {
+    private val analyzer = AudioAnalyzer()
     private var player: ExoPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        player = ExoPlayer.Builder(this).build()
+        player = VoocPlayer.create(this, analyzer)
         setContent {
             VoocTheme {
                 VisualizerHome(
                     player = player!!,
+                    analyzer = analyzer,
                     onPickAudio = { uri -> player?.setMediaItem(MediaItem.fromUri(uri)); player?.prepare() }
                 )
             }
@@ -74,11 +78,12 @@ private fun VoocTheme(content: @Composable () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VisualizerHome(player: ExoPlayer, onPickAudio: (Uri) -> Unit) {
+private fun VisualizerHome(player: ExoPlayer, analyzer: AudioAnalyzer, onPickAudio: (Uri) -> Unit) {
     var trackName by remember { mutableStateOf("No track selected") }
     var playing by remember { mutableStateOf(false) }
     var duration by remember { mutableLongStateOf(0L) }
     var position by remember { mutableLongStateOf(0L) }
+    var analysis by remember { mutableStateOf("ANALYZER IDLE") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             onPickAudio(uri)
@@ -100,6 +105,20 @@ private fun VisualizerHome(player: ExoPlayer, onPickAudio: (Uri) -> Unit) {
         while (true) {
             position = player.currentPosition.coerceAtLeast(0L)
             delay(250)
+        }
+    }
+    // Phase 1 debug readout: live band levels + BPM from the in-app audio analyzer.
+    LaunchedEffect(player, analyzer) {
+        while (true) {
+            if (playing) {
+                val frame = analyzer.analyzeLive(player.currentPosition / 1000.0)
+                if (frame.bands.size >= 3) {
+                    analysis = "BASS %.2f  MID %.2f  TREBLE %.2f  BPM %.0f".format(
+                        frame.bands[0], frame.bands[1], frame.bands[2], frame.beat.bpm
+                    )
+                }
+            }
+            delay(33)
         }
     }
 
@@ -158,6 +177,7 @@ private fun VisualizerHome(player: ExoPlayer, onPickAudio: (Uri) -> Unit) {
                     Text("NOW PLAYING", color = Lime, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp)
                     Spacer(Modifier.height(6.dp))
                     Text(trackName, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    Text(analysis, style = MaterialTheme.typography.labelSmall, color = Color(0xFF9DA394))
                     Slider(
                         value = if (duration > 0) position.toFloat().coerceIn(0f, duration.toFloat()) else 0f,
                         onValueChange = { position = it.toLong() },

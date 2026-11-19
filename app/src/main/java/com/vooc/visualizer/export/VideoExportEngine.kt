@@ -475,7 +475,7 @@ object VideoExportEngine {
                     val colorB = runCatching { android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF")) }.getOrDefault(color)
                     val capColor = runCatching { android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF")) }.getOrDefault(strokeColor)
                     val peakColor = runCatching { android.graphics.Color.parseColor(textValue("Peak Color", "#FFFFFFFF")) }.getOrDefault(strokeColor)
-                    val colorMode = textValue("Color Mode", "Gradient")
+                    val colorMode = if ((element.value("Gradient Fill") as? ElementValue.Bool)?.value == true) "Gradient" else textValue("Color Mode", "Alternating")
                     val capMode = textValue("Top/Bottom Cap", "None")
                     val capPlacement = textValue("Cap Placement", "Top")
                     val capSize = (number("Cap Size", 4f) * width / 1080f).coerceAtLeast(1f)
@@ -514,12 +514,15 @@ object VideoExportEngine {
                             "Stretch" -> cy + height * 0.44f
                             else -> cy + height * 0.38f
                         }
-                        val h = if (alignment == "Stretch") (barHeight * 1.25f).coerceAtMost(height * 0.95f) else barHeight
-                        val top = if (mirrorY || alignment == "Center") baseline - h / 2f else if (alignment == "Top") baseline else baseline - h
+                        val drawHeight = if (mirrorY) barHeight / 2f else barHeight
+                        val h = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(height * 0.95f) else drawHeight
+                        val top = if (mirrorY) baseline - h else if (alignment == "Center") baseline - barHeight / 2f else if (alignment == "Top") baseline else baseline - h
                         val bottom = top + h
+                        val gradientT = if (textValue("Gradient Direction", "Vertical") == "Horizontal") index.toFloat() / (count - 1).coerceAtLeast(1) else level
                         val fill = when (colorMode) {
                             "Alternating" -> if (index % 2 == 0) colorA else colorB
-                            "Gradient", "By Amplitude" -> lerpColor(colorA, colorB, level)
+                            "Gradient" -> lerpColor(colorA, colorB, gradientT)
+                            "By Amplitude" -> lerpColor(colorA, colorB, level)
                             else -> color
                         }
                         fun drawShape(yTop: Float, yBottom: Float) {
@@ -545,6 +548,7 @@ object VideoExportEngine {
                                 paint.alpha = alpha
                                 paint.strokeWidth = strokeWidth
                             }
+                            paint.style = if (outline) Paint.Style.STROKE else Paint.Style.FILL
                             if (extrusion) {
                                 canvas.save()
                                 canvas.translate(extrusionDepth, extrusionDepth)
@@ -598,7 +602,7 @@ object VideoExportEngine {
                         canvas.save()
                         canvas.rotate(number("Bar Rotation", 0f), x + barWidth / 2f, baseline)
                         drawShape(top, bottom)
-                        if (mirrorY) drawShape(if (top < baseline) baseline else baseline - h, if (top < baseline) baseline + h else baseline)
+                        if (mirrorY) drawShape(baseline, baseline + h)
                         canvas.restore()
                     }
                     paint.color = color

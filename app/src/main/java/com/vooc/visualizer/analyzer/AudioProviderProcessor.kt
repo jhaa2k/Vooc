@@ -214,7 +214,7 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
     fun integer(name: String, fallback: Int) = number(name, fallback.toDouble()).toInt()
     fun boolean(name: String, fallback: Boolean) = when (val v = value(name)) {
         is ElementValue.Bool -> v.value
-        is ElementValue.Integer -> v.value != 0
+        is ElementValue.Integer -> v.value != 0L
         is ElementValue.Number -> v.value != 0.0
         else -> fallback
     }
@@ -241,7 +241,7 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
         fftSize = run {
             val raw = when (val fft = value("Fft Size")) {
                 is ElementValue.Text -> fft.value.toIntOrNull() ?: 2048
-                is ElementValue.Integer -> fft.value
+                is ElementValue.Integer -> fft.value.toInt()
                 is ElementValue.Number -> fft.value.toInt()
                 else -> 2048
             }

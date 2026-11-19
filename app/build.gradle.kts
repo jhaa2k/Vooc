@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -43,3 +45,18 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
+
+
+// Decode the bundled Poppins font before Android resource processing.
+val decodePoppinsFont by tasks.registering {
+    val encodedFont = layout.projectDirectory.file("src/main/font/poppins-regular.ttf.base64")
+    val outputFont = layout.projectDirectory.file("src/main/res/font/poppins_regular.ttf")
+    inputs.file(encodedFont)
+    outputs.file(outputFont)
+    doLast {
+        outputFont.asFile.parentFile.mkdirs()
+        val compactBase64 = encodedFont.asFile.readText().filterNot { it.isWhitespace() }
+        outputFont.asFile.writeBytes(Base64.getDecoder().decode(compactBase64))
+    }
+}
+tasks.named("preBuild").configure { dependsOn(decodePoppinsFont) }

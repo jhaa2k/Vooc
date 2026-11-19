@@ -192,6 +192,7 @@ object ElementPropertyCatalog {
         number("Scale", "General", 100.0, 0.0, 1000.0),
         text("Measure Scale (Measure What)", "General", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
         text("Measure Rot (Measure What)", "General", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options)
     )
 

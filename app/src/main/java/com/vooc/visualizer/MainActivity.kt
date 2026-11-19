@@ -1006,8 +1006,12 @@ private fun TemplateLibraryScreen(
 }
 
 @Composable
-private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.AnalyzerConfig,
-    onConfigChange: (com.vooc.visualizer.analyzer.AnalyzerConfig) -> Unit, modifier: Modifier = Modifier) {
+private fun AnalyzerSettingsScreen(
+    config: com.vooc.visualizer.analyzer.AnalyzerConfig,
+    onConfigChange: (com.vooc.visualizer.analyzer.AnalyzerConfig) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expandedCategory by remember { mutableStateOf("AUDIO INPUT") }
     val bandLabels = config.bands.bands.map { it.label }
     val defaultBandSpecs = remember(bandLabels) {
         if (bandLabels == listOf("Bass", "Mid", "Treble")) {
@@ -1016,78 +1020,103 @@ private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.Analyzer
             com.vooc.visualizer.analyzer.BandConfig.logSpaced(config.bands.bands.size)
         }
     }
-    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         item {
-            Text("AUDIO ANALYZER SETTINGS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
-            OptionDropdown("FFT SIZE", config.fftSize.size.toString(), FftSize.entries.map { it.size.toString() }) {
-                onConfigChange(config.copy(fftSize = FftSize.fromSize(it.toInt())))
+            Text("SETTINGS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
+            Text("AUDIO ANALYSIS • PROCESSING • FREQUENCY BANDS", color = Muted, style = MaterialTheme.typography.labelSmall)
+        }
+        item {
+            EditorSection("AUDIO INPUT", expandedCategory, { expandedCategory = if (expandedCategory == "AUDIO INPUT") "" else "AUDIO INPUT" }) {
+                OptionDropdown("FFT SIZE", config.fftSize.size.toString(), FftSize.entries.map { it.size.toString() }) {
+                    onConfigChange(config.copy(fftSize = FftSize.fromSize(it.toInt())))
+                }
+                OptionDropdown("WINDOW FUNCTION", config.window.name, WindowFunction.entries.map { it.name }) {
+                    onConfigChange(config.copy(window = WindowFunction.valueOf(it)))
+                }
+                OptionDropdown("OVERLAP", config.overlap.name, Overlap.entries.map { it.name }) {
+                    onConfigChange(config.copy(overlap = Overlap.valueOf(it)))
+                }
+                OptionDropdown("CHANNEL MODE", config.channelMode.name, ChannelMode.entries.map { it.name }) {
+                    onConfigChange(config.copy(channelMode = ChannelMode.valueOf(it)))
+                }
             }
-            OptionDropdown("WINDOW FUNCTION", config.window.name, WindowFunction.entries.map { it.name }) {
-                onConfigChange(config.copy(window = WindowFunction.valueOf(it)))
+        }
+        item {
+            EditorSection("BEAT DETECTION", expandedCategory, { expandedCategory = if (expandedCategory == "BEAT DETECTION") "" else "BEAT DETECTION" }) {
+                OptionDropdown("BEAT ALGORITHM", config.beat.algorithm.name, BeatAlgorithm.entries.map { it.name }) {
+                    onConfigChange(config.copy(beat = config.beat.copy(algorithm = BeatAlgorithm.valueOf(it))))
+                }
+                LayerSlider("BEAT SENSITIVITY", config.beat.sensitivity * 100f, 0f..100f) {
+                    onConfigChange(config.copy(beat = config.beat.copy(sensitivity = it / 100f)))
+                }
+                LayerSlider("BEAT COOLDOWN", config.beat.cooldownMs.toFloat(), 50f..500f) {
+                    onConfigChange(config.copy(beat = config.beat.copy(cooldownMs = it.toInt())))
+                }
+                LayerSlider("BEAT THRESHOLD", config.beat.threshold, 1f..5f) {
+                    onConfigChange(config.copy(beat = config.beat.copy(threshold = it)))
+                }
+                OptionDropdown("TIME SIGNATURE", config.beat.timeSignature.label, com.vooc.visualizer.analyzer.TimeSignature.entries.map { it.label }) {
+                    val signature = com.vooc.visualizer.analyzer.TimeSignature.entries.first { item -> item.label == it }
+                    onConfigChange(config.copy(beat = config.beat.copy(timeSignature = signature)))
+                }
             }
-            OptionDropdown("OVERLAP", config.overlap.name, Overlap.entries.map { it.name }) {
-                onConfigChange(config.copy(overlap = Overlap.valueOf(it)))
+        }
+        item {
+            EditorSection("SIGNAL RESPONSE", expandedCategory, { expandedCategory = if (expandedCategory == "SIGNAL RESPONSE") "" else "SIGNAL RESPONSE" }) {
+                OptionDropdown("NORMALIZATION", config.normalization.name, com.vooc.visualizer.analyzer.Normalization.entries.map { it.name }) {
+                    onConfigChange(config.copy(normalization = com.vooc.visualizer.analyzer.Normalization.valueOf(it)))
+                }
+                OptionDropdown("INTERPOLATION", config.interpolation.name, com.vooc.visualizer.analyzer.Interpolation.entries.map { it.name }) {
+                    onConfigChange(config.copy(interpolation = com.vooc.visualizer.analyzer.Interpolation.valueOf(it)))
+                }
+                LayerSlider("TEMPORAL SMOOTHING", config.smoothing.temporal * 100f, 0f..99f) {
+                    onConfigChange(config.copy(smoothing = config.smoothing.copy(temporal = it / 100f, asymmetric = false)))
+                }
+                LayerSlider("ATTACK", config.smoothing.attackMs, 0f..1000f) {
+                    onConfigChange(config.copy(smoothing = config.smoothing.copy(attackMs = it)))
+                }
+                LayerSlider("RELEASE", config.smoothing.releaseMs, 0f..1000f) {
+                    onConfigChange(config.copy(smoothing = config.smoothing.copy(releaseMs = it)))
+                }
             }
-            OptionDropdown("CHANNEL MODE", config.channelMode.name, ChannelMode.entries.map { it.name }) {
-                onConfigChange(config.copy(channelMode = ChannelMode.valueOf(it)))
+        }
+        item {
+            EditorSection("ANALYSIS BUFFER", expandedCategory, { expandedCategory = if (expandedCategory == "ANALYSIS BUFFER") "" else "ANALYSIS BUFFER" }) {
+                LayerSlider("RING BUFFER", config.ringBufferSamples.toFloat(), 4096f..16384f) {
+                    onConfigChange(config.copy(ringBufferSamples = (it.toInt() / 1024 * 1024).coerceIn(4096, 16384)))
+                }
+                LayerSlider("WAVEFORM SAMPLES", config.waveformSamples.toFloat(), 256f..8192f) {
+                    onConfigChange(config.copy(waveformSamples = (it.toInt() / 256 * 256).coerceIn(256, 8192)))
+                }
             }
-            OptionDropdown("BEAT ALGORITHM", config.beat.algorithm.name, BeatAlgorithm.entries.map { it.name }) {
-                onConfigChange(config.copy(beat = config.beat.copy(algorithm = BeatAlgorithm.valueOf(it))))
-            }
-            LayerSlider("BEAT SENSITIVITY", config.beat.sensitivity * 100f, 0f..100f) {
-                onConfigChange(config.copy(beat = config.beat.copy(sensitivity = it / 100f)))
-            }
-            LayerSlider("BEAT COOLDOWN", config.beat.cooldownMs.toFloat(), 50f..500f) {
-                onConfigChange(config.copy(beat = config.beat.copy(cooldownMs = it.toInt())))
-            }
-            LayerSlider("BEAT THRESHOLD", config.beat.threshold, 1f..5f) {
-                onConfigChange(config.copy(beat = config.beat.copy(threshold = it)))
-            }
-            OptionDropdown("TIME SIGNATURE", config.beat.timeSignature.label, com.vooc.visualizer.analyzer.TimeSignature.entries.map { it.label }) {
-                val sig = com.vooc.visualizer.analyzer.TimeSignature.entries.first { item -> item.label == it }
-                onConfigChange(config.copy(beat = config.beat.copy(timeSignature = sig)))
-            }
-            OptionDropdown("NORMALIZATION", config.normalization.name, com.vooc.visualizer.analyzer.Normalization.entries.map { it.name }) {
-                onConfigChange(config.copy(normalization = com.vooc.visualizer.analyzer.Normalization.valueOf(it)))
-            }
-            OptionDropdown("INTERPOLATION", config.interpolation.name, com.vooc.visualizer.analyzer.Interpolation.entries.map { it.name }) {
-                onConfigChange(config.copy(interpolation = com.vooc.visualizer.analyzer.Interpolation.valueOf(it)))
-            }
-            LayerSlider("TEMPORAL SMOOTHING", config.smoothing.temporal * 100f, 0f..99f) {
-                onConfigChange(config.copy(smoothing = config.smoothing.copy(temporal = it / 100f, asymmetric = false)))
-            }
-            LayerSlider("ATTACK", config.smoothing.attackMs, 0f..1000f) {
-                onConfigChange(config.copy(smoothing = config.smoothing.copy(attackMs = it)))
-            }
-            LayerSlider("RELEASE", config.smoothing.releaseMs, 0f..1000f) {
-                onConfigChange(config.copy(smoothing = config.smoothing.copy(releaseMs = it)))
-            }
-            LayerSlider("RING BUFFER", config.ringBufferSamples.toFloat(), 4096f..16384f) {
-                onConfigChange(config.copy(ringBufferSamples = (it.toInt() / 1024 * 1024).coerceIn(4096, 16384)))
-            }
-            LayerSlider("WAVEFORM SAMPLES", config.waveformSamples.toFloat(), 256f..8192f) {
-                onConfigChange(config.copy(waveformSamples = (it.toInt() / 256 * 256).coerceIn(256, 8192)))
-            }
-            OptionDropdown("CUSTOM FREQUENCY BANDS", config.bands.bands.size.toString(), (1..32).map { it.toString() }) {
-                onConfigChange(config.copy(bands = config.bands.copy(bands = com.vooc.visualizer.analyzer.BandConfig.logSpaced(it.toInt()))))
-            }
-            OptionDropdown("CROSSOVER FILTER", config.bands.crossover.name, com.vooc.visualizer.analyzer.CrossoverOrder.entries.map { it.name }) {
-                onConfigChange(config.copy(bands = config.bands.copy(crossover = com.vooc.visualizer.analyzer.CrossoverOrder.valueOf(it))))
-            }
-            OptionDropdown("FILTER SLOPE", config.bands.slope.name, com.vooc.visualizer.analyzer.BandSlope.entries.map { it.name }) {
-                onConfigChange(config.copy(bands = config.bands.copy(slope = com.vooc.visualizer.analyzer.BandSlope.valueOf(it))))
-            }
-            LayerSlider("DB FLOOR", config.bands.dbFloor, -120f..-10f) {
-                onConfigChange(config.copy(bands = config.bands.copy(dbFloor = it)))
+        }
+        item {
+            EditorSection("FREQUENCY BAND SETUP", expandedCategory, { expandedCategory = if (expandedCategory == "FREQUENCY BAND SETUP") "" else "FREQUENCY BAND SETUP" }) {
+                OptionDropdown("CUSTOM FREQUENCY BANDS", config.bands.bands.size.toString(), (1..32).map { it.toString() }) {
+                    onConfigChange(config.copy(bands = config.bands.copy(bands = com.vooc.visualizer.analyzer.BandConfig.logSpaced(it.toInt()))))
+                }
+                OptionDropdown("CROSSOVER FILTER", config.bands.crossover.name, com.vooc.visualizer.analyzer.CrossoverOrder.entries.map { it.name }) {
+                    onConfigChange(config.copy(bands = config.bands.copy(crossover = com.vooc.visualizer.analyzer.CrossoverOrder.valueOf(it))))
+                }
+                OptionDropdown("FILTER SLOPE", config.bands.slope.name, com.vooc.visualizer.analyzer.BandSlope.entries.map { it.name }) {
+                    onConfigChange(config.copy(bands = config.bands.copy(slope = com.vooc.visualizer.analyzer.BandSlope.valueOf(it))))
+                }
+                LayerSlider("DB FLOOR", config.bands.dbFloor, -120f..-10f) {
+                    onConfigChange(config.copy(bands = config.bands.copy(dbFloor = it)))
+                }
             }
         }
         items(config.bands.bands, key = { it.label }) { band ->
             val bandIndex = config.bands.bands.indexOfFirst { it.label == band.label }
             val defaultBand = defaultBandSpecs.getOrNull(bandIndex) ?: band
-            Column(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(band.label.uppercase(), color = Lime, style = MaterialTheme.typography.labelMedium)
+            EditorSection("BAND • ${band.label.uppercase()}", expandedCategory, {
+                val title = "BAND • ${band.label.uppercase()}"
+                expandedCategory = if (expandedCategory == title) "" else title
+            }) {
                 LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f, resetValue = defaultBand.lowHz) { value ->
                     val updated = config.bands.bands.map { current ->
                         if (current.label == band.label) current.copy(lowHz = value.coerceAtMost(current.highHz - 1f)) else current
@@ -1127,7 +1156,6 @@ private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.Analyzer
         }
     }
 }
-
 
 private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLayer) -> VisualLayer): StudioProject =
     project.copy(layers = project.layers.map { if (it.id == id) transform(it) else it })

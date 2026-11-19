@@ -13,6 +13,7 @@ import org.json.JSONObject
 enum class StudioElementType(val displayName: String) {
     AUDIO_PROVIDER("Audio Provider"),
     IMAGE("Image"),
+    BACKGROUND("Background"),
     RGB_SPLIT("Rgb Split"),
     BLUR_EFFECT("Blur Effect"),
     BARS_SEGMENTS("Bars/Segments"),
@@ -194,6 +195,59 @@ object ElementPropertyCatalog {
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
         number("Opacity", "General", 100.0, 0.0, 100.0),
         text("Measure Rot (Measure What)", "General", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options)
+    )
+
+    private val backgroundGeneral = listOf(
+        text("Tag", "General", "Background"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Anchor Y", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val backgroundAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        text("Color", "Appearance", "#FFFFFFFF"),
+        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
+        bool("Show Unblurred Content", "Appearance", false),
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
+    private val backgroundSpecific = listOf(
+        text("Source Type", "Background", "Solid Color", listOf("Solid Color", "Image", "Video")),
+        text("Image File / Source", "Background", ""),
+        text("Fit Mode (Scale Type)", "Background", "Fill (Cover)", listOf(
+            "Fit (Contain)", "Fill (Cover)", "Stretch"
+        )),
+        bool("Edge Blur (Image Fill)", "Background", false),
+        number("Blur Radius", "Background", 24.0, 0.0, 256.0),
+        number("Corner Radius", "Background", 0.0, 0.0, 512.0),
+        text("Color Overlay", "Background", "#00000000"),
+        number("Opacity / Alpha", "Background", 1.0, 0.0, 1.0)
     )
 
     private val provider = listOf(
@@ -622,6 +676,10 @@ object ElementPropertyCatalog {
             return (textGeneral + textAppearance + textTypography)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
+        if (type == StudioElementType.BACKGROUND) {
+            return (backgroundGeneral + backgroundAppearance + backgroundSpecific)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
         if (type == StudioElementType.IMAGE) {
             return (imageGeneral + imageAppearance + imageSpecific)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
@@ -635,6 +693,7 @@ object ElementPropertyCatalog {
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         val specific = when (type) {
+            StudioElementType.BACKGROUND -> backgroundSpecific
             StudioElementType.IMAGE -> imageSpecific
             StudioElementType.RGB_SPLIT -> rgbSplit
             StudioElementType.BLUR_EFFECT -> emptyList()

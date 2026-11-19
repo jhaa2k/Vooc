@@ -23,7 +23,17 @@ data class VisualLayer(
     val opacity: Float = 100f,
     val color: Long = 0xFFC6F36A,
     val sensitivity: Float = 100f,
-    val smoothing: Float = 45f
+    val smoothing: Float = 45f,
+    val measureWhat: String = "Spectrum",
+    val channel: String = "MIX",
+    val barCount: Int = 64,
+    val thickness: Float = 2f,
+    val spacing: Float = 1f,
+    val radius: Float = 18f,
+    val particleCount: Int = 48,
+    val textContent: String = "VOOC",
+    val imageUri: String = "",
+    val gradientColor: Long = 0xFF55D6FF
 )
 
 data class StudioProject(
@@ -49,7 +59,12 @@ object ProjectStore {
                 .put("name", layer.name).put("enabled", layer.enabled).put("x", layer.x)
                 .put("y", layer.y).put("scale", layer.scale).put("rotation", layer.rotation)
                 .put("opacity", layer.opacity).put("color", layer.color)
-                .put("sensitivity", layer.sensitivity).put("smoothing", layer.smoothing))
+                .put("sensitivity", layer.sensitivity).put("smoothing", layer.smoothing)
+                .put("measureWhat", layer.measureWhat).put("channel", layer.channel)
+                .put("barCount", layer.barCount).put("thickness", layer.thickness)
+                .put("spacing", layer.spacing).put("radius", layer.radius)
+                .put("particleCount", layer.particleCount).put("textContent", layer.textContent)
+                .put("imageUri", layer.imageUri).put("gradientColor", layer.gradientColor))
         }
         root.put("layers", array)
         context.openFileOutput(FILE_NAME, Context.MODE_PRIVATE).use { it.write(root.toString().toByteArray()) }
@@ -72,7 +87,17 @@ object ProjectStore {
                 opacity = o.optDouble("opacity", 100.0).toFloat(),
                 color = o.optLong("color", 0xFFC6F36A),
                 sensitivity = o.optDouble("sensitivity", 100.0).toFloat(),
-                smoothing = o.optDouble("smoothing", 45.0).toFloat()
+                smoothing = o.optDouble("smoothing", 45.0).toFloat(),
+                measureWhat = o.optString("measureWhat", "Spectrum"),
+                channel = o.optString("channel", "MIX"),
+                barCount = o.optInt("barCount", 64).coerceIn(8, 256),
+                thickness = o.optDouble("thickness", 2.0).toFloat(),
+                spacing = o.optDouble("spacing", 1.0).toFloat(),
+                radius = o.optDouble("radius", 18.0).toFloat(),
+                particleCount = o.optInt("particleCount", 48).coerceIn(4, 256),
+                textContent = o.optString("textContent", "VOOC"),
+                imageUri = o.optString("imageUri", ""),
+                gradientColor = o.optLong("gradientColor", 0xFF55D6FF)
             )
         }
         StudioProject(root.optString("name", "Untitled Project"), root.optInt("width", 1920),

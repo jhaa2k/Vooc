@@ -260,12 +260,52 @@ object ElementPropertyCatalog {
         text("Split Color 2", "Split Effect", "#FF0000FF")
     )
 
+    private val blurGeneral = listOf(
+        text("Tag", "General", "Blur Effect"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf("Left", "Center", "Right")),
+        text("Anchor Y", "General", "Middle", listOf("Top", "Middle", "Bottom")),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val blurAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        text("Color", "Appearance", "#FFFFFFFF"),
+        integer("Source Composition Index", "Appearance", 2, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
+        bool("Show Unblurred Content", "Appearance", false),
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
     private val blurEffect = listOf(
-        text("Target Image", "Blur", ""),
-        number("Blur Radius", "Blur", 8.0, 0.0, 128.0),
-        number("Blur Multiplier", "Blur", 1.0, 0.0, 32.0),
-        integer("Blur Layer Count", "Blur", 3, 1.0, 3.0),
-        bool("Show Unblurred Content", "Blur", false)
+        number("Blur Radius", "Blur", 2.0, 0.0, 128.0),
+        number("Blur Multiplier", "Blur", 4.1, 0.0, 64.0),
+        ElementPropertySpec("1layer Scale", "Blur", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        ElementPropertySpec("2layer Scale", "Blur", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.0, 0.0), 0.0, 10.0),
+        ElementPropertySpec("3layer Scale", "Blur", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.0, 0.0), 0.0, 10.0),
+        text("1layer Color", "Blur", "#FFFFFFFF"),
+        text("2layer Color", "Blur", "#FFFFFFFF"),
+        text("3layer Color", "Blur", "#FFFFFFFF")
     )
 
     private val bars = listOf(
@@ -336,10 +376,14 @@ object ElementPropertyCatalog {
 
     fun forElement(type: StudioElementType): List<ElementPropertySpec> {
         if (type == StudioElementType.AUDIO_PROVIDER) return provider
+        if (type == StudioElementType.BLUR_EFFECT) {
+            return (blurGeneral + blurAppearance + blurEffect)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
         val specific = when (type) {
             StudioElementType.IMAGE -> imageSpecific
             StudioElementType.RGB_SPLIT -> rgbSplit
-            StudioElementType.BLUR_EFFECT -> blurEffect
+            StudioElementType.BLUR_EFFECT -> emptyList()
             StudioElementType.BARS_SEGMENTS -> bars
             StudioElementType.PARTICLES -> particles
             StudioElementType.TEXT -> textElement

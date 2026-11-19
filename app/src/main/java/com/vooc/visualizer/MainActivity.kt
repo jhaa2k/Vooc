@@ -333,7 +333,7 @@ private fun VoocStudio(
     var projectEntries by remember { mutableStateOf(ProjectRepository.list(context)) }
     var currentProjectId by remember { mutableStateOf(projectEntries.firstOrNull()?.id) }
     var repositoryReady by remember { mutableStateOf(false) }
-    var showAudioPlayer by remember { mutableStateOf(false) }
+    var showAudioPlayer by remember { mutableStateOf(true) }
     var timelineProperty by remember { mutableStateOf("X") }
     var multiSelectedIds by remember { mutableStateOf(setOf<Long>()) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
@@ -557,19 +557,6 @@ private fun VoocStudio(
                     verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                 item {
-                    Text("START WITH A PRESET", color = Muted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp)
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        StudioPresets.names.forEach { preset ->
-                            OutlinedButton(onClick = {
-                                project = StudioPresets.create(preset)
-                                selectedId = project.layers.lastOrNull()?.id ?: 0L
-                            }, shape = RectangleShape, contentPadding = PaddingValues(horizontal = 11.dp, vertical = 5.dp)) {
-                                Text(preset.uppercase(), style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                    }
-                }
-                item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("LAYERS", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 2.sp)
@@ -590,6 +577,7 @@ private fun VoocStudio(
                                     })
                                 }
                             }
+                        }
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("${multiSelectedIds.size} SELECTED", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterVertically).weight(1f))
@@ -617,21 +605,31 @@ private fun VoocStudio(
                     Row(
                         Modifier.fillMaxWidth()
                             .background(if (layer.id == selectedId) Color(0xFF29321D) else Panel)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = 7.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(checked = layer.id in multiSelectedIds, onCheckedChange = { checked ->
                             multiSelectedIds = if (checked) multiSelectedIds + layer.id else multiSelectedIds - layer.id
-                        }, colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
+                        }, modifier = Modifier.size(30.dp), colors = CheckboxDefaults.colors(checkedColor = Lime, uncheckedColor = Muted))
                         Column(Modifier.weight(1f).clickable {
                             if (!layer.locked) selectedId = layer.id
                         }) {
                             Text(layer.name.uppercase(), color = if (layer.locked) Muted else Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             Text(layer.kind.name.uppercase() + if (layer.groupId.isNotBlank()) "  •  GROUPED" else "", color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
-                        IconButton(onClick = {
-                            project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it })
-                        }) { Text(if (layer.enabled) "EYE" else "OFF", color = if (layer.enabled) Lime else Muted, style = MaterialTheme.typography.labelSmall) }
+                        IconButton(
+                            onClick = {
+                                project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(enabled = !it.enabled) else it })
+                            },
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(
+                                if (layer.enabled) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                                if (layer.enabled) "Hide layer" else "Show layer",
+                                tint = if (layer.enabled) Lime else Muted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                         IconButton(onClick = {
                             project = project.copy(layers = project.layers.map { if (it.id == layer.id) it.copy(locked = !it.locked) else it })
                             if (!layer.locked && selectedId == layer.id) selectedId = project.layers.firstOrNull { it.id != layer.id && !it.locked }?.id ?: 0L

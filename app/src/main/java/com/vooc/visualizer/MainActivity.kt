@@ -73,8 +73,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -1553,7 +1551,6 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
 }
 
 @Composable
-@Composable
 private fun CompactTextInput(label: String, value: String, onValueChange: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(label.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
@@ -1593,6 +1590,7 @@ private fun MeasureWhatDropdown(value: String, options: List<String>, onSelect: 
     }
 }
 
+@Composable
 private fun OptionDropdown(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -1721,7 +1719,6 @@ private fun ThinSlider(
             .semantics {
                 contentDescription = label.uppercase()
                 stateDescription = safeValue.toString()
-                progressBarRangeInfo = ProgressBarRangeInfo(safeValue, valueRange, steps)
             }
     ) {
         val inset = 6.dp.toPx()

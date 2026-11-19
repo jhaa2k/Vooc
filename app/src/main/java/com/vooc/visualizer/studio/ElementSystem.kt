@@ -519,14 +519,80 @@ object ElementPropertyCatalog {
         text("3layer Color", "Blur", "#FFFFFFFF")
     )
 
+    private val barsGeneral = listOf(
+        text("Tag", "General", "Spectrum Bars"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Anchor Y", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val barsAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        text("Color", "Appearance", "#FFFFFFFF"),
+        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
+        bool("Show Unblurred Content", "Appearance", false),
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
     private val bars = listOf(
         integer("Audio Provider Index", "Bars", 0, 0.0, 31.0),
-        integer("Bar Count", "Bars", 64, 1.0, 2048.0),
-        number("Min Height", "Bars", 0.0, 0.0, 10000.0),
-        number("Max Height", "Bars", 300.0, 0.0, 10000.0),
-        bool("Flip Input", "Bars", false),
-        bool("Mirror", "Bars", false),
-        bool("Alternating Flip", "Behavior", false),
+        integer("Bar Count", "Layout", 64, 1.0, 512.0),
+        number("Min Height", "Layout", 0.0, 0.0, 10000.0),
+        number("Max Height", "Layout", 300.0, 0.0, 10000.0),
+        text("Bar Design", "Design", "Rounded Rect", listOf(
+            "Rectangle", "Rounded Rect", "Capsule / Pill", "Line", "Circle / Dot",
+            "Triangle", "Diamond", "Hexagon", "Custom Image"
+        )),
+        number("Bar Width", "Layout", 8.0, 0.5, 256.0),
+        number("Spacing / Gap", "Layout", 3.0, 0.0, 256.0),
+        text("Alignment", "Layout", "Bottom", listOf("Bottom", "Top", "Center", "Stretch")),
+        text("Frequency Scale", "Audio", "Logarithmic", listOf("Linear", "Logarithmic")),
+        number("Smoothing / Damping", "Behavior", 0.72, 0.0, 1.0),
+        bool("Flip Input", "Audio", false),
+        bool("Mirror", "Modifiers", false),
+        text("Mirror Mode", "Modifiers", "Horizontal", listOf("Off", "Horizontal", "Vertical", "Both")),
+        bool("Center Symmetry", "Modifiers", false),
+        bool("Outline / Stroke", "Modifiers", false),
+        number("Stroke Width", "Modifiers", 1.5, 0.0, 32.0),
+        text("Stroke Color", "Modifiers", "#FFFFFFFF"),
+        bool("3D / Extrusion", "Modifiers", false),
+        number("Extrusion Depth", "Modifiers", 5.0, 0.0, 64.0),
+        bool("Gradient Fill", "Modifiers", false),
+        text("Gradient Start Color", "Modifiers", "#FF56D8FF"),
+        text("Gradient End Color", "Modifiers", "#FF9B5CFF"),
+        text("Gradient Direction", "Modifiers", "Vertical", listOf("Vertical", "Horizontal")),
+        text("Top/Bottom Cap", "Modifiers", "None", listOf("None", "Circle", "Square")),
+        number("Cap Size", "Modifiers", 4.0, 0.0, 64.0),
+        bool("Glow / Shadow", "Modifiers", false),
+        number("Glow Strength", "Modifiers", 0.35, 0.0, 1.0),
+        bool("Peak / Cap", "Modifiers", false),
+        number("Peak Hold", "Modifiers", 0.65, 0.0, 1.0),
+        number("Peak Fall Speed", "Modifiers", 0.8, 0.0, 1.0),
         number("Reaction Delay", "Behavior", 0.0, 0.0, 5000.0),
         number("Accumulated Delay", "Behavior", 0.0, 0.0, 5000.0),
         number("Softness", "Behavior", 0.0, 0.0, 1.0)
@@ -752,6 +818,10 @@ object ElementPropertyCatalog {
         }
         if (type == StudioElementType.MOTION_BLUR_EFFECT) {
             return (motionBlurGeneral + motionBlurAppearance + motionBlur)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
+        if (type == StudioElementType.BARS_SEGMENTS) {
+            return (barsGeneral + barsAppearance + bars)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.SHAPE) {

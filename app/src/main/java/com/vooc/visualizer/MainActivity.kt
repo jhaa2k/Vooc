@@ -1754,11 +1754,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val levels = barFrame.levels
                         val peaks = barFrame.peaks
                         val gap = number("Spacing / Gap", 3f).dp.toPx().coerceAtLeast(0f)
-                        val totalWidth = (size.width * 0.86f * scale.coerceIn(0.1f, 2f)).coerceAtMost(size.width)
+                        val scaleVector = props["Scale"] as? ElementValue.Vector2
+                        val scaleX = ((scaleVector?.x ?: 1.0).toFloat() * scale).coerceIn(0f, 10f)
+                        val scaleYRaw = (scaleVector?.y ?: 1.0).toFloat()
+                        val scaleY = ((if (props["Scale Is Uniform"] == ElementValue.Bool(true)) (scaleVector?.x ?: 1.0).toFloat() else scaleYRaw) * scale).coerceIn(0f, 10f)
+                        val totalWidth = (size.width * 0.86f * scaleX).coerceAtMost(size.width)
                         val slot = totalWidth / count
                         val requestedWidth = number("Bar Width", 8f).dp.toPx()
                         val barWidth = requestedWidth.coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
-                        val maxHeight = (number("Max Height", size.height * 0.35f) * scale).coerceIn(1f, size.height * 0.95f)
+                        val maxHeight = (number("Max Height", size.height * 0.35f) * scaleY).coerceIn(1f, size.height * 0.95f)
                         val minHeight = number("Min Height", 0f).coerceIn(0f, maxHeight)
                         val design = textValue("Bar Design", "Rounded Rect")
                         val alignment = textValue("Alignment", "Bottom")

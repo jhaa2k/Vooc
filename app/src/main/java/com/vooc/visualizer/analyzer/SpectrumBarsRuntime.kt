@@ -47,10 +47,14 @@ class SpectrumBarsRuntime {
         val coefficient = exp(-dt / tau)
         val wasPrimed = primed
         clockSeconds += dt
-        history.addLast(clockSeconds to source.copyOf())
-        while (history.size > 360 || (history.isNotEmpty() && clockSeconds - history.first.first > 8f)) history.removeFirst()
         val reactionSeconds = reactionDelayMs.coerceIn(0f, 5000f) / 1000f
         val accumulatedSeconds = accumulatedDelayMs.coerceIn(0f, 5000f) / 1000f
+        if (reactionSeconds > 0f || accumulatedSeconds > 0f) {
+            history.addLast(clockSeconds to source.copyOf())
+            while (history.size > 360 || (history.isNotEmpty() && clockSeconds - history.first.first > 8f)) history.removeFirst()
+        } else {
+            history.clear()
+        }
         val holdSeconds = 0.08f + peakHold.coerceIn(0f, 1f) * 0.9f
         val fallPerSecond = 0.15f + peakFallSpeed.coerceIn(0f, 1f) * 3.5f
         for (i in 0 until n) {

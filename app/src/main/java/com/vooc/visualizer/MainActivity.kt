@@ -832,6 +832,14 @@ private fun VoocStudio(
                     }
                     item {
                         EditorSection("COLOR", expandedSection, { expandedSection = if (expandedSection == "COLOR") "" else "COLOR" }) {
+                            ColorWheelField("PRIMARY COLOR", String.format("#%08X", selected.color)) { hex ->
+                                val parsed = runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(selected.color.toInt())
+                                project = updateLayer(project, selectedId) { it.copy(color = parsed.toLong() and 0xFFFFFFFFL) }
+                            }
+                            ColorWheelField("SECONDARY / GRADIENT COLOR", String.format("#%08X", selected.gradientColor)) { hex ->
+                                val parsed = runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(selected.gradientColor.toInt())
+                                project = updateLayer(project, selectedId) { it.copy(gradientColor = parsed.toLong() and 0xFFFFFFFFL) }
+                            }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf(0xFFC6F36A, 0xFFFFFFFF, 0xFF55D6FF, 0xFFFF5F7A, 0xFFB58CFF, 0xFFFFB454).forEach { value ->
                                     Box(Modifier.size(32.dp).background(Color(value)).clickable {
@@ -1156,7 +1164,13 @@ private fun ElementStudioEditor(
                             }
                             ElementValueType.TEXT, ElementValueType.COLOR -> {
                                 val current = (value as? ElementValue.Text)?.value.orEmpty()
-                                CompactTextInput(spec.name.uppercase(), current) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
+                                if (spec.name.contains("color", ignoreCase = true) && current.matches(Regex("#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"))) {
+                                    ColorWheelField(spec.name.uppercase(), current) { hex ->
+                                        onChange(selected.withValue(spec.name, ElementValue.Text(hex)))
+                                    }
+                                } else {
+                                    CompactTextInput(spec.name.uppercase(), current) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
+                                }
                             }
                             ElementValueType.VECTOR2 -> {
                                 val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
@@ -1579,6 +1593,73 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ColorWheelField(label: String, value: String, onColorChange: (String) -> Unit) {
+    var showWheel by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+        Box(Modifier.width(42.dp).height(30.dp).background(
+            runCatching { Color(android.graphics.Color.parseColor(value)) }.getOrDefault(Color.White),
+            RectangleShape
+        ).border(1.dp, Color(0xFF69705F), RectangleShape))
+        Spacer(Modifier.width(8.dp))
+        OutlinedButton(onClick = { showWheel = true }, modifier = Modifier.height(36.dp), contentPadding = PaddingValues(horizontal = 10.dp), shape = RectangleShape) {
+            Text("PICK COLOR", color = Lime, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+    if (showWheel) {
+        var chosen by remember(value) { mutableStateOf(runCatching { android.graphics.Color.parseColor(value) }.getOrDefault(android.graphics.Color.WHITE)) }
+        AlertDialog(
+            onDismissRequest = { showWheel = false },
+            containerColor = Panel,
+            title = { Text("COLOR WHEEL", color = Color.White) },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Canvas(Modifier.size(232.dp).pointerInput(Unit) {
+                        detectTapGestures { point ->
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            val dx = point.x - cx
+                            val dy = point.y - cy
+                            val radius = kotlin.math.sqrt(dx * dx + dy * dy)
+                            val maxRadius = size.minDimension * 0.48f
+                            val hue = ((Math.toDegrees(kotlin.math.atan2(dy, dx).toDouble()) + 360.0) % 360.0).toFloat()
+                            val saturation = (radius / maxRadius).coerceIn(0f, 1f)
+                            val hsv = floatArrayOf(hue, saturation, 1f)
+                            chosen = android.graphics.Color.HSVToColor(hsv)
+                        }
+                    }) {
+                        val cx = size.width / 2f
+                        val cy = size.height / 2f
+                        val radius = size.minDimension * 0.48f
+                        for (degree in 0 until 360) {
+                            val angle = degree * PI.toFloat() / 180f
+                            val hueColor = android.graphics.Color.HSVToColor(floatArrayOf(degree.toFloat(), 1f, 1f))
+                            drawLine(Color.White, Offset(cx, cy), Offset(cx + cos(angle) * radius, cy + sin(angle) * radius), 2.2.dp.toPx())
+                            drawLine(Color(hueColor), Offset(cx + cos(angle) * radius * 0.08f, cy + sin(angle) * radius * 0.08f),
+                                Offset(cx + cos(angle) * radius, cy + sin(angle) * radius), 2.2.dp.toPx())
+                        }
+                        drawCircle(Color.White, radius * 0.075f, Offset(cx, cy))
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(34.dp).background(Color(chosen), RectangleShape).border(1.dp, Color.White))
+                        Spacer(Modifier.width(10.dp))
+                        Text(String.format("#%08X", chosen.toLong() and 0xFFFFFFFFL), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Text("Tap inside the wheel: centre = white, outer edge = full saturation.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onColorChange(String.format("#%08X", chosen.toLong() and 0xFFFFFFFFL))
+                    showWheel = false
+                }) { Text("APPLY", color = Lime) }
+            },
+            dismissButton = { TextButton(onClick = { showWheel = false }) { Text("CANCEL", color = Muted) } }
+        )
     }
 }
 

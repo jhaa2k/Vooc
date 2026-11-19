@@ -68,6 +68,8 @@ import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.VisualLayer
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -481,13 +483,15 @@ private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLaye
 private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, frame: AnalysisFrame?, playing: Boolean) {
     var phase by remember { mutableFloatStateOf(0f) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val imageBitmaps = remember(layers.map { it.imageUri }) {
-        layers.mapNotNull { layer ->
-            if (layer.kind != LayerKind.IMAGE || layer.imageUri.isBlank()) null
-            else runCatching {
-                context.contentResolver.openInputStream(Uri.parse(layer.imageUri))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-            }.getOrNull()?.let { layer.id to it }
-        }.toMap()
+    val imageBitmaps by produceState(initialValue = emptyMap<Long, androidx.compose.ui.graphics.ImageBitmap>(), key1 = layers.map { it.id to it.imageUri }) {
+        value = withContext(Dispatchers.IO) {
+            layers.mapNotNull { layer ->
+                if (layer.kind != LayerKind.IMAGE || layer.imageUri.isBlank()) null
+                else runCatching {
+                    context.contentResolver.openInputStream(Uri.parse(layer.imageUri))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+                }.getOrNull()?.let { layer.id to it }
+            }.toMap()
+        }
     }
     LaunchedEffect(playing) {
         while (playing) { phase = (phase + 0.08f) % (2f * PI.toFloat()); delay(16) }

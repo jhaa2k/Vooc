@@ -361,7 +361,7 @@ private fun VoocStudio(
             }
         }
     }
-    val selected = project.layers.firstOrNull { it.id == selectedId }
+    val selected = project.layers.firstOrNull { it.id == selectedId } ?: project.layers.firstOrNull() ?: VisualLayer(0L, LayerKind.BACKGROUND)
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
             onPickAudio(uris)
@@ -1143,11 +1143,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
     }
     val imageBitmaps by produceState(initialValue = emptyMap<Long, androidx.compose.ui.graphics.ImageBitmap>(), key1 = layers.map { it.id to it.imageUri }) {
         value = withContext(Dispatchers.IO) {
-            layers.mapNotNull { layer ->
+            layers.mapNotNull { layer: VisualLayer ->
                 if (layer.kind != LayerKind.IMAGE || layer.imageUri.isBlank()) null
-                else runCatching {
-                    context.contentResolver.openInputStream(Uri.parse(layer.imageUri))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-                }.getOrNull()?.let { layer.id to it }
+                else {
+                    val bitmap: androidx.compose.ui.graphics.ImageBitmap? = runCatching {
+                        context.contentResolver.openInputStream(Uri.parse(layer.imageUri))
+                            ?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
+                    }.getOrNull()
+                    bitmap?.let { image -> layer.id to image }
+                }
             }.toMap()
         }
     }

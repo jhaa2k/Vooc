@@ -1865,6 +1865,26 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 Offset(center.x + radius, center.y + radius * 0.25f), maxOf(1f, radius * 0.08f))
                         }
                     }
+                    StudioElementType.SHAPE -> {
+                        val w = number("Width", 300f).dp.toPx() * scale
+                        val h = number("Height", 300f).dp.toPx() * scale
+                        val shapeColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Fill / Color", colorText))) }
+                            .getOrDefault(elementColor).copy(alpha = opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f))
+                        val left = center.x - w / 2f
+                        val top = center.y - h / 2f
+                        when (textValue("Shape Type", "Rectangle")) {
+                            "Circle/Oval" -> drawOval(shapeColor, Offset(left, top), androidx.compose.ui.geometry.Size(w, h))
+                            "Line" -> drawLine(shapeColor, Offset(left, center.y), Offset(left + w, center.y),
+                                number("Stroke / Border Width", 3f).dp.toPx().coerceAtLeast(1f))
+                            "Triangle" -> {
+                                val p = Path().apply { moveTo(center.x, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
+                                drawPath(p, shapeColor)
+                            }
+                            else -> drawRoundRect(shapeColor, Offset(left, top), androidx.compose.ui.geometry.Size(w, h),
+                                androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f).dp.toPx()))
+                        }
+                    }
+                    StudioElementType.BACKGROUND -> Unit
                     StudioElementType.AUDIO_PROVIDER -> Unit
                 }
             }

@@ -954,11 +954,11 @@ private fun VoocStudio(
                         OptionDropdown("ANIMATED PROPERTY", timelineProperty,
                             listOf("X", "Y", "SCALE", "ROTATION", "OPACITY")) { timelineProperty = it }
                         val currentValue = when (timelineProperty) {
-                            "X" -> selected.x
-                            "Y" -> selected.y
-                            "SCALE" -> selected.scale
-                            "ROTATION" -> selected.rotation
-                            else -> selected.opacity
+                            "X" -> selected!!.x
+                            "Y" -> selected!!.y
+                            "SCALE" -> selected!!.scale
+                            "ROTATION" -> selected!!.rotation
+                            else -> selected!!.opacity
                         }
                         Button(
                             onClick = {

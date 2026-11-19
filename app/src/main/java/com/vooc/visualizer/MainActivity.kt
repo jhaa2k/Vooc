@@ -1725,14 +1725,105 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     }
                     StudioElementType.BARS_SEGMENTS -> {
                         val samples = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
-                        val count = number("Bar Count", 64f).toInt().coerceIn(1, 256)
-                        val maxHeight = number("Max Height", size.height * 0.35f).coerceAtLeast(1f) * scale
-                        val barWidth = (size.width * 0.72f / count).coerceAtLeast(1f)
+                        val safeSamples = samples.ifEmpty { FloatArray(64) }
+                        val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
+                        val maxHeight = (number("Max Height", size.height * 0.35f) * scale).coerceAtLeast(1f)
+                            .coerceAtMost(size.height * 0.9f)
+                        val minHeight = number("Min Height", 0f).coerceAtLeast(0f)
+                        val gap = number("Spacing / Gap", 3f).dp.toPx().coerceAtLeast(0f)
+                        val requestedWidth = number("Bar Width", 8f).dp.toPx().coerceAtLeast(0.5f)
+                        val totalWidth = size.width * 0.82f * scale.coerceAtMost(2f)
+                        val slot = totalWidth / count
+                        val barWidth = (requestedWidth.takeIf { it > 0f } ?: slot * 0.72f)
+                            .coerceAtMost((slot - gap).coerceAtLeast(0.5f)).coerceAtLeast(0.5f)
+                        val design = textValue("Bar Design", "Rounded Rect")
+                        val alignment = textValue("Alignment", "Bottom")
+                        val mirrored = textValue("Mirror Mode", if (props["Mirror"] == ElementValue.Bool(true)) "Horizontal" else "Off")
+                        val centered = props["Center Symmetry"] == ElementValue.Bool(true)
+                        val outline = props["Outline / Stroke"] == ElementValue.Bool(true)
+                        val strokeWidth = number("Stroke Width", 1.5f).dp.toPx().coerceAtLeast(0.5f)
+                        val strokeColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Stroke Color", colorText))) }
+                            .getOrDefault(elementColor)
+                        val gradientStart = runCatching { Color(android.graphics.Color.parseColor(textValue("Gradient Start Color", "#FF56D8FF"))) }.getOrDefault(elementColor)
+                        val gradientEnd = runCatching { Color(android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF9B5CFF"))) }.getOrDefault(elementColor)
+                        val gradient = props["Gradient Fill"] == ElementValue.Bool(true)
+                        val shapeStyle = if (outline) Stroke(strokeWidth) else androidx.compose.ui.graphics.drawscope.Fill
+                        val radius = when (design) {
+                            "Capsule / Pill" -> barWidth / 2f
+                            "Rounded Rect" -> (barWidth * 0.22f).coerceAtLeast(1f)
+                            else -> 0f
+                        }
+                        val capMode = textValue("Top/Bottom Cap", "None")
+                        val capRadius = number("Cap Size", 4f).dp.toPx().coerceAtLeast(1f)
                         repeat(count) { index ->
-                            val sample = samples[(index * samples.size / count).coerceIn(0, samples.lastIndex)].coerceIn(0f, 1f)
-                            val height = (number("Min Height", 0f) + sample * maxHeight).coerceAtMost(size.height)
-                            val x = center.x - count * barWidth / 2f + index * barWidth
-                            drawRect(elementColor, Offset(x, center.y - height / 2f), androidx.compose.ui.geometry.Size(barWidth * 0.72f, height))
+                            val sourceIndex = if (textValue("Frequency Scale", "Logarithmic") == "Logarithmic") {
+                                val t = (index + 0.5f) / count
+                                ((kotlin.math.pow(safeSamples.size.toFloat(), t) - 1f) /
+                                    (safeSamples.size - 1).coerceAtLeast(1)).toInt()
+                            } else (index * safeSamples.size / count)
+                            val sampleIndex = sourceIndex.coerceIn(0, safeSamples.lastIndex)
+                            var sample = safeSamples[sampleIndex].coerceIn(0f, 1f)
+                            if (props["Flip Input"] == ElementValue.Bool(true)) sample = 1f - sample
+                            val symmetry = if (mirrored == "Horizontal" || mirrored == "Both" || props["Mirror"] == ElementValue.Bool(true)) {
+                                minOf(index, count - 1 - index) * 2
+                            } else index
+                            val value = safeSamples[(symmetry * safeSamples.size / count).coerceIn(0, safeSamples.lastIndex)].coerceIn(0f, 1f)
+                            if (mirrored == "Horizontal" || mirrored == "Both" || props["Mirror"] == ElementValue.Bool(true)) sample = maxOf(sample, value)
+                            val barHeight = (minHeight + sample * maxHeight).coerceIn(0f, size.height * 0.9f)
+                            val x = center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f
+                            val yTop = when {
+                                centered -> center.y - barHeight / 2f
+                                alignment == "Top" -> center.y - size.height * 0.36f
+                                alignment == "Center" -> center.y - barHeight / 2f
+                                else -> center.y + size.height * 0.36f - barHeight
+                            }
+                            val top = if (centered) yTop else yTop
+                            val bottom = if (centered) center.y + barHeight / 2f else top + barHeight
+                            val left = x
+                            val right = x + barWidth
+                            val barColor = if (gradient) Color(
+                                (gradientStart.red + (gradientEnd.red - gradientStart.red) * sample),
+                                (gradientStart.green + (gradientEnd.green - gradientStart.green) * sample),
+                                (gradientStart.blue + (gradientEnd.blue - gradientStart.blue) * sample),
+                                opacity
+                            ) else elementColor
+                            val fillColor = if (outline) strokeColor.copy(alpha = opacity) else barColor
+                            val barPath = Path().apply {
+                                when (design) {
+                                    "Triangle" -> { moveTo(left, bottom); lineTo((left + right) / 2f, top); lineTo(right, bottom); close() }
+                                    "Diamond" -> { moveTo((left + right) / 2f, top); lineTo(right, (top + bottom) / 2f); lineTo((left + right) / 2f, bottom); lineTo(left, (top + bottom) / 2f); close() }
+                                    "Hexagon" -> { moveTo(left + barWidth * 0.22f, top); lineTo(right - barWidth * 0.22f, top); lineTo(right, (top + bottom) / 2f); lineTo(right - barWidth * 0.22f, bottom); lineTo(left + barWidth * 0.22f, bottom); lineTo(left, (top + bottom) / 2f); close() }
+                                    else -> { moveTo(left, top); lineTo(right, top); lineTo(right, bottom); lineTo(left, bottom); close() }
+                                }
+                            }
+                            if (props["3D / Extrusion"] == ElementValue.Bool(true)) {
+                                val depth = number("Extrusion Depth", 5f).dp.toPx()
+                                drawPath(barPath, fillColor.copy(alpha = opacity * 0.35f), style = shapeStyle)
+                                val shifted = Path().apply { addPath(barPath, Offset(depth, depth)) }
+                                drawPath(shifted, fillColor.copy(alpha = opacity * 0.35f), style = shapeStyle)
+                            }
+                            if (props["Glow / Shadow"] == ElementValue.Bool(true)) {
+                                val glow = number("Glow Strength", 0.35f).coerceIn(0f, 1f)
+                                drawRoundRect(fillColor.copy(alpha = glow * 0.22f), Offset(left - capRadius, top - capRadius),
+                                    androidx.compose.ui.geometry.Size(barWidth + capRadius * 2, (bottom - top) + capRadius * 2),
+                                    androidx.compose.ui.geometry.CornerRadius(radius + capRadius))
+                            }
+                            when (design) {
+                                "Circle / Dot" -> drawCircle(fillColor, (barWidth * 0.5f).coerceAtLeast(1f), Offset((left + right) / 2f, bottom - barWidth / 2f), style = shapeStyle)
+                                "Line" -> drawLine(fillColor, Offset((left + right) / 2f, bottom), Offset((left + right) / 2f, top), if (outline) strokeWidth else barWidth.coerceAtLeast(1f), cap = StrokeCap.Round)
+                                "Rounded Rect", "Capsule / Pill" -> drawRoundRect(fillColor, Offset(left, top), androidx.compose.ui.geometry.Size(barWidth, (bottom - top).coerceAtLeast(1f)),
+                                    androidx.compose.ui.geometry.CornerRadius(radius), style = shapeStyle)
+                                else -> drawPath(barPath, fillColor, style = shapeStyle)
+                            }
+                            if (capMode != "None") {
+                                val capCenter = Offset((left + right) / 2f, top)
+                                if (capMode == "Circle") drawCircle(fillColor, capRadius, capCenter)
+                                else drawRect(fillColor, Offset(capCenter.x - capRadius, capCenter.y - capRadius), androidx.compose.ui.geometry.Size(capRadius * 2, capRadius * 2))
+                            }
+                            if (props["Peak / Cap"] == ElementValue.Bool(true)) {
+                                val peakY = top - number("Cap Size", 4f).dp.toPx() * (1f + number("Peak Hold", 0.65f))
+                                drawCircle(strokeColor.copy(alpha = opacity), capRadius.coerceAtLeast(1f), Offset((left + right) / 2f, peakY))
+                            }
                         }
                     }
                     StudioElementType.PARTICLES -> {

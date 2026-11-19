@@ -126,7 +126,7 @@ object PresetFileCodec {
                 it.contains("bar", true) || it.contains("wave", true) || it.contains("circle", true) ||
                 it.contains("ring", true) || it.contains("particle", true) || it.contains("text", true) ||
                 it.contains("image", true) || it.contains("background", true) || it.contains("spectrum", true) ||
-                it.contains("scope", true) || it.contains("shape", true)
+                it.contains("scope", true) || it.contains("shape", true) || it.contains("segment", true)
             } ?: return null
         val t = typeText.lowercase(Locale.ROOT)
         val kind = when {
@@ -139,7 +139,7 @@ object PresetFileCodec {
             "ring" in t -> LayerKind.RING
             "scope" in t -> LayerKind.SCOPE
             "shape" in t -> LayerKind.SHAPE
-            "spectrum" in t || "bar" in t || "equalizer" in t -> LayerKind.BARS
+            "spectrum" in t || "bar" in t || "segment" in t || "equalizer" in t -> LayerKind.BARS
             else -> return null
         }
         val props = obj.optJSONObject("properties") ?: obj.optJSONObject("props") ?: obj

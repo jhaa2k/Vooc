@@ -388,11 +388,69 @@ object ElementPropertyCatalog {
         number("Direction Random", "Particles", 0.0, 0.0, 360.0)
     )
 
-    private val textElement = listOf(
-        text("Text", "Appearance", "VOOC"),
+    private val textGeneral = listOf(
+        text("Tag", "General", "Text"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Anchor Y", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val textAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
         text("Color", "Appearance", "#FFFFFFFF"),
-        number("Font Size", "Appearance", 48.0, 1.0, 512.0),
-        text("Type Face", "Appearance", "Poppins")
+        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
+        bool("Show Unblurred Content", "Appearance", false),
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
+    private val textTypography = listOf(
+        text("Text", "Typography", "VOOC"),
+        text("Font Family", "Typography", "Poppins"),
+        number("Font Size", "Typography", 48.0, 1.0, 512.0),
+        text("Font Style", "Typography", "Bold", listOf("Regular", "Medium", "SemiBold", "Bold", "Italic", "Bold Italic")),
+        bool("Underline", "Typography", false),
+        number("Letter Spacing", "Typography", 0.0, -20.0, 100.0),
+        number("Line Spacing", "Typography", 1.0, 0.5, 4.0),
+        text("Alignment", "Typography", "Center", listOf("Left", "Center", "Right", "Justified")),
+        text("Text Gradient Start", "Typography", "#FFFFFFFF"),
+        text("Text Gradient End", "Typography", "#FFFFFFFF"),
+        bool("Stroke Enabled", "Typography", false),
+        text("Stroke Color", "Typography", "#FF000000"),
+        number("Stroke Thickness", "Typography", 0.0, 0.0, 32.0),
+        bool("Shadow Enabled", "Typography", false),
+        text("Shadow Color", "Typography", "#99000000"),
+        number("Shadow Offset X", "Typography", 2.0, -100.0, 100.0),
+        number("Shadow Offset Y", "Typography", 2.0, -100.0, 100.0),
+        number("Shadow Blur", "Typography", 4.0, 0.0, 100.0),
+        number("Max Width", "Typography", 1000.0, 1.0, 10000.0),
+        bool("Wrap Text", "Typography", true),
+        bool("Auto-Scale", "Typography", false),
+        text("Case", "Typography", "Original", listOf("Original", "Uppercase", "Lowercase", "Capitalize"))
     )
 
     private val motionBlur = listOf(
@@ -416,13 +474,17 @@ object ElementPropertyCatalog {
             return (particlesGeneral + particlesAppearance + particles)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
+        if (type == StudioElementType.TEXT) {
+            return (textGeneral + textAppearance + textTypography)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
         val specific = when (type) {
             StudioElementType.IMAGE -> imageSpecific
             StudioElementType.RGB_SPLIT -> rgbSplit
             StudioElementType.BLUR_EFFECT -> emptyList()
             StudioElementType.BARS_SEGMENTS -> bars
             StudioElementType.PARTICLES -> particles
-            StudioElementType.TEXT -> textElement
+            StudioElementType.TEXT -> emptyList()
             StudioElementType.MOTION_BLUR_EFFECT -> motionBlur
             StudioElementType.AUDIO_PROVIDER -> emptyList()
         }

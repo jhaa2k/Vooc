@@ -1,6 +1,7 @@
 package com.vooc.visualizer
 
 import android.net.Uri
+import android.content.ComponentName
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,12 +37,15 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
 import com.vooc.visualizer.analyzer.AnalysisFrame
-import com.vooc.visualizer.analyzer.AudioAnalyzer
-import com.vooc.visualizer.analyzer.player.VoocPlayer
+import com.vooc.visualizer.playback.VoocAudioEngine
+import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.ProjectStore
 import com.vooc.visualizer.studio.StudioProject
@@ -59,43 +63,51 @@ private val Panel = Color(0xFF171A14)
 private val Muted = Color(0xFF92998A)
 
 class MainActivity : ComponentActivity() {
-    private val analyzer = AudioAnalyzer()
-    private var player: ExoPlayer? = null
+    private var controllerFuture: ListenableFuture<MediaController>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        player = VoocPlayer.create(this, analyzer)
-        val restored = ProjectStore.load(this) ?: StudioProject()
         setContent {
             VoocTheme {
-                VoocStudio(
-                    player = player!!,
-                    analyzer = analyzer,
-                    initialProject = restored,
-                    onSave = { ProjectStore.save(this, it) },
-                    onPickAudio = { uris ->
-                        uris.forEach { uri ->
-                            runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                        }
-                        player?.setMediaItems(uris.map { MediaItem.fromUri(it) })
-                        player?.prepare()
-                        player?.playWhenReady = true
-                    }
-                )
+                Box(Modifier.fillMaxSize().background(Ink), contentAlignment = Alignment.Center) {
+                    Text("CONNECTING TO VOOC PLAYER…", color = Lime, letterSpacing = 2.sp)
+                }
             }
         }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        // Playback remains in-app while the activity is visible. A MediaSessionService owns
-        // background playback in the next service integration; do not pretend this is enabled yet.
-        player?.pause()
+        val token = SessionToken(this, ComponentName(this, VoocPlaybackService::class.java))
+        val future = MediaController.Builder(this, token).buildAsync()
+        controllerFuture = future
+        future.addListener({
+            val controller = runCatching { future.get() }.getOrNull() ?: return@addListener
+            val restored = ProjectStore.load(this) ?: StudioProject()
+            setContent {
+                VoocTheme {
+                    VoocStudio(
+                        player = controller,
+                        analyzer = VoocAudioEngine.analyzer,
+                        initialProject = restored,
+                        onSave = { ProjectStore.save(this, it) },
+                        onPickAudio = { uris ->
+                            uris.forEach { uri ->
+                                runCatching {
+                                    contentResolver.takePersistableUriPermission(
+                                        uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    )
+                                }
+                            }
+                            controller.setMediaItems(uris.map { MediaItem.fromUri(it) })
+                            controller.prepare()
+                            controller.playWhenReady = true
+                        }
+                    )
+                }
+            }
+        }, ContextCompat.getMainExecutor(this))
     }
 
     override fun onDestroy() {
-        player?.release()
-        player = null
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        controllerFuture = null
         super.onDestroy()
     }
 }
@@ -112,7 +124,7 @@ private fun VoocTheme(content: @Composable () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VoocStudio(
-    player: ExoPlayer,
+    player: Player,
     analyzer: AudioAnalyzer,
     initialProject: StudioProject,
     onSave: (StudioProject) -> Unit,
@@ -420,7 +432,7 @@ private fun LayerSlider(label: String, value: Float, range: ClosedFloatingPointR
 }
 
 @Composable
-private fun PlayerScreen(player: ExoPlayer, trackName: String, playing: Boolean, position: Long, duration: Long,
+private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, position: Long, duration: Long,
                          picker: androidx.activity.result.ActivityResultLauncher<Array<String>>) {
     Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("MUSIC PLAYER", color = Lime, letterSpacing = 2.sp)

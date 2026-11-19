@@ -21,9 +21,9 @@ class ElementSystemTest {
     @Test
     fun sharedGeneralPropertiesAreConsistentAcrossVisualElements() {
         val expected = setOf(
-            "Tag", "Visible", "Blend Mode", "Position X", "Position Y",
-            "Anchor X", "Anchor Y", "Alignment Position", "Scale Is Uniform",
-            "Scale X", "Scale Y", "Rotation"
+            "Tag", "Visible", "Blend Mode", "Position", "Anchor X", "Anchor Y",
+            "Measure Pos (Measure What)", "Alignment Position", "Scale Is Uniform",
+            "Scale", "Measure Scale (Measure What)", "Rotation", "Measure Rot (Measure What)"
         )
         val visualTypes = StudioElementType.entries.filter { it != StudioElementType.AUDIO_PROVIDER }
         visualTypes.forEach { type ->

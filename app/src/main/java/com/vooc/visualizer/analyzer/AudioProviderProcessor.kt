@@ -31,7 +31,8 @@ data class AudioProviderConfig(
     val beatRangeBarFirst: Int = 0,
     val beatRangeBarLast: Int = 127,
     val beatRangeValueLower: Float = 0.08f,
-    val beatRangeValueHigher: Float = 0.8f
+    val beatRangeValueHigher: Float = 0.8f,
+    val fftSize: Int = 2048
 ) {
     fun validated(nyquist: Float = 96000f): AudioProviderConfig {
         val maxHz = nyquist.coerceAtLeast(2f)
@@ -53,7 +54,8 @@ data class AudioProviderConfig(
             beatRangeBarFirst = beatRangeBarFirst.coerceAtLeast(0),
             beatRangeBarLast = beatRangeBarLast.coerceAtLeast(0),
             beatRangeValueLower = beatRangeValueLower.finiteClamp(0f, 1f),
-            beatRangeValueHigher = beatRangeValueHigher.finiteClamp(0f, 1f)
+            beatRangeValueHigher = beatRangeValueHigher.finiteClamp(0f, 1f),
+            fftSize = fftSize.takeIf { it in setOf(256, 512, 1024, 2048, 4096, 8192) } ?: 2048
         )
     }
 
@@ -74,12 +76,14 @@ class AudioProviderProcessor {
     private var previousBeatLevel = 0f
     private var beatValue = 0f
     private var lastTimeSec = Double.NaN
+    private var primed = false
 
     fun reset() {
         smoothed = FloatArray(0)
         previousBeatLevel = 0f
         beatValue = 0f
         lastTimeSec = Double.NaN
+        primed = false
     }
 
     fun process(frame: AnalysisFrame, requested: AudioProviderConfig): AudioProviderFrame {
@@ -128,10 +132,10 @@ class AudioProviderProcessor {
         if (smoothed.size != count) smoothed = FloatArray(count)
         val alpha = cfg.smooth.coerceIn(0f, 1f)
         for (i in 0 until count) {
-            smoothed[i] = if (lastTimeSec == frame.timeSec && smoothed[i] == 0f) filtered[i]
-                else alpha * smoothed[i] + (1f - alpha) * filtered[i]
+            smoothed[i] = if (!primed) filtered[i] else alpha * smoothed[i] + (1f - alpha) * filtered[i]
             smoothed[i] = (smoothed[i] * cfg.outputMultiplier).coerceIn(0f, 32f)
         }
+        primed = true
 
         val first = cfg.beatRangeBarFirst.coerceIn(0, count - 1)
         val last = cfg.beatRangeBarLast.coerceIn(first, count - 1)
@@ -199,3 +203,39 @@ class AudioProviderProcessor {
         return (10.0.pow(db / 20.0)).toFloat().coerceIn(0f, 1.2f)
     }
 }
+
+
+/** Converts the Audio Provider element's persisted controls into the runtime processor configuration. */
+fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
+    require(type == StudioElementType.AUDIO_PROVIDER) { "Audio Provider configuration requires an Audio Provider element" }
+    fun number(name: String, fallback: Double) = (value(name) as? ElementValue.Number)?.value
+        ?: (value(name) as? ElementValue.Integer)?.value?.toDouble() ?: fallback
+    fun integer(name: String, fallback: Int) = number(name, fallback.toDouble()).toInt()
+    fun boolean(name: String, fallback: Boolean) = (value(name) as? ElementValue.Bool)?.value ?: fallback
+    return AudioProviderConfig(
+        sampleOutCount = integer("Sample Out Count", 128),
+        mirrorSamples = boolean("Mirror Samples", false),
+        repeatSamples = boolean("Repeat Samples", false),
+        startAndEndGap = integer("Star And End Gap", 0),
+        smooth = number("Smooth", 0.35).toFloat(),
+        preSmooth = number("Pre Smooth", 0.0).toFloat(),
+        filterRadius = integer("Filter Radius", 0),
+        filterStrength = number("Filter Strength", 0.0).toFloat(),
+        aWeight = boolean("AWeight", false),
+        outputMultiplier = number("Output Multiplier", 1.0).toFloat(),
+        lowerHz = number("Lower Hz", 30.0).toFloat(),
+        higherHz = number("Higher Hz", 16000.0).toFloat(),
+        hzLinearFactor = number("Hz Linear Factor", 0.0).toFloat(),
+        freqShift = number("Freq Shift", 0.0).toFloat(),
+        beatSmooth = number("Beat Smooth", 0.35).toFloat(),
+        beatRangeBarFirst = integer("Beat Range Bar First", 0),
+        beatRangeBarLast = integer("Beat Range Bar Last", 127),
+        beatRangeValueLower = number("Beat Range Value Lower", 0.08).toFloat(),
+        beatRangeValueHigher = number("Beat Range Value Higher", 0.8).toFloat(),
+        fftSize = (value("Fft Size") as? ElementValue.Text)?.value?.toIntOrNull() ?: 2048
+    )
+}
+
+/** Apply the provider's FFT size while preserving all other analyzer settings. */
+fun AudioProviderConfig.applyTo(base: AnalyzerConfig): AnalyzerConfig =
+    base.copy(fftSize = FftSize.fromSize(validated().fftSize))

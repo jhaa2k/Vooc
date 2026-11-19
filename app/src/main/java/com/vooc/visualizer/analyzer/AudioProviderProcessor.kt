@@ -77,6 +77,7 @@ class AudioProviderProcessor {
     private var beatValue = 0f
     private var lastTimeSec = Double.NaN
     private var primed = false
+    private var hasPreviousBeatLevel = false
 
     fun reset() {
         smoothed = FloatArray(0)
@@ -84,6 +85,7 @@ class AudioProviderProcessor {
         beatValue = 0f
         lastTimeSec = Double.NaN
         primed = false
+        hasPreviousBeatLevel = false
     }
 
     fun process(frame: AnalysisFrame, requested: AudioProviderConfig): AudioProviderFrame {
@@ -145,8 +147,9 @@ class AudioProviderProcessor {
         val lower = cfg.beatRangeValueLower
         val upper = max(lower + 1e-4f, cfg.beatRangeValueHigher)
         val normalizedLevel = ((level - lower) / (upper - lower)).coerceIn(0f, 1f)
-        val onset = max(0f, level - previousBeatLevel) / upper.coerceAtLeast(1e-4f)
+        val onset = if (hasPreviousBeatLevel) max(0f, level - previousBeatLevel) / upper.coerceAtLeast(1e-4f) else 0f
         previousBeatLevel = level
+        hasPreviousBeatLevel = true
         // A transient must be confirmed by the analyzer's onset detector; sustained loudness alone is not a beat.
         val beatTarget = if (frame.beat.beat) max(normalizedLevel, frame.beat.pulse) else 0f
         val onsetTarget = if (onset > 0.04f) (onset * 2f).coerceIn(0f, 1f) * normalizedLevel else 0f

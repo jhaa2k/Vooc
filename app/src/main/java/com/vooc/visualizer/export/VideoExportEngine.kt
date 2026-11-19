@@ -393,16 +393,31 @@ object VideoExportEngine {
             }
             fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
             val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
-            val cx = width * (0.5f + position.x.toFloat() / 200f)
-            val cy = height * (0.5f + position.y.toFloat() / 200f)
-            val scale = (number("Scale", 100f) / 100f).coerceIn(0f, 10f)
+            fun motionFor(property: String) = MeasureWhatEngine.evaluate(
+                mode = textValue(property, "Nothing"),
+                runtimeSeconds = seconds,
+                trackPositionSeconds = seconds,
+                playing = true,
+                beatPulse = providerBeat,
+                bass = providerSamples?.takeIf { it.isNotEmpty() }?.take((providerSamples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel,
+                treble = providerSamples?.takeIf { it.isNotEmpty() }?.takeLast((providerSamples.size / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel,
+                bpm = 120f,
+                seed = element.id.hashCode().toLong()
+            )
+            val posMotion = motionFor("Measure Pos (Measure What)")
+            val scaleMotion = motionFor("Measure Scale (Measure What)")
+            val rotMotion = motionFor("Measure Rot (Measure What)")
+            val cx = width * (0.5f + position.x.toFloat() / 200f + posMotion.offsetX)
+            val cy = height * (0.5f + position.y.toFloat() / 200f + posMotion.offsetY)
+            val scale = (number("Scale", 100f) / 100f * scaleMotion.scale).coerceIn(0f, 10f)
+            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation
             val alpha = (number("Opacity", 100f).coerceIn(0f, 100f) * 2.55f).toInt()
             val color = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
             paint.color = color
             paint.alpha = alpha
             paint.style = Paint.Style.FILL
             canvas.save()
-            canvas.rotate(number("Rotation", 0f), cx, cy)
+            canvas.rotate(rotation, cx, cy)
             when (element.type) {
                 StudioElementType.TEXT -> {
                     paint.textSize = (number("Font Size", min(width, height) * 0.06f) * scale).coerceAtLeast(6f)

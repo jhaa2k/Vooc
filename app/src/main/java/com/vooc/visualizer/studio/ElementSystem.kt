@@ -133,7 +133,12 @@ data class ElementDocument(
         val spec = ElementPropertyCatalog.forElement(type).firstOrNull { it.name == name }
             ?: return this
         val valid = spec.validate(value) ?: return this
-        return copy(properties = properties + (name to valid))
+        val updated = copy(properties = properties + (name to valid))
+        return when (name) {
+            "Tag" -> updated.copy(tag = (valid as ElementValue.Text).value)
+            "Visible" -> updated.copy(visible = (valid as ElementValue.Bool).value)
+            else -> updated
+        }
     }
 
     fun normalized(): ElementDocument {
@@ -144,9 +149,15 @@ data class ElementDocument(
         }.toMap()
         val defaults = specs.mapValues { (name, spec) ->
             normalizedProperties[name] ?: spec.defaultValue
-        }
+        }.toMutableMap()
+        val safeTag = (defaults["Tag"] as? ElementValue.Text)?.value?.trim()?.take(80)
+            ?.ifEmpty { type.displayName } ?: tag.trim().take(80).ifEmpty { type.displayName }
+        val safeVisible = (defaults["Visible"] as? ElementValue.Bool)?.value ?: visible
+        defaults["Tag"] = ElementValue.Text(safeTag)
+        defaults["Visible"] = ElementValue.Bool(safeVisible)
         return copy(
-            tag = tag.trim().ifEmpty { type.displayName }.take(80),
+            tag = safeTag,
+            visible = safeVisible,
             properties = defaults,
             measurements = measurements.mapValues { it.value.validated() }
         )
@@ -334,7 +345,12 @@ object ElementPropertyCatalog {
     }
 
     fun create(type: StudioElementType, id: String, tag: String = type.displayName): ElementDocument {
-        val properties = forElement(type).associate { it.name to it.defaultValue }
+        val properties = forElement(type).associate { spec ->
+            spec.name to when (spec.name) {
+                "Tag" -> ElementValue.Text(tag)
+                else -> spec.defaultValue
+            }
+        }
         return ElementDocument(id = id, type = type, tag = tag, properties = properties).normalized()
     }
 }

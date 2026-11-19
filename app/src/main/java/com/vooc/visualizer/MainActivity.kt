@@ -1733,8 +1733,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val amplitudeScale = number("Amplitude Scale", 1f).coerceIn(0f, 16f)
                         val gamma = number("Amplitude Gamma", 1f).coerceIn(0.1f, 4f)
                         val input = FloatArray(rawSamples.size.coerceAtLeast(1)) { i ->
-                            (rawSamples.getOrElse(i) { 0f }.coerceAtLeast(0f) * amplitudeScale).coerceIn(0f, 32f)
-                                .let { value -> value.pow(gamma).coerceIn(0f, 1f) }
+                            (rawSamples.getOrElse(i) { 0f }.coerceAtLeast(0f) * amplitudeScale).coerceAtLeast(0f)
+                                .let { value -> (value / (1f + value)).pow(gamma).coerceIn(0f, 1f) }
                         }
                         val nowMs = android.os.SystemClock.elapsedRealtime()
                         val previousMs = barLastUpdateMs.put(element.id, nowMs) ?: nowMs - 16L

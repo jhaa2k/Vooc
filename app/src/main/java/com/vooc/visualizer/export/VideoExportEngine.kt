@@ -171,6 +171,14 @@ object VideoExportEngine {
                 }
             }
         }
+        project.document.elements.filter { it.type == StudioElementType.IMAGE }.forEach { element ->
+            val uriText = (element.value("Custom Image") as? ElementValue.Text)?.value.orEmpty()
+            if (uriText.isNotBlank()) runCatching {
+                resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
+                    BitmapFactory.decodeStream(stream)?.let { imageCache[uriText] = it }
+                }
+            }
+        }
         val info = MediaCodec.BufferInfo()
         var audioTrack = -1
         var videoTrack = -1
@@ -426,10 +434,18 @@ object VideoExportEngine {
                     }
                 }
                 StudioElementType.IMAGE -> {
-                    paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = max(1f, width / 540f)
-                    canvas.drawCircle(cx, cy, min(width, height) * 0.1f * scale, paint)
-                    paint.style = Paint.Style.FILL
+                    val uriText = textValue("Custom Image")
+                    val image = imageCache[uriText]
+                    if (image != null) {
+                        val drawWidth = width * 0.42f * scale
+                        val drawHeight = drawWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
+                        canvas.drawBitmap(image, null, RectF(cx - drawWidth / 2f, cy - drawHeight / 2f, cx + drawWidth / 2f, cy + drawHeight / 2f), paint)
+                    } else {
+                        paint.style = Paint.Style.STROKE
+                        paint.strokeWidth = max(1f, width / 540f)
+                        canvas.drawCircle(cx, cy, min(width, height) * 0.1f * scale, paint)
+                        paint.style = Paint.Style.FILL
+                    }
                 }
                 StudioElementType.RGB_SPLIT -> {
                     val radius = min(width, height) * 0.09f * scale

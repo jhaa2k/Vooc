@@ -11,6 +11,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.graphics.CircleShape
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -46,9 +49,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import android.graphics.BitmapFactory
 import com.vooc.visualizer.analyzer.ChannelSelect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
@@ -83,7 +93,23 @@ private val Lime = Color(0xFFC6F36A)
 private val Ink = Color(0xFF0C0E0B)
 private val Panel = Color(0xFF171A14)
 private val Muted = Color(0xFF92998A)
-private val Poppins = FontFamily(Font(com.vooc.visualizer.R.font.poppins_regular))
+private fun poppinsVariableFont(weight: Int) = Font(
+    com.vooc.visualizer.R.font.poppins_variable,
+    weight = FontWeight(weight),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight))
+)
+
+private val Poppins = FontFamily(
+    poppinsVariableFont(100),
+    poppinsVariableFont(200),
+    poppinsVariableFont(300),
+    poppinsVariableFont(400),
+    poppinsVariableFont(500),
+    poppinsVariableFont(600),
+    poppinsVariableFont(700),
+    poppinsVariableFont(800),
+    poppinsVariableFont(900)
+)
 
 class MainActivity : ComponentActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -146,21 +172,21 @@ private fun VoocTheme(content: @Composable () -> Unit) {
             surface = Panel, onSurface = Color(0xFFE8EBDD), secondary = Color(0xFF9DAA85)),
         typography = Typography().let { base ->
             base.copy(
-                displayLarge = base.displayLarge.copy(fontFamily = Poppins),
-                displayMedium = base.displayMedium.copy(fontFamily = Poppins),
-                displaySmall = base.displaySmall.copy(fontFamily = Poppins),
-                headlineLarge = base.headlineLarge.copy(fontFamily = Poppins),
-                headlineMedium = base.headlineMedium.copy(fontFamily = Poppins),
-                headlineSmall = base.headlineSmall.copy(fontFamily = Poppins),
-                titleLarge = base.titleLarge.copy(fontFamily = Poppins, fontSize = 18.sp, lineHeight = 22.sp),
-                titleMedium = base.titleMedium.copy(fontFamily = Poppins, fontSize = 16.sp, lineHeight = 20.sp),
-                titleSmall = base.titleSmall.copy(fontFamily = Poppins, fontSize = 14.sp, lineHeight = 18.sp),
-                bodyLarge = base.bodyLarge.copy(fontFamily = Poppins, fontSize = 14.sp, lineHeight = 18.sp),
-                bodyMedium = base.bodyMedium.copy(fontFamily = Poppins, fontSize = 13.sp, lineHeight = 17.sp),
-                bodySmall = base.bodySmall.copy(fontFamily = Poppins, fontSize = 11.sp, lineHeight = 14.sp),
-                labelLarge = base.labelLarge.copy(fontFamily = Poppins, fontSize = 12.sp, lineHeight = 16.sp),
-                labelMedium = base.labelMedium.copy(fontFamily = Poppins, fontSize = 11.sp, lineHeight = 14.sp),
-                labelSmall = base.labelSmall.copy(fontFamily = Poppins, fontSize = 10.sp, lineHeight = 12.sp)
+                displayLarge = base.displayLarge.copy(fontFamily = Poppins, fontWeight = FontWeight.Bold),
+                displayMedium = base.displayMedium.copy(fontFamily = Poppins, fontWeight = FontWeight.Bold),
+                displaySmall = base.displaySmall.copy(fontFamily = Poppins, fontWeight = FontWeight.SemiBold),
+                headlineLarge = base.headlineLarge.copy(fontFamily = Poppins, fontWeight = FontWeight.Bold),
+                headlineMedium = base.headlineMedium.copy(fontFamily = Poppins, fontWeight = FontWeight.SemiBold),
+                headlineSmall = base.headlineSmall.copy(fontFamily = Poppins, fontWeight = FontWeight.SemiBold),
+                titleLarge = base.titleLarge.copy(fontFamily = Poppins, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 22.sp),
+                titleMedium = base.titleMedium.copy(fontFamily = Poppins, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 20.sp),
+                titleSmall = base.titleSmall.copy(fontFamily = Poppins, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp),
+                bodyLarge = base.bodyLarge.copy(fontFamily = Poppins, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 18.sp),
+                bodyMedium = base.bodyMedium.copy(fontFamily = Poppins, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 17.sp),
+                bodySmall = base.bodySmall.copy(fontFamily = Poppins, fontWeight = FontWeight.Normal, fontSize = 11.sp, lineHeight = 14.sp),
+                labelLarge = base.labelLarge.copy(fontFamily = Poppins, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
+                labelMedium = base.labelMedium.copy(fontFamily = Poppins, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 14.sp),
+                labelSmall = base.labelSmall.copy(fontFamily = Poppins, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 12.sp)
             )
         },
         content = content
@@ -637,6 +663,14 @@ private fun TemplateLibraryScreen(
 @Composable
 private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.AnalyzerConfig,
     onConfigChange: (com.vooc.visualizer.analyzer.AnalyzerConfig) -> Unit, modifier: Modifier = Modifier) {
+    val bandLabels = config.bands.bands.map { it.label }
+    val defaultBandSpecs = remember(bandLabels) {
+        if (bandLabels == listOf("Bass", "Mid", "Treble")) {
+            com.vooc.visualizer.analyzer.BandConfig.defaultThreeBand()
+        } else {
+            com.vooc.visualizer.analyzer.BandConfig.logSpaced(config.bands.bands.size)
+        }
+    }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -704,16 +738,18 @@ private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.Analyzer
             }
         }
         items(config.bands.bands, key = { it.label }) { band ->
+            val bandIndex = config.bands.bands.indexOfFirst { it.label == band.label }
+            val defaultBand = defaultBandSpecs.getOrNull(bandIndex) ?: band
             Column(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(band.label.uppercase(), color = Lime, style = MaterialTheme.typography.labelMedium)
-                LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f) { value ->
+                LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f, resetValue = defaultBand.lowHz) { value ->
                     val updated = config.bands.bands.map { current ->
                         if (current.label == band.label) current.copy(lowHz = value.coerceAtMost(current.highHz - 1f)) else current
                     }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
-                LayerSlider("HIGH CUT HZ", band.highHz, 250f..20000f) { value ->
+                LayerSlider("HIGH CUT HZ", band.highHz, 250f..20000f, resetValue = defaultBand.highHz) { value ->
                     val updated = config.bands.bands.map { current ->
                         if (current.label == band.label) current.copy(highHz = value.coerceAtLeast(current.lowHz + 1f)) else current
                     }
@@ -723,7 +759,7 @@ private fun AnalyzerSettingsScreen(config: com.vooc.visualizer.analyzer.Analyzer
                     val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(gain = value) else current }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
-                LayerSlider("SMOOTHING", band.smoothing * 100f, 0f..99f) { value ->
+                LayerSlider("SMOOTHING", band.smoothing * 100f, 0f..99f, resetValue = 30f) { value ->
                     val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(smoothing = value / 100f) else current }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
@@ -755,6 +791,9 @@ private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLaye
 private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, frame: AnalysisFrame?, playing: Boolean) {
     var phase by remember { mutableFloatStateOf(0f) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val poppinsTypeface = remember(context) {
+        androidx.core.content.res.ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable)
+    }
     val imageBitmaps by produceState(initialValue = emptyMap<Long, androidx.compose.ui.graphics.ImageBitmap>(), key1 = layers.map { it.id to it.imageUri }) {
         value = withContext(Dispatchers.IO) {
             layers.mapNotNull { layer ->
@@ -928,7 +967,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                             this.color = color.toArgb()
                             textSize = (24f * scale).coerceAtLeast(8f).sp.toPx()
                             textAlign = android.graphics.Paint.Align.CENTER
-                            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+                            typeface = poppinsTypeface?.let { android.graphics.Typeface.create(it, android.graphics.Typeface.BOLD) }
+                                ?: android.graphics.Typeface.DEFAULT_BOLD
                         }
                         canvas.nativeCanvas.drawText(layer.textContent.uppercase(), center.x, center.y, paint)
                     }
@@ -978,17 +1018,166 @@ private fun EditorSection(title: String, expanded: String, onToggle: () -> Unit,
     }
 }
 
+private fun defaultSliderResetValue(label: String, range: ClosedFloatingPointRange<Float>): Float =
+    when (label.uppercase()) {
+        "BEAT SENSITIVITY" -> 60f
+        "MANUAL BPM (0 = AUTO)" -> 0f
+        "POSITION X", "POSITION Y", "ROTATION" -> 0f
+        "SCALE", "OPACITY", "AUDIO SENSITIVITY" -> 100f
+        "SMOOTHING" -> 45f
+        "RED" -> 198f
+        "GREEN" -> 243f
+        "BLUE" -> 106f
+        "BAR / SAMPLE COUNT" -> 64f
+        "THICKNESS" -> 2f
+        "SPACING" -> 1f
+        "RADIUS" -> 18f
+        "PARTICLE COUNT" -> 48f
+        "BEAT COOLDOWN" -> 150f
+        "BEAT THRESHOLD" -> 1.5f
+        "TEMPORAL SMOOTHING" -> 50f
+        "ATTACK" -> 20f
+        "RELEASE" -> 180f
+        "RING BUFFER" -> 8192f
+        "WAVEFORM SAMPLES" -> 2048f
+        "DB FLOOR" -> -70f
+        "GAIN" -> 1f
+        "ATTACK MS" -> 20f
+        "RELEASE MS" -> 150f
+        else -> range.start
+    }.coerceIn(range)
+
 @Composable
-private fun LayerSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(bottom = 5.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall)
-            Text(value.toInt().toString(), color = Lime, style = MaterialTheme.typography.labelSmall)
+private fun LayerSlider(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    resetValue: Float = defaultSliderResetValue(label, range),
+    onChange: (Float) -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(label.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Text(value.toInt().toString(), color = Lime, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
-        Slider(value = value.coerceIn(range), onValueChange = onChange, valueRange = range,
-            modifier = Modifier.fillMaxWidth().height(24.dp),
-            colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime, inactiveTrackColor = Color(0xFF42483A)))
+        ThinSlider(
+            label = label,
+            value = value,
+            valueRange = range,
+            resetValue = resetValue,
+            onValueChange = onChange
+        )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThinSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    resetValue: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    steps: Int = 0,
+    onDoubleTapReset: (() -> Unit)? = null,
+    onValueChangeFinished: (() -> Unit)? = null
+) {
+    val safeValue = value.coerceIn(valueRange)
+    val safeReset = resetValue.coerceIn(valueRange)
+    val resetAction by rememberUpdatedState(
+        onDoubleTapReset ?: { onValueChange(safeReset) }
+    )
+
+    Slider(
+        value = safeValue,
+        onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
+        valueRange = valueRange,
+        steps = steps,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(34.dp)
+            .pointerInput(safeReset) {
+                var lastTapTime = 0L
+                var lastTapPosition = Offset.Zero
+                awaitEachGesture {
+                    val down = awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial
+                    )
+                    var moved = false
+                    var releasedAt = 0L
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                            moved = true
+                        }
+                        if (!change.pressed) {
+                            releasedAt = change.uptimeMillis
+                            break
+                        }
+                    }
+                    if (!moved && releasedAt > 0L) {
+                        val isDoubleTap = lastTapTime > 0L &&
+                            releasedAt - lastTapTime <= viewConfiguration.doubleTapTimeoutMillis &&
+                            (down.position - lastTapPosition).getDistance() <= viewConfiguration.touchSlop * 2f
+                        if (isDoubleTap) {
+                            resetAction()
+                            lastTapTime = 0L
+                        } else {
+                            lastTapTime = releasedAt
+                            lastTapPosition = down.position
+                        }
+                    } else {
+                        lastTapTime = 0L
+                    }
+                }
+            }
+            .semantics {
+                contentDescription = label.uppercase()
+                stateDescription = safeValue.toString()
+            },
+        colors = SliderDefaults.colors(
+            thumbColor = Lime,
+            activeTrackColor = Lime,
+            inactiveTrackColor = Color.Transparent,
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent
+        ),
+        thumb = {
+            Box(
+                Modifier
+                    .size(10.dp)
+                    .background(Lime, CircleShape)
+                    .border(1.dp, Ink, CircleShape)
+            )
+        },
+        track = { sliderState ->
+            Canvas(Modifier.fillMaxWidth().height(4.dp)) {
+                val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)
+                val progress = ((sliderState.value - valueRange.start) / span).coerceIn(0f, 1f)
+                val centerY = size.height / 2f
+                drawLine(
+                    color = Color(0xFF3D4436),
+                    start = Offset(0f, centerY),
+                    end = Offset(size.width, centerY),
+                    strokeWidth = 1.25.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+                if (progress > 0f) {
+                    drawLine(
+                        color = Lime,
+                        start = Offset(0f, centerY),
+                        end = Offset(size.width * progress, centerY),
+                        strokeWidth = 1.6.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+            }
+        }
+    )
 }
 
 @Composable
@@ -1008,12 +1197,15 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
                 Text("QUEUE  •  ${player.mediaItemCount} TRACKS", color = Muted, style = MaterialTheme.typography.labelSmall)
             }
         }
-        Slider(value = seek.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
-            modifier = Modifier.fillMaxWidth().height(24.dp),
+        ThinSlider(
+            label = "PLAYBACK SEEK",
+            value = seek.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+            resetValue = 0f,
             onValueChange = { seek = it },
             onValueChangeFinished = { player.seekTo(seek.toLong()) },
-            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-            colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime))
+            onDoubleTapReset = { seek = 0f; player.seekTo(0L) }
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatTime(position), color = Muted, style = MaterialTheme.typography.labelSmall)
             Text(formatTime(duration), color = Muted, style = MaterialTheme.typography.labelSmall)
@@ -1030,10 +1222,18 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
                 Text("PLAYBACK SPEED", color = Muted, style = MaterialTheme.typography.labelSmall)
                 Text(String.format("%.2fx", speed), color = Lime, style = MaterialTheme.typography.labelSmall)
             }
-            Slider(value = speed, onValueChange = { speed = it; player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it, 1f)) },
-                modifier = Modifier.fillMaxWidth().height(24.dp),
-                valueRange = 0.5f..2f, steps = 5,
-                colors = SliderDefaults.colors(thumbColor = Lime, activeTrackColor = Lime))
+            ThinSlider(
+                label = "PLAYBACK SPEED",
+                value = speed,
+                valueRange = 0.5f..2f,
+                resetValue = 1f,
+                steps = 5,
+                onValueChange = { speed = it; player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it, 1f)) },
+                onDoubleTapReset = {
+                    speed = 1f
+                    player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(1f, 1f))
+                }
+            )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = { shuffle = !shuffle; player.shuffleModeEnabled = shuffle }) {

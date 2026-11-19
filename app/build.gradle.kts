@@ -47,10 +47,10 @@ dependencies {
 }
 
 
-// Decode the bundled Poppins font before Android resource processing.
+// Decode the bundled Poppins variable font (wght 100–900) before Android resource processing.
 val decodePoppinsFont by tasks.registering {
-    val encodedFont = layout.projectDirectory.file("src/main/font/poppins-regular.ttf.base64")
-    val outputFont = layout.projectDirectory.file("src/main/res/font/poppins_regular.ttf")
+    val encodedFont = layout.projectDirectory.file("src/main/font/Poppins-VariableFont_wght.ttf.base64")
+    val outputFont = layout.projectDirectory.file("src/main/res/font/poppins_variable.ttf")
     inputs.file(encodedFont)
     outputs.file(outputFont)
     doLast {

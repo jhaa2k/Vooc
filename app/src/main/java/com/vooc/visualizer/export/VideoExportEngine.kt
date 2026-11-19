@@ -1,6 +1,8 @@
 package com.vooc.visualizer.export
 
 import android.content.ContentResolver
+import android.content.Context
+import com.vooc.visualizer.analyzer.decode.PcmDecoder
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaExtractor
@@ -27,7 +29,7 @@ import com.vooc.visualizer.studio.LayerKind
 object VideoExportEngine {
     data class Result(val frames: Int, val durationMs: Long, val audioMuxed: Boolean)
 
-    fun export(resolver: ContentResolver, project: StudioProject, destination: Uri, onProgress: (Float) -> Unit = {}): Result {
+    fun export(context: Context, resolver: ContentResolver, project: StudioProject, destination: Uri, onProgress: (Float) -> Unit = {}): Result {
         val width = (project.width.coerceIn(320, 3840) / 2) * 2
         val height = (project.height.coerceIn(320, 3840) / 2) * 2
         val fps = project.fps.coerceIn(15, 60)
@@ -65,6 +67,46 @@ object VideoExportEngine {
         val durationMs = min(project.document.durationMs.takeIf { it > 0L } ?: sourceDurationMs.takeIf { it > 0L } ?: 10_000L,
             trimDuration ?: Long.MAX_VALUE).coerceIn(1000L, 300_000L)
         val frameCount = (durationMs * fps / 1000L).toInt().coerceAtLeast(1)
+        // Decode a lightweight RMS envelope before rendering. The AAC source is still muxed
+        // untouched by the separate extractor below; analysis never alters source audio.
+        val audioEnvelope = FloatArray(frameCount)
+        if (audioUri != null) {
+            PcmDecoder(context, audioUri).use { decoder ->
+                val stream = decoder.open()
+                val energy = DoubleArray(frameCount)
+                val weights = IntArray(frameCount)
+                decoder.decode { samples, frames, ptsUs ->
+                    val relativeUs = ptsUs - trimStartUs
+                    if (relativeUs >= 0L && frames > 0) {
+                        val index = ((relativeUs * fps) / 1_000_000L).toInt()
+                        if (index in 0 until frameCount) {
+                            var sum = 0.0
+                            val sampleCount = frames * stream.channels
+                            for (i in 0 until sampleCount.coerceAtMost(samples.size)) {
+                                val v = samples[i].toDouble()
+                                sum += v * v
+                            }
+                            val rms = kotlin.math.sqrt(sum / sampleCount.coerceAtLeast(1)).toFloat()
+                            energy[index] += rms.toDouble()
+                            weights[index]++
+                        }
+                    }
+                    true
+                }
+                var last = 0f
+                for (i in audioEnvelope.indices) {
+                    if (weights[i] > 0) last = (energy[i] / weights[i]).toFloat()
+                    audioEnvelope[i] = last.coerceIn(0f, 1f)
+                }
+                // Fill leading buckets from the first decoded measurement, if available.
+                val first = audioEnvelope.firstOrNull { it > 0f } ?: 0f
+                for (i in audioEnvelope.indices) {
+                    if (audioEnvelope[i] == 0f && i < (audioEnvelope.indexOfFirst { it > 0f }.takeIf { it >= 0 } ?: 0)) {
+                        audioEnvelope[i] = first
+                    }
+                }
+            }
+        }
         val output = resolver.openFileDescriptor(destination, "w") ?: throw IllegalStateException("Cannot open destination file.")
         val muxer = MediaMuxer(output.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -107,7 +149,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(canvas, paint, project, width, height, timeMs, imageCache)
+                            drawFrame(canvas, paint, project, width, height, timeMs, imageCache, audioEnvelope.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -183,7 +225,7 @@ object VideoExportEngine {
         }
     }
 
-    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>) {
+    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, audioLevel: Float) {
         canvas.drawColor((project.document.backgroundArgb or (0xFFL shl 24)).toInt())
         val seconds = timeMs / 1000f
         project.layers.filter { it.enabled }.map { evaluateLayer(project, it, timeMs) }.forEach { layer ->
@@ -195,7 +237,7 @@ object VideoExportEngine {
             val cy = height * (0.5f + layer.y / 200f)
             val scale = layer.scale.coerceIn(1f, 400f) / 100f
             val count = layer.barCount.coerceIn(8, 256)
-            val pulse = 0.12f + 0.38f * (0.5f + 0.5f * sin(seconds * (2.2f + layer.sensitivity / 100f) * 2f * PI.toFloat()))
+            val pulse = (0.08f + audioLevel.coerceIn(0f, 1f) * (0.35f + layer.sensitivity.coerceIn(0f, 200f) / 100f)).coerceIn(0.08f, 1f)
             canvas.save()
             canvas.rotate(layer.rotation, cx, cy)
             when (layer.kind) {
@@ -205,7 +247,8 @@ object VideoExportEngine {
                     val bw = ((width * 0.82f - gap * (count - 1)) / count).coerceAtLeast(1f)
                     val baseY = cy + height * 0.34f * scale
                     for (i in 0 until count) {
-                        val amplitude = 0.18f + 0.82f * abs(sin(i * 0.21f + seconds * 3.2f)) * pulse
+                        val frequencyShape = 0.18f + 0.82f * abs(sin(i * 0.21f + seconds * 3.2f))
+                        val amplitude = frequencyShape * (0.12f + audioLevel.coerceIn(0f, 1f) * (0.45f + layer.sensitivity.coerceIn(0f, 200f) / 100f))
                         val barHeight = height * 0.42f * amplitude * scale
                         val x = cx - (bw * count + gap * (count - 1)) / 2f + i * (bw + gap)
                         if (layer.kind == LayerKind.BARSH) canvas.drawRect(x, cy - barHeight / 2f, x + bw, cy + barHeight / 2f, paint)
@@ -226,7 +269,7 @@ object VideoExportEngine {
                     val path = android.graphics.Path()
                     for (i in 0..240) {
                         val x = width * 0.08f + width * 0.84f * i / 240f
-                        val y = cy + sin(i * 0.075f + seconds * 4f) * height * 0.12f * pulse * scale
+                        val y = cy + sin(i * 0.075f + seconds * 4f) * height * 0.12f * (0.08f + audioLevel.coerceIn(0f, 1f)) * scale
                         if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                     }
                     canvas.drawPath(path, paint)

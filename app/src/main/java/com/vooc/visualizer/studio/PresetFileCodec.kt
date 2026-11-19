@@ -52,7 +52,7 @@ object PresetFileCodec {
         val layers = mutableListOf<VisualLayer>()
         val warnings = linkedSetOf<String>()
         collectAveeObjects(root, layers, warnings)
-        val unique = layers.distinctBy { it.id }.take(256)
+        val unique = layers.take(256)
         require(unique.isNotEmpty()) {
             "Avee scene data was found, but Vooc could not identify supported visual elements. The template may use unsupported Avee object types."
         }

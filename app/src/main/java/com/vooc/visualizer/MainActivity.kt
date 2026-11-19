@@ -99,6 +99,7 @@ import com.vooc.visualizer.studio.ProjectRepository
 import com.vooc.visualizer.studio.ProjectEntry
 import com.vooc.visualizer.studio.ProjectKeyframe
 import com.vooc.visualizer.studio.StudioProject
+import com.vooc.visualizer.studio.MeasureWhatEngine
 import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.TemplateStore
 import com.vooc.visualizer.studio.VisualLayer
@@ -855,7 +856,7 @@ private fun VoocStudio(
                     }
                     item {
                         EditorSection("AUDIO / MEASURE", expandedSection, { expandedSection = if (expandedSection == "AUDIO / MEASURE") "" else "AUDIO / MEASURE" }) {
-                            OptionDropdown("MEASURE WHAT", selected.measureWhat, listOf("Spectrum", "Bass", "Mid", "Treble", "RMS", "Peak", "Beat", "Waveform")) { value ->
+                            OptionDropdown("MEASURE WHAT", selected.measureWhat, MeasureWhatEngine.options + listOf("Spectrum", "Bass", "Mid", "Treble", "RMS", "Peak", "Waveform")) { value ->
                                 project = updateLayer(project, selectedId) { it.copy(measureWhat = value) }
                             }
                             if (selected.measureWhat == "Spectrum") {
@@ -1350,7 +1351,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
     }
     val layerSmoothing = remember { mutableMapOf<Long, FloatArray>() }
     LaunchedEffect(playing) {
-        while (playing) { phase = (phase + 0.08f) % (2f * PI.toFloat()); delay(16) }
+        while (playing) { phase += 0.08f; delay(16) }
     }
     Canvas(modifier.background(Color.Black)) {
         val cx = size.width / 2f
@@ -1359,8 +1360,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
             val alpha = (layer.opacity / 100f).coerceIn(0f, 1f)
             val color = Color(layer.color).copy(alpha = alpha)
             val accent = Color(layer.gradientColor).copy(alpha = alpha)
-            val scale = (layer.scale / 100f).coerceIn(0f, 4f)
-            val center = Offset(cx + layer.x / 100f * size.width, cy + layer.y / 100f * size.height)
+            val baseScale = (layer.scale / 100f).coerceIn(0f, 4f)
+            val baseCenter = Offset(cx + layer.x / 100f * size.width, cy + layer.y / 100f * size.height)
             val channel = runCatching { frame?.channel(ChannelSelect.valueOf(layer.channel)) }.getOrNull()
             val providerSamples = providerFrame?.samples
             val spectrum = providerSamples ?: channel?.spectrum ?: frame?.spectrum ?: FloatArray(64)
@@ -1375,6 +1376,26 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 "Waveform" -> waveform.maxOfOrNull { kotlin.math.abs(it) } ?: 0f
                 else -> 0f
             }.coerceIn(0f, 1f)
+            val bassLevel = providerSamples?.take((providerSamples.size / 5).coerceAtLeast(1))
+                ?.average()?.toFloat() ?: (frame?.band(0) ?: 0f)
+            val trebleLevel = providerSamples?.takeLast((providerSamples.size / 5).coerceAtLeast(1))
+                ?.average()?.toFloat() ?: (frame?.band(2) ?: 0f)
+            val motion = MeasureWhatEngine.evaluate(
+                mode = layer.measureWhat,
+                runtimeSeconds = phase,
+                trackPositionSeconds = (frame?.timeSec ?: 0.0).toFloat(),
+                playing = playing,
+                beatPulse = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f,
+                bass = bassLevel,
+                treble = trebleLevel,
+                bpm = frame?.beat?.bpm ?: 120f,
+                seed = layer.id
+            )
+            val center = Offset(
+                baseCenter.x + motion.offsetX * size.width,
+                baseCenter.y + motion.offsetY * size.height
+            )
+            val scale = (baseScale * motion.scale).coerceIn(0f, 4f)
             val count: Int = layer.barCount.coerceIn(8, 256)
             val values: FloatArray = when (layer.measureWhat) {
                 "Bass", "Mid", "Treble", "RMS", "Peak", "Beat" -> FloatArray(count) { band }
@@ -1412,7 +1433,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
             val responsiveValueAt: (Int) -> Float = { sampleIndex ->
                 smoothed[sampleIndex.coerceIn(0, count - 1)]
             }
-            rotate(layer.rotation, center) {
+            rotate(layer.rotation + motion.rotation, center) {
                 when (layer.kind) {
                     LayerKind.BACKGROUND -> drawRect(Color(0xFF070906))
                     LayerKind.BARS, LayerKind.BARSH, LayerKind.BLOCKS -> {

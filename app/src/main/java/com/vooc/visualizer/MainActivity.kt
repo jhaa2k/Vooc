@@ -29,6 +29,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -1213,25 +1219,31 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, fra
                 else -> 0f
             }.coerceIn(0f, 1f)
             val count = layer.barCount.coerceIn(8, 256)
-            val values = when (layer.measureWhat) {
+            val values: FloatArray = when (layer.measureWhat) {
                 "Bass", "Mid", "Treble", "RMS", "Peak", "Beat" -> FloatArray(count) { band }
                 "Waveform" -> waveform
                 else -> spectrum
             }
-            val valueAt: (Int) -> Float = { i ->
-                if (values.isEmpty()) 0f else if (layer.measureWhat == "Spectrum" && frame != null) {
-                    val x = i.toFloat() / (count - 1).coerceAtLeast(1)
+            val valueAt: (Int) -> Float = { index: Int ->
+                val rawValue = if (values.isEmpty()) {
+                    0f
+                } else if (layer.measureWhat == "Spectrum" && frame != null) {
+                    val x = index.toFloat() / (count - 1).coerceAtLeast(1)
                     val minHz = layer.spectrumMinHz.coerceIn(10f, frame.sampleRate * 0.45f)
                     val maxHz = layer.spectrumMaxHz.coerceIn(minHz + 1f, frame.sampleRate * 0.49f)
                     val hz = if (layer.spectrumScale == "LOGARITHMIC")
                         minHz * kotlin.math.exp(kotlin.math.ln(maxHz / minHz) * x)
                     else minHz + (maxHz - minHz) * x
-                    val bin = (hz / frame.binWidthHz).coerceIn(0f, (values.lastIndex).toFloat())
-                    val lo = bin.toInt()
-                    val hi = (lo + 1).coerceAtMost(values.lastIndex)
-                    (values[lo] + (values[hi] - values[lo]) * (bin - lo))
-                } else values[(i * values.size / count).coerceIn(0, values.lastIndex)].coerceIn(0f, 1f)
-            }.let { sample -> { i: Int -> (sample(i) * layer.sensitivity / 100f).coerceIn(0f, 1f) } }
+                    val bin = (hz / frame.binWidthHz).coerceIn(0f, values.lastIndex.toFloat())
+                    val lowBin = bin.toInt()
+                    val highBin = (lowBin + 1).coerceAtMost(values.lastIndex)
+                    values[lowBin] + (values[highBin] - values[lowBin]) * (bin - lowBin.toFloat())
+                } else {
+                    val sampleIndex = (index * values.size / count).coerceIn(0, values.lastIndex)
+                    values[sampleIndex].coerceIn(0f, 1f)
+                }
+                (rawValue * layer.sensitivity / 100f).coerceIn(0f, 1f)
+            }
             rotate(layer.rotation, center) {
                 when (layer.kind) {
                     LayerKind.BACKGROUND -> drawRect(Color(0xFF070906))

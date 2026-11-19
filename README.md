@@ -1,26 +1,28 @@
 # Vooc — Audio Visualizer Studio
 
-Vooc is an Android music visualizer/editor built with Kotlin, Jetpack Compose and Media3.
+Android music visualizer/editor built with Kotlin, Jetpack Compose and Media3.
 
-## Current redesign branch
+## Active rebuild
 
 Branch: `redesign/full-studio`
 
-### Implemented in this branch
-- Media3 playback service and MediaSession integration for notification / lock-screen transport controls.
-- In-app decoded PCM tap feeding the audio analyzer; no microphone or system-wide audio capture.
-- FFT spectrum, waveform, RMS/peak, frequency bands and beat tracking through the analyzer module.
-- Studio preview driven by live analyzer frames.
-- Layer creation, enable/disable, delete and selection for bars, mirrored bars, rings, circles, waves, scope, particles, dots, lines, blocks, grid, shapes, text, image and background.
-- Layer transform, opacity, sensitivity, smoothing and color controls.
-- Starter presets and local JSON project save/restore.
-- Multi-track import, queue, seek, previous/next, shuffle and repeat controls.
+### Working implementation in the branch
+- Media3 ExoPlayer playback service with a MediaSession for notification and lock-screen controls.
+- Decoded PCM tap from this app's own player; no microphone or system-wide audio capture.
+- FFT analysis with stereo left/right and mid/side modes, waveform, RMS/peak, bass/mid/treble bands, beat algorithms and manual BPM.
+- Live Compose preview with distinct render paths for bars, mirrored bars, circle spectrum, multi-ring, concentric, ring, pulse, wave, waveform, scope, dots, lines, blocks, grid, particles, shape, text, image and background layers.
+- Per-layer measure source, channel, sample count, transforms, rotation, opacity, sensitivity, smoothing, thickness, spacing, radius, particle count and RGB/secondary colors.
+- Image import, text content editing, layer rename, duplicate, reorder, enable/disable and delete.
+- Twelve starter compositions.
+- Local auto-save plus JSON project import/export.
+- Multi-track audio import, queue management, seeking, previous/next, shuffle, repeat and playback speed.
+- Export workspace stores resolution and frame-rate settings.
 
-### Still required before calling this a full release
-- Verify the media-session notification and background playback on physical Android devices.
-- Complete the export renderer and MP4 muxing pipeline (audio/video synchronization, H.264/AAC, progress, cancellation and error recovery).
-- Finish the full effect stack (blur, RGB split, motion blur, mirror and custom shader controls), image/text asset management and full preset library.
-- Add project import/export, robust library metadata, automated UI/instrumentation tests and device performance profiling.
-- Validate sustained 60 FPS rendering on supported devices and test large audio files / long exports.
+### Not complete / not yet device-verified
+- Actual MP4 encoding and audio/video muxing are not implemented. Export settings are not a video exporter.
+- Full GPU effects pipeline (blur, glow, RGB split, motion blur, mirror and custom shaders) is not complete.
+- Verify notification/background playback and imported image persistence on physical devices.
+- Add automated UI/instrumentation tests, profile frame time and memory, and validate long audio sessions and large exports.
+- Verify sustained 60 FPS on target devices. A CI build only verifies compilation and packaging.
 
-The debug APK is built by GitHub Actions. A successful CI build proves compilation and packaging only; it does not replace device playback, rendering or export validation.
+Do not treat this branch as a release build until the outstanding export/effects work and physical-device validation are complete.

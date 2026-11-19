@@ -296,17 +296,63 @@ object ElementPropertyCatalog {
         text("Generated Album Art Color", "Generated Album Art", "#FFFFFFFF")
     )
 
-    private val rgbSplit = listOf(
-        text("Blend Mode Content", "Appearance", "Normal"),
+    private val rgbGeneral = listOf(
+        text("Tag", "General", "RGB Split"),
+        bool("Visible", "General", true),
+        text("Blend Mode", "General", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
+        ElementPropertySpec("Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        text("Anchor X", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Anchor Y", "General", "Center", listOf(
+            "Center", "Top-Left", "Top-Center", "Top-Right", "Middle-Left",
+            "Middle-Right", "Bottom-Left", "Bottom-Center", "Bottom-Right"
+        )),
+        text("Measure Pos (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        ElementPropertySpec("Alignment Position", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Scale Is Uniform", "General", true),
+        ElementPropertySpec("Scale", "General", ElementValueType.VECTOR2,
+            ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
+        text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Rotation", "General", 0.0, -3600.0, 3600.0),
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+    )
+
+    private val rgbAppearance = listOf(
+        text("Blend Mode Content", "Appearance", "Alpha", listOf(
+            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Lighten", "Exclusion", "Subtractive", "Copy"
+        )),
         text("Color", "Appearance", "#FFFFFFFF"),
-        text("Target Image", "Appearance", ""),
+        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        text("Mask Image", "Appearance", ""),
         bool("Show Unblurred Content", "Appearance", false),
-        bool("Show Unblurred Content Under", "Appearance", false),
-        number("Split Multiplier", "Split Effect", 1.0, 0.0, 32.0),
-        number("Split Amount", "Split Effect", 4.0, 0.0, 256.0),
-        text("Split Color 0", "Split Effect", "#FFFF0000"),
-        text("Split Color 1", "Split Effect", "#FF00FF00"),
-        text("Split Color 2", "Split Effect", "#FF0000FF")
+        bool("Show Unblurred Content Under", "Appearance", false)
+    )
+
+    private val rgbSplit = listOf(
+        number("Red Offset X", "RGB Split", -4.0, -256.0, 256.0),
+        number("Red Offset Y", "RGB Split", 0.0, -256.0, 256.0),
+        number("Green Offset X", "RGB Split", 0.0, -256.0, 256.0),
+        number("Green Offset Y", "RGB Split", 0.0, -256.0, 256.0),
+        number("Blue Offset X", "RGB Split", 4.0, -256.0, 256.0),
+        number("Blue Offset Y", "RGB Split", 0.0, -256.0, 256.0),
+        number("Split Amount / Distance", "RGB Split", 4.0, 0.0, 256.0),
+        number("Angle / Direction", "RGB Split", 0.0, -360.0, 360.0),
+        ElementPropertySpec("Center / Focus Point", "RGB Split", ElementValueType.VECTOR2,
+            ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        number("Falloff / Radial Split", "RGB Split", 0.0, 0.0, 10.0),
+        number("Speed / Frequency", "RGB Split", 0.0, 0.0, 100.0),
+        number("Split Multiplier", "RGB Split", 1.0, 0.0, 32.0),
+        text("Split Color 0", "RGB Split", "#FFFF0000"),
+        text("Split Color 1", "RGB Split", "#FF00FF00"),
+        text("Split Color 2", "RGB Split", "#FF0000FF")
     )
 
     private val blurGeneral = listOf(
@@ -529,6 +575,10 @@ object ElementPropertyCatalog {
         }
         if (type == StudioElementType.IMAGE) {
             return (imageGeneral + imageAppearance + imageSpecific)
+                .groupBy { it.name }.values.map { sameName -> sameName.last() }
+        }
+        if (type == StudioElementType.RGB_SPLIT) {
+            return (rgbGeneral + rgbAppearance + rgbSplit)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         val specific = when (type) {

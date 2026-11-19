@@ -151,7 +151,7 @@ object VizLoader {
                 mapOf("mode" to parts.firstOrNull().orEmpty(), "args" to parts.drop(1).mapNotNull { it.toFloatOrNull() })
             }
             "img", "pimg" -> {
-                val (kind, _, id) = raw.toString().partition(":")
+                val (kind, id) = raw.toString().partition(":")
                 mapOf("kind" to kind, "id" to id)
             }
             else -> raw // Enum/text/id and future types are retained exactly.

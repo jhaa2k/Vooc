@@ -322,7 +322,7 @@ object ElementPropertyCatalog {
         number("Pre Smooth", "Spectrum", 0.0, 0.0, 1.0),
         integer("Filter Radius", "Spectrum", 0, 0.0, 64.0),
         number("Filter Strength", "Spectrum", 0.0, 0.0, 1.0),
-        bool("AWeight", "Spectrum", false),
+        number("AWeight", "Spectrum", 0.0, 0.0, 1.0),
         number("Output Multiplier", "Spectrum", 1.0, 0.0, 32.0),
         number("Lower Hz", "Spectrum Hz", 30.0, 1.0, 96000.0),
         number("Higher Hz", "Spectrum Hz", 16000.0, 2.0, 96000.0),
@@ -331,8 +331,8 @@ object ElementPropertyCatalog {
         number("Beat Smooth", "Beat", 0.35, 0.0, 1.0),
         integer("Beat Range Bar First", "Beat", 0, 0.0, 2048.0),
         integer("Beat Range Bar Last", "Beat", 127, 0.0, 2048.0),
-        number("Beat Range Value Lower", "Beat", 0.08, 0.0, 1.0),
-        number("Beat Range Value Higher", "Beat", 0.8, 0.0, 1.0),
+        number("Beat Range Value Lower", "Beat", 0.08, 0.0, 100.0),
+        number("Beat Range Value Higher", "Beat", 0.8, 0.0, 100.0),
         text("Fft Size", "Performance", "2048", listOf("256", "512", "1024", "2048", "4096", "8192"))
     )
 

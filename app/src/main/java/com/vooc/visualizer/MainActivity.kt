@@ -1235,8 +1235,14 @@ private fun ElementStudioEditor(
                             }
                             ElementValueType.VECTOR2 -> {
                                 val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
-                                LayerSlider("${spec.name.uppercase()} X", vector.x.toFloat(), -1000f..1000f) { x -> onChange(selected.withValue(spec.name, ElementValue.Vector2(x.toDouble(), vector.y))) }
-                                LayerSlider("${spec.name.uppercase()} Y", vector.y.toFloat(), -1000f..1000f) { y -> onChange(selected.withValue(spec.name, ElementValue.Vector2(vector.x, y.toDouble()))) }
+                                val minimum = (spec.min ?: -1000.0).toFloat()
+                                val maximum = (spec.max ?: 1000.0).toFloat().coerceAtLeast(minimum + 0.001f)
+                                LayerSlider("${spec.name.uppercase()} X", vector.x.toFloat(), minimum..maximum) { x ->
+                                    onChange(selected.withValue(spec.name, ElementValue.Vector2(x.toDouble(), vector.y)))
+                                }
+                                LayerSlider("${spec.name.uppercase()} Y", vector.y.toFloat(), minimum..maximum) { y ->
+                                    onChange(selected.withValue(spec.name, ElementValue.Vector2(vector.x, y.toDouble())))
+                                }
                             }
                         }
                     }

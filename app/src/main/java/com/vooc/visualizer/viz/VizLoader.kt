@@ -106,7 +106,9 @@ object VizLoader {
             if (!p.has("v") || !p.has("t")) continue
             val typeCode = p.optString("t")
             val raw = p.opt("v")
-            val decoded = if (typeCode.startsWith("_child")) {
+            val decoded = if (name == "fftSize" && typeCode.startsWith("i")) {
+                raw.toString().toIntOrNull()?.let { if (it in 7..13) 1 shl it else it } ?: raw
+            } else if (typeCode.startsWith("_child")) {
                 val nested = linkedMapOf<String, Any?>()
                 val nestedKeys = p.keys()
                 while (nestedKeys.hasNext()) {

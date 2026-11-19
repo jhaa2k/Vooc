@@ -53,6 +53,15 @@ class ElementSystemTest {
     }
 
     @Test
+    fun normalizationPreservesUnknownPropertiesForForwardCompatibility() {
+        val element = ElementPropertyCatalog.create(StudioElementType.IMAGE, "image-1")
+            .copy(properties = ElementPropertyCatalog.create(StudioElementType.IMAGE, "image-1").properties +
+                ("Future Property" to ElementValue.Text("keep-me")))
+        val normalized = element.normalized()
+        assertEquals(ElementValue.Text("keep-me"), normalized.value("Future Property"))
+    }
+
+    @Test
     fun elementFactoryPopulatesSpecificationDefaults() {
         val image = ElementPropertyCatalog.create(StudioElementType.IMAGE, "image-1", "Album Art")
         assertEquals("Album Art", image.tag)

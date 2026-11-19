@@ -83,6 +83,8 @@ import com.vooc.visualizer.playback.VoocAudioEngine
 import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.ProjectStore
+import com.vooc.visualizer.studio.ProjectRepository
+import com.vooc.visualizer.studio.ProjectEntry
 import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.TemplateStore
@@ -172,6 +174,110 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
+@Composable
+private fun ProjectBrowserScreen(
+    entries: List<ProjectEntry>,
+    currentId: String?,
+    onCreate: () -> Unit,
+    onOpen: (ProjectEntry) -> Unit,
+    onDuplicate: (ProjectEntry) -> Unit,
+    onRename: (ProjectEntry, String) -> Unit,
+    onDelete: (ProjectEntry) -> Unit,
+    onToggleAudio: () -> Unit,
+    showAudio: Boolean,
+    modifier: Modifier = Modifier
+) {
+    var renameTarget by remember { mutableStateOf<ProjectEntry?>(null) }
+    var renameValue by remember { mutableStateOf("") }
+    var deleteTarget by remember { mutableStateOf<ProjectEntry?>(null) }
+    Column(modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("YOUR PROJECTS", color = Lime, style = MaterialTheme.typography.titleLarge, letterSpacing = 1.2.sp)
+                Text("${entries.size} SAVED PROJECTS", color = Muted, style = MaterialTheme.typography.labelSmall)
+            }
+            IconButton(onClick = onToggleAudio) {
+                Icon(Icons.Outlined.LibraryMusic, if (showAudio) "Hide audio player" else "Show audio player", tint = if (showAudio) Lime else Muted)
+            }
+            Button(onClick = onCreate, shape = RectangleShape, colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Ink)) {
+                Icon(Icons.Default.Add, null)
+                Spacer(Modifier.width(4.dp))
+                Text("NEW")
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        if (entries.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Outlined.Collections, null, tint = Muted, modifier = Modifier.size(42.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Text("NO PROJECTS YET", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text("Create a project to start designing.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(onClick = onCreate, shape = RectangleShape) { Text("CREATE PROJECT", color = Lime) }
+                }
+            }
+        } else {
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                items(entries, key = { it.id }) { entry ->
+                    Column(
+                        Modifier.fillMaxWidth().background(if (entry.id == currentId) Color(0xFF20291A) else Panel)
+                            .border(if (entry.id == currentId) 1.dp else 0.dp, if (entry.id == currentId) Lime else Panel)
+                            .clickable { onOpen(entry) }.padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(width = 76.dp, height = 54.dp).background(Color(0xFF090B08))
+                                .border(1.dp, Color(0xFF3A4430)), contentAlignment = Alignment.Center) {
+                                Canvas(Modifier.fillMaxSize().padding(8.dp)) {
+                                    val mid = size.height * 0.5f
+                                    val barWidth = size.width / 18f
+                                    for (i in 0 until 16) {
+                                        val h = size.height * (0.18f + ((i * 37) % 70) / 100f)
+                                        drawLine(Lime, Offset(i * barWidth + barWidth / 2f, mid - h / 2f),
+                                            Offset(i * barWidth + barWidth / 2f, mid + h / 2f), barWidth * 0.55f)
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(entry.name.uppercase(), color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                                Text("${entry.width} × ${entry.height}  •  ${entry.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                Text(entry.aspectRatioLabel, color = Lime, style = MaterialTheme.typography.labelSmall)
+                            }
+                            TextButton(onClick = { onOpen(entry) }) { Text("OPEN", color = Lime) }
+                        }
+                        Spacer(Modifier.height(5.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { renameTarget = entry; renameValue = entry.name }) { Text("RENAME", color = Muted) }
+                            TextButton(onClick = { onDuplicate(entry) }) { Text("DUPLICATE", color = Muted) }
+                            TextButton(onClick = { deleteTarget = entry }) { Text("DELETE", color = Color(0xFFFF7777)) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    renameTarget?.let { target ->
+        AlertDialog(onDismissRequest = { renameTarget = null }, containerColor = Panel,
+            title = { Text("RENAME PROJECT", color = Color.White) },
+            text = { OutlinedTextField(value = renameValue, onValueChange = { renameValue = it.take(80) },
+                singleLine = true, label = { Text("PROJECT NAME") }) },
+            confirmButton = { TextButton(onClick = { onRename(target, renameValue); renameTarget = null }) { Text("SAVE", color = Lime) } },
+            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("CANCEL", color = Muted) } }
+        )
+    }
+    deleteTarget?.let { target ->
+        AlertDialog(onDismissRequest = { deleteTarget = null }, containerColor = Panel,
+            title = { Text("DELETE PROJECT?", color = Color.White) },
+            text = { Text("This permanently deletes “${target.name}”.", color = Muted) },
+            confirmButton = { TextButton(onClick = { onDelete(target); deleteTarget = null }) { Text("DELETE", color = Color(0xFFFF7777)) } },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("CANCEL", color = Muted) } }
+        )
+    }
+}
+
 @Composable
 private fun VoocTheme(content: @Composable () -> Unit) {
     MaterialTheme(
@@ -221,6 +327,9 @@ private fun VoocStudio(
     var frame by remember { mutableStateOf<AnalysisFrame?>(null) }
     var analyzerConfig by remember { mutableStateOf(analyzer.config) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    var projectEntries by remember { mutableStateOf(ProjectRepository.list(context)) }
+    var currentProjectId by remember { mutableStateOf(projectEntries.firstOrNull()?.id) }
+    var showAudioPlayer by remember { mutableStateOf(false) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && selectedId != 0L) {
@@ -263,7 +372,20 @@ private fun VoocStudio(
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
-    LaunchedEffect(project) { delay(500); onSave(project) }
+    LaunchedEffect(Unit) {
+        if (currentProjectId == null) {
+            val created = ProjectRepository.create(context, project)
+            currentProjectId = created?.id
+            projectEntries = ProjectRepository.list(context)
+        }
+    }
+    LaunchedEffect(project, currentProjectId) {
+        delay(450)
+        onSave(project)
+        val id = currentProjectId
+        if (id != null) ProjectRepository.save(context, id, project)
+        projectEntries = ProjectRepository.list(context)
+    }
     LaunchedEffect(player, analyzer) {
         while (true) {
             position = player.currentPosition.coerceAtLeast(0L)
@@ -327,9 +449,53 @@ private fun VoocStudio(
     ) { padding ->
         when (screen) {
             "LIBRARY" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
-                HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
-                PlayerScreen(player, trackName, playing, position, duration, picker, Modifier.weight(0.60f))
+                ProjectBrowserScreen(
+                    entries = projectEntries,
+                    currentId = currentProjectId,
+                    onCreate = {
+                        val next = StudioProject(name = "Untitled Project")
+                        val entry = ProjectRepository.create(context, next)
+                        if (entry != null) {
+                            currentProjectId = entry.id
+                            project = next
+                            selectedId = next.layers.lastOrNull()?.id ?: 0L
+                            projectEntries = ProjectRepository.list(context)
+                            screen = "STUDIO"
+                        }
+                    },
+                    onOpen = { entry ->
+                        ProjectRepository.load(context, entry.id)?.let { loaded ->
+                            currentProjectId = entry.id
+                            project = loaded
+                            selectedId = loaded.layers.lastOrNull()?.id ?: 0L
+                            screen = "STUDIO"
+                        }
+                    },
+                    onDuplicate = { entry ->
+                        ProjectRepository.duplicate(context, entry.id)
+                        projectEntries = ProjectRepository.list(context)
+                    },
+                    onRename = { entry, name ->
+                        ProjectRepository.rename(context, entry.id, name)
+                        projectEntries = ProjectRepository.list(context)
+                    },
+                    onDelete = { entry ->
+                        ProjectRepository.delete(context, entry.id)
+                        projectEntries = ProjectRepository.list(context)
+                        if (currentProjectId == entry.id) {
+                            val fallback = projectEntries.firstOrNull()
+                            currentProjectId = fallback?.id
+                            fallback?.let { ProjectRepository.load(context, it.id) }?.let { project = it }
+                        }
+                    },
+                    onToggleAudio = { showAudioPlayer = !showAudioPlayer },
+                    showAudio = showAudioPlayer,
+                    modifier = Modifier.weight(if (showAudioPlayer) 0.58f else 1f)
+                )
+                if (showAudioPlayer) {
+                    HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
+                    PlayerScreen(player, trackName, playing, position, duration, picker, Modifier.weight(0.42f))
+                }
             }
             "EXPORT" -> Column(Modifier.fillMaxSize().padding(padding)) {
                 PreviewPane(project, frame, playing, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))

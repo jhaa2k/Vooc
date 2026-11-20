@@ -47,9 +47,31 @@ class ElementSystemTest {
     fun propertyValuesAreTypeCheckedAndClamped() {
         val element = ElementPropertyCatalog.create(StudioElementType.BARS_SEGMENTS, "bars-1")
         val bounded = element.withValue("Bar Count", ElementValue.Number(5000.0))
-        assertEquals(ElementValue.Integer(512L), bounded.value("Bar Count"))
+        assertEquals(ElementValue.Integer(256L), bounded.value("Bar Count"))
         val invalid = element.withValue("Visible", ElementValue.Text("yes"))
         assertEquals(ElementValue.Bool(true), invalid.value("Visible"))
+    }
+
+    @Test
+    fun spectrumBarsExposeTheRequestedLayoutAudioAndAppearanceControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.BARS_SEGMENTS).associateBy { it.name }
+        val required = setOf(
+            "Opacity", "Measure Opacity (Measure What)", "Bar Count", "Segments Per Bar",
+            "Orientation", "Shape Path", "Corner Radius", "Sensitivity", "Attack Smoothing",
+            "Release Smoothing", "Frequency Scale", "Mirror Mode", "Color Mode",
+            "Per-Bar Color", "Peak Indicator Style", "Peak Indicator Color"
+        )
+        assertTrue("Missing spectrum controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(8.0, specs.getValue("Bar Count").min!!, 0.0)
+        assertEquals(256.0, specs.getValue("Bar Count").max!!, 0.0)
+        assertEquals(
+            listOf("Horizontal", "Vertical", "Radial", "Mirror"),
+            specs.getValue("Orientation").options
+        )
+        assertEquals(
+            MeasureWhatEngine.options,
+            specs.getValue("Measure Opacity (Measure What)").options
+        )
     }
 
     @Test

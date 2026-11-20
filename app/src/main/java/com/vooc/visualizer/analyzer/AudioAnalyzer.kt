@@ -104,8 +104,10 @@ class AudioAnalyzer(
         side = FloatArray(n)
         val selects = when (cfg.channelMode) {
             ChannelMode.MONO -> listOf(ChannelSelect.MIX)
-            ChannelMode.STEREO_SPLIT -> listOf(ChannelSelect.MIX, ChannelSelect.LEFT, ChannelSelect.RIGHT)
-            ChannelMode.MID_SIDE -> listOf(ChannelSelect.MIX, ChannelSelect.SIDE)
+            // Keep all per-layer selectors available whenever stereo analysis is enabled.
+            // MID is the mono mix; SIDE is the normalized L-R difference.
+            ChannelMode.STEREO_SPLIT, ChannelMode.MID_SIDE ->
+                listOf(ChannelSelect.MIX, ChannelSelect.LEFT, ChannelSelect.RIGHT, ChannelSelect.SIDE)
         }
         pipelines = selects.map { ChannelPipeline(it, sampleRate, n, cfg) }
         tracker = BeatTracker(sampleRate, n, cfg.beat, beatModel)

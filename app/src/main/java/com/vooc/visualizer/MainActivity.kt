@@ -2398,7 +2398,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 }
                             }
                             val overlay = runCatching { Color(android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF"))) }.getOrDefault(Color.Transparent)
-                            val imageAlpha = (opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f) * number("Transparency Strength", 1f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
+                            val imageAlpha = (opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
                             val imageColorMatrix = ColorMatrix().apply {
                                 setToSaturation(saturation)

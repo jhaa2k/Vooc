@@ -2090,7 +2090,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         val maximumLines = number("Maximum Lines", 0f).toInt().coerceAtLeast(0)
                         val visibleLines = (if (maximumLines > 0) textLines.take(maximumLines) else textLines).toMutableList()
-                        if (textValue("Overflow Mode", "Visible") == "Ellipsis" && visibleLines.size < textLines.size && visibleLines.isNotEmpty()) visibleLines[visibleLines.lastIndex] = android.text.TextUtils.ellipsize(visibleLines.last(), textPaint, maxTextWidth, android.text.TextUtils.TruncateAt.END).toString()
+                        if (textValue("Overflow Mode", "Visible") == "Ellipsis" && visibleLines.size < textLines.size && visibleLines.isNotEmpty()) visibleLines[visibleLines.lastIndex] = android.text.TextUtils.ellipsize(visibleLines.last(), android.text.TextPaint(textPaint), maxTextWidth, android.text.TextUtils.TruncateAt.END).toString()
                         val lineHeight = if (textValue("Line Height Mode", "Multiplier") == "Fixed" && number("Fixed Line Height", 0f) > 0f) number("Fixed Line Height", 0f).dp.toPx() else textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
                         val paragraphSpacing = number("Paragraph Spacing", 0f).dp.toPx()
                         val textBlockHeight = (visibleLines.size - 1) * (lineHeight + paragraphSpacing)

@@ -3,7 +3,6 @@ package com.vooc.visualizer.studio
 import android.graphics.Bitmap
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.sqrt
 
 /**
  * Shared background-image processing for preview and export.
@@ -38,7 +37,8 @@ object BackgroundImageProcessor {
         val pixels = IntArray(width * height)
         output.getPixels(pixels, 0, width, 0, 0, width, height)
         val edgeWidth = if (edgeBlur) {
-            (blurRadius * 2f * blurQuality).coerceIn(1f, min(width, height).coerceAtLeast(2) * 0.45f)
+            val maximumEdgeWidth = (min(width, height) * 0.45f).coerceAtLeast(1f)
+            (blurRadius * 2f * blurQuality).coerceIn(1f, maximumEdgeWidth)
         } else 0f
 
         if (pixelAdjustments || edgeBlur) {
@@ -96,10 +96,11 @@ object BackgroundImageProcessor {
         val reduction = (1f / (1f + blurRadius / (12f * blurQuality))).coerceIn(0.06f, 1f)
         val reducedWidth = (width * reduction).toInt().coerceAtLeast(1)
         val reducedHeight = (height * reduction).toInt().coerceAtLeast(1)
+        if (reducedWidth >= width && reducedHeight >= height) return output
         val reduced = Bitmap.createScaledBitmap(output, reducedWidth, reducedHeight, true)
         val blurred = Bitmap.createScaledBitmap(reduced, width, height, true)
-        if (reduced !== output && !reduced.isRecycled) reduced.recycle()
-        if (!output.isRecycled) output.recycle()
+        if (reduced !== output && reduced !== blurred && !reduced.isRecycled) reduced.recycle()
+        if (output !== blurred && !output.isRecycled) output.recycle()
         return blurred
     }
 }

@@ -202,6 +202,11 @@ object VideoExportEngine {
                             imageCache["${uriText}#${element.id}"] = processed
                             if (processed !== source) source.recycle()
                             maskBitmap?.recycle()
+                        } else if (element.type == StudioElementType.BLUR_EFFECT) {
+                            val blurred = processBlurEffectForExport(source, element)
+                            imageCache["${uriText}#${element.id}"] = blurred
+                            imageCache[uriText] = source
+                            if (blurred !== source) source.recycle()
                         } else imageCache[uriText] = source
                     }
                 }
@@ -309,6 +314,23 @@ object VideoExportEngine {
             muxer.writeSampleData(track, buffer, sampleInfo)
             if (!extractor.advance()) return true
         }
+    }
+
+    private fun processBlurEffectForExport(source: Bitmap, element: com.vooc.visualizer.studio.ElementDocument): Bitmap {
+        fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
+            is com.vooc.visualizer.studio.ElementValue.Number -> value.value.toFloat()
+            is com.vooc.visualizer.studio.ElementValue.Integer -> value.value.toFloat()
+            else -> fallback
+        }
+        val radius = (number("Blur Radius", 2f) * number("Blur Multiplier", 4.1f)).coerceIn(0f, 512f)
+        if (radius <= 0.1f) return source
+        val reduction = (1f / (1f + radius / 3f)).coerceIn(0.05f, 1f)
+        val reduced = Bitmap.createScaledBitmap(source,
+            (source.width * reduction).toInt().coerceAtLeast(1),
+            (source.height * reduction).toInt().coerceAtLeast(1), true)
+        val blurred = Bitmap.createScaledBitmap(reduced, source.width, source.height, true)
+        if (reduced !== source) reduced.recycle()
+        return blurred
     }
 
     private fun processImageForExport(source: Bitmap, element: com.vooc.visualizer.studio.ElementDocument, maskSource: Bitmap? = null): Bitmap {
@@ -1306,11 +1328,16 @@ object VideoExportEngine {
                     }
                 }
                 StudioElementType.BLUR_EFFECT -> {
-                    val image = imageCache[textValue("Target Image")]
+                    val sourceUri = textValue("Target Image")
+                    val image = imageCache["${sourceUri}#${element.id}"] ?: imageCache[sourceUri]
                     if (image != null) {
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
-                        canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f), paint)
+                        val destination = RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
+                        if ((element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true) {
+                            imageCache[sourceUri]?.let { original -> canvas.drawBitmap(original, null, destination, Paint(paint).apply { alpha = (alpha * 0.35f).toInt() }) }
+                        }
+                        canvas.drawBitmap(image, null, destination, paint)
                     }
                 }
                 StudioElementType.MOTION_BLUR_EFFECT -> {

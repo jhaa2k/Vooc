@@ -1640,20 +1640,79 @@ object VideoExportEngine {
                     paint.color = fill
                     paint.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
                     val rect = RectF(cx - shapeWidth / 2f, cy - shapeHeight / 2f, cx + shapeWidth / 2f, cy + shapeHeight / 2f)
-                    when (textValue("Shape Type", "Rectangle")) {
-                        "Circle/Oval" -> canvas.drawOval(rect, paint)
-                        "Line" -> {
-                            paint.strokeWidth = max(1f, number("Stroke / Border Width", 3f) * width / 1080f)
-                            canvas.drawLine(rect.left, cy, rect.right, cy, paint)
-                        }
-                        "Triangle" -> {
-                            val path = android.graphics.Path().apply {
-                                moveTo(cx, rect.top); lineTo(rect.right, rect.bottom); lineTo(rect.left, rect.bottom); close()
+                    val shapeType = textValue("Shape Type", "Rectangle")
+                    val shapePath = android.graphics.Path().apply {
+                        when (shapeType) {
+                            "Circle/Oval" -> {
+                                val startAngle = number("Ellipse Start Angle", 0f) + number("Trim Offset", 0f) * 360f
+                                val sweep = number("Ellipse Sweep Angle", 360f) * number("Trim Paths / Progress", 1f)
+                                addArc(rect, startAngle, sweep)
+                                if (kotlin.math.abs(sweep) >= 359.9f) close()
                             }
-                            canvas.drawPath(path, paint)
+                            "Line" -> { moveTo(rect.left, cy); lineTo(rect.left + shapeWidth * number("Trim Paths / Progress", 1f).coerceIn(0f, 1f), cy) }
+                            "Triangle" -> { moveTo(cx, rect.top); lineTo(rect.right, rect.bottom); lineTo(rect.left, rect.bottom); close() }
+                            "Polygon", "Star" -> {
+                                val count = if (shapeType == "Star") number("Star Points", 5f).toInt().coerceIn(3, 128) * 2 else number("Polygon Sides", 6f).toInt().coerceIn(3, 128)
+                                for (point in 0 until count) {
+                                    val angle = (point.toFloat() / count * 360f - 90f) * PI.toFloat() / 180f
+                                    val radius = if (shapeType == "Star" && point % 2 == 1) number("Star Inner Radius", 0.5f).coerceIn(0.01f, 0.99f) else 1f
+                                    val px = cx + cos(angle) * shapeWidth * 0.5f * radius
+                                    val py = cy + sin(angle) * shapeHeight * 0.5f * radius
+                                    if (point == 0) moveTo(px, py) else lineTo(px, py)
+                                }
+                                close()
+                            }
+                            "Custom" -> {
+                                val points = textValue("Custom Path Data").split(';').mapNotNull { token ->
+                                    val pair = token.trim().split(',', ' ').filter { it.isNotBlank() }
+                                    if (pair.size < 2) null else runCatching { pair[0].toFloat() to pair[1].toFloat() }.getOrNull()
+                                }.take(512)
+                                points.forEachIndexed { index, point ->
+                                    val px = rect.left + point.first.coerceIn(0f, 1f) * shapeWidth
+                                    val py = rect.top + point.second.coerceIn(0f, 1f) * shapeHeight
+                                    if (index == 0) moveTo(px, py) else lineTo(px, py)
+                                }
+                                if (points.size >= 3) close()
+                            }
+                            else -> addRoundRect(rect, number("Corner Radius", 0f) * width / 1080f, number("Corner Radius", 0f) * width / 1080f, android.graphics.Path.Direction.CW)
                         }
-                        else -> canvas.drawRoundRect(rect, number("Corner Radius", 0f) * width / 1080f,
-                            number("Corner Radius", 0f) * width / 1080f, paint)
+                    }
+                    val fillPaint = Paint(paint).apply {
+                        style = Paint.Style.FILL
+                        alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
+                        if (element.value("Gradient Fill") == ElementValue.Bool(true)) {
+                            val startColor = runCatching { android.graphics.Color.parseColor(textValue("Gradient Start Color", "#FFFFFFFF")) }.getOrDefault(fill)
+                            val endColor = runCatching { android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                            val gradientCenter = element.value("Gradient Center") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                            val gx = rect.left + shapeWidth * gradientCenter.x.toFloat()
+                            val gy = rect.top + shapeHeight * gradientCenter.y.toFloat()
+                            val radius = (max(shapeWidth, shapeHeight) * number("Gradient Radius", 0.5f)).coerceAtLeast(1f)
+                            val angle = Math.toRadians(number("Gradient Angle", 0f).toDouble())
+                            val dx = kotlin.math.cos(angle).toFloat() * radius
+                            val dy = kotlin.math.sin(angle).toFloat() * radius
+                            val tile = when (textValue("Gradient Spread", "Pad")) { "Repeat" -> Shader.TileMode.REPEAT; "Reflect" -> Shader.TileMode.MIRROR; else -> Shader.TileMode.CLAMP }
+                            shader = if (textValue("Gradient Type", "Linear") == "Radial") android.graphics.RadialGradient(gx, gy, radius, startColor, endColor, tile)
+                                else android.graphics.LinearGradient(gx - dx, gy - dy, gx + dx, gy + dy, startColor, endColor, tile)
+                        }
+                    }
+                    canvas.drawPath(shapePath, fillPaint)
+                    fillPaint.shader = null
+                    val strokeWidth = number("Stroke / Border Width", 0f) * width / 1080f
+                    if (strokeWidth > 0f || shapeType == "Line") {
+                        val strokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                        val strokePaint = Paint(paint).apply {
+                            color = if (shapeType == "Line") fill else strokeColor
+                            alpha = (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
+                            style = Paint.Style.STROKE
+                            this.strokeWidth = strokeWidth.coerceAtLeast(if (shapeType == "Line") 1f else 0f)
+                            strokeCap = when (textValue("Stroke Cap", "Round")) { "Butt" -> Paint.Cap.BUTT; "Square" -> Paint.Cap.SQUARE; else -> Paint.Cap.ROUND }
+                            strokeJoin = when (textValue("Stroke Join", "Round")) { "Miter" -> Paint.Join.MITER; "Bevel" -> Paint.Join.BEVEL; else -> Paint.Join.ROUND }
+                            strokeMiter = number("Stroke Miter Limit", 4f).coerceAtLeast(1f)
+                            val pattern = textValue("Stroke Dash Pattern").split(',', ' ').mapNotNull { it.trim().toFloatOrNull()?.takeIf { value -> value > 0f } }.toFloatArray()
+                            val intervals = when (textValue("Stroke Style", "Solid")) { "Dashed" -> floatArrayOf(this.strokeWidth * 4f, this.strokeWidth * 2f); "Dotted" -> floatArrayOf(this.strokeWidth, this.strokeWidth * 1.8f); else -> pattern.takeIf { it.size >= 2 } }
+                            if (intervals != null) pathEffect = android.graphics.DashPathEffect(intervals, number("Stroke Dash Offset", 0f) * width / 1080f)
+                        }
+                        canvas.drawPath(shapePath, strokePaint)
                     }
                     paint.color = color
                     paint.alpha = alpha

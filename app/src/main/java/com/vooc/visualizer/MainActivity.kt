@@ -187,7 +187,7 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
     val keyG = android.graphics.Color.green(keyColor).toFloat()
     val keyB = android.graphics.Color.blue(keyColor).toFloat()
     val edge = edgeBlur * min(w, h) / 1080f
-    if (keyEnabled || edge > 0f) {
+    if (keyEnabled || edge > 0f || maskPixels != null) {
         for (y in 0 until h) for (x in 0 until w) {
             val index = y * w + x
             val pixel = pixels[index]
@@ -1539,10 +1539,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     }
     val elementOriginalImages by produceState(
         initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
-        key1 = elements.filter { it.type == StudioElementType.BLUR_EFFECT }.map { element -> element.id to element.properties }
+        key1 = elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT }.map { element -> element.id to element.properties }
     ) {
         value = withContext(Dispatchers.IO) {
-            elements.filter { it.type == StudioElementType.BLUR_EFFECT }.mapNotNull { element ->
+            elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT }.mapNotNull { element ->
                 val uriText = (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
                 if (uriText.isBlank()) null else runCatching {
                     context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
@@ -1563,12 +1563,13 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                             val decoded = BitmapFactory.decodeStream(stream) ?: return@use null
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
-                            val maskBitmap = if (element.type == StudioElementType.IMAGE && maskUri.isNotBlank()) {
+                            val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.MOTION_BLUR_EFFECT) && maskUri.isNotBlank()) {
                                 context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
                             } else null
                             val processed = when (element.type) {
                                 StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)
                                 StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
+                                StudioElementType.MOTION_BLUR_EFFECT -> processImageForPreview(decoded, element, maskBitmap)
                                 else -> decoded
                             }
                             val image = processed.asImageBitmap()

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="vooc_ink">#FF0C0E0B</color>
+    <color name="vooc_panel">#FF171A14</color>
+    <color name="vooc_lime">#FFC6F36A</color>
+    <color name="vooc_muted">#FF92998A</color>
+</resources>

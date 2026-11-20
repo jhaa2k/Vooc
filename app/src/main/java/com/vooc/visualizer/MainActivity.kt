@@ -1438,11 +1438,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     }
     val elementImages by produceState(
         initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
-        key1 = elements.map { it.id to ((it.value("Custom Bar Image") as? ElementValue.Text)?.value?.takeIf { value -> value.isNotBlank() } ?: (it.value("Custom Image") as? ElementValue.Text)?.value.orEmpty()) }
+        key1 = elements.map { element ->
+            element.id to listOf("Custom Bar Image", "Custom Image", "Image Source / File", "Target Image")
+                .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
+        }
     ) {
         value = withContext(Dispatchers.IO) {
             elements.mapNotNull { element ->
-                val uriText = ((element.value("Custom Bar Image") as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } ?: (element.value("Custom Image") as? ElementValue.Text)?.value.orEmpty())
+                val uriText = listOf("Custom Bar Image", "Custom Image", "Image Source / File", "Target Image")
+                    .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
                 if (uriText.isBlank()) null else {
                     val bitmap = runCatching {
                         context.contentResolver.openInputStream(Uri.parse(uriText))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
@@ -2291,20 +2295,83 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     StudioElementType.IMAGE -> {
                         val bitmap = elementImages[element.id]
                         if (bitmap != null) {
-                            val side = (size.minDimension * 0.45f * scale).coerceAtLeast(1f)
-                            drawImage(bitmap, dstOffset = androidx.compose.ui.unit.IntOffset((center.x - side / 2f).toInt(), (center.y - side / 2f).toInt()),
-                                dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt()))
-                        } else {
-                            drawCircle(elementColor.copy(alpha = 0.35f), size.minDimension * 0.11f * scale, center, style = Stroke(width = 2.dp.toPx()))
-                            drawLine(elementColor, Offset(center.x - 18.dp.toPx(), center.y), Offset(center.x + 18.dp.toPx(), center.y), 2.dp.toPx())
-                            drawLine(elementColor, Offset(center.x, center.y - 18.dp.toPx()), Offset(center.x, center.y + 18.dp.toPx()), 2.dp.toPx())
+                            val frameWidth = (size.width * 0.45f * scale).coerceAtLeast(1f)
+                            val frameHeight = (size.height * 0.45f * scale).coerceAtLeast(1f)
+                            val fitMode = if (props["Keep Aspect Ratio And Crop To Fit"] == ElementValue.Bool(true)) "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
+                            val keepRatio = props["Keep Aspect Ratio"] != ElementValue.Bool(false)
+                            val sourceLeft = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * bitmap.width).toInt()
+                            val sourceTop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * bitmap.height).toInt()
+                            val sourceRight = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * bitmap.width).toInt()
+                            val sourceBottom = (number("Crop Bottom", 0f).coerceIn(0f, 0.95f) * bitmap.height).toInt()
+                            val sourceWidth = (bitmap.width - sourceLeft - sourceRight).coerceAtLeast(1)
+                            val sourceHeight = (bitmap.height - sourceTop - sourceBottom).coerceAtLeast(1)
+                            val imageRatio = sourceWidth.toFloat() / sourceHeight
+                            val frameRatio = frameWidth / frameHeight
+                            val destination = when {
+                                fitMode == "Stretch" || !keepRatio -> androidx.compose.ui.geometry.Rect(center.x - frameWidth / 2f, center.y - frameHeight / 2f, center.x + frameWidth / 2f, center.y + frameHeight / 2f)
+                                fitMode == "Fill (Cover)" -> {
+                                    val w = if (imageRatio > frameRatio) frameHeight * imageRatio else frameWidth
+                                    val h = if (imageRatio > frameRatio) frameHeight else frameWidth / imageRatio
+                                    androidx.compose.ui.geometry.Rect(center.x - w / 2f, center.y - h / 2f, center.x + w / 2f, center.y + h / 2f)
+                                }
+                                else -> {
+                                    val w = if (imageRatio > frameRatio) frameWidth else frameHeight * imageRatio
+                                    val h = if (imageRatio > frameRatio) frameWidth / imageRatio else frameHeight
+                                    androidx.compose.ui.geometry.Rect(center.x - w / 2f, center.y - h / 2f, center.x + w / 2f, center.y + h / 2f)
+                                }
+                            }
+                            val shapeName = textValue("Shape", textValue("Mask / Shape", "Rectangle"))
+                            val clip = Path().apply {
+                                when (shapeName) {
+                                    "Circle", "Ellipse", "Circle/Oval" -> addOval(destination)
+                                    "Triangle" -> { moveTo(destination.center.x, destination.top); lineTo(destination.right, destination.bottom); lineTo(destination.left, destination.bottom); close() }
+                                    else -> addRect(destination)
+                                }
+                            }
+                            val overlay = runCatching { Color(android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF"))) }.getOrDefault(Color.Transparent)
+                            val imageAlpha = (opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
+                            clipPath(clip) {
+                                drawImage(bitmap,
+                                    srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
+                                    srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
+                                    dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
+                                    dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
+                                    alpha = imageAlpha,
+                                    colorFilter = if (overlay.alpha > 0f) androidx.compose.ui.graphics.ColorFilter.tint(overlay, androidx.compose.ui.graphics.BlendMode.SrcAtop) else null
+                                )
+                            }
                         }
                     }
                     StudioElementType.RGB_SPLIT -> {
-                        val amount = number("Split Amount", 4f).coerceIn(0f, 64f).dp.toPx()
-                        listOf(Color.Red, Color.Green, Color.Blue).forEachIndexed { index, tint ->
-                            drawCircle(tint.copy(alpha = opacity * 0.65f), size.minDimension * (0.09f + index * 0.015f) * scale,
-                                Offset(center.x + (index - 1) * amount, center.y), style = Stroke(width = 2.dp.toPx()))
+                        val bitmap = elementImages[element.id]
+                        if (bitmap != null) {
+                            val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * scale
+                            val angle = (number("Angle / Direction", 0f) + playbackSeconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
+                            val focus = props["Center / Focus Point"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                            val falloff = number("Falloff / Radial Split", 0f).coerceAtLeast(0f)
+                            val colors = listOf("Split Color 0", "Split Color 1", "Split Color 2").mapIndexed { index, key ->
+                                runCatching { Color(android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index]))) }.getOrDefault(listOf(Color.Red, Color.Green, Color.Blue)[index])
+                            }
+                            val offsets = listOf(
+                                Offset(number("Red Offset X", -4f), number("Red Offset Y", 0f)),
+                                Offset(number("Green Offset X", 0f), number("Green Offset Y", 0f)),
+                                Offset(number("Blue Offset X", 4f), number("Blue Offset Y", 0f))
+                            )
+                            val frameWidth = size.width * 0.45f * scale
+                            val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
+                            val destination = Offset(center.x - frameWidth / 2f, center.y - frameHeight / 2f)
+                            colors.forEachIndexed { index, tint ->
+                                val base = offsets[index]
+                                val radialScale = 1f + falloff * kotlin.math.sqrt((focus.x.toFloat() - 0.5f).pow(2) + (focus.y.toFloat() - 0.5f).pow(2))
+                                val dx = (base.x * scale + cos(angle) * amount * (index - 1)) * radialScale
+                                val dy = (base.y * scale + sin(angle) * amount * (index - 1)) * radialScale
+                                drawImage(bitmap,
+                                    dstOffset = androidx.compose.ui.unit.IntOffset((destination.x + dx).toInt(), (destination.y + dy).toInt()),
+                                    dstSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1)),
+                                    alpha = opacity * 0.72f,
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint, androidx.compose.ui.graphics.BlendMode.Screen)
+                                )
+                            }
                         }
                     }
                     StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT -> {

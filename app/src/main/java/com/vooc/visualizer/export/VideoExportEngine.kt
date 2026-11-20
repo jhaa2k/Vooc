@@ -941,8 +941,11 @@ object VideoExportEngine {
                         .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
                     val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
                     if (image != null) {
-                        val frameWidth = width * 0.45f * scale
-                        val frameHeight = height * 0.45f * scale
+                        val imageScale = element.value("Scale") as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
+                        val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)
+                        val imageScaleY = (if ((element.value("Scale Is Uniform") as? ElementValue.Bool)?.value == true) imageScaleX else imageScale.y.toFloat()).coerceIn(0f, 10f)
+                        val frameWidth = width * 0.45f * scale * imageScaleX
+                        val frameHeight = height * 0.45f * scale * imageScaleY
                         val fitMode = if ((element.value("Keep Aspect Ratio And Crop To Fit") as? ElementValue.Bool)?.value == true) "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
                         val keepRatio = (element.value("Keep Aspect Ratio") as? ElementValue.Bool)?.value != false
                         val leftCrop = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * image.width).toInt()

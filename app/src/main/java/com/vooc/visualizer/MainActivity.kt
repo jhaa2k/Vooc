@@ -54,6 +54,7 @@ import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -1454,7 +1455,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     val barRuntimes = remember { mutableMapOf<String, SpectrumBarsRuntime>() }
     val barLastUpdateMs = remember { mutableMapOf<String, Long>() }
     LaunchedEffect(playing) {
-        while (playing) { phase += 0.08f; delay(16) }
+        var previousFrameNanos = 0L
+        while (playing) {
+            withFrameNanos { frameNanos ->
+                if (previousFrameNanos != 0L) {
+                    val deltaSeconds = ((frameNanos - previousFrameNanos).coerceAtLeast(0L) / 1_000_000_000f)
+                        .coerceIn(0f, 0.1f)
+                    phase += deltaSeconds
+                }
+                previousFrameNanos = frameNanos
+            }
+        }
     }
     Canvas(modifier.background(Color.Black)) {
         clipRect {

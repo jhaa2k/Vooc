@@ -2462,8 +2462,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     StudioElementType.IMAGE -> {
                         val bitmap = elementImages[element.id]
                         if (bitmap != null) {
-                            val frameWidth = (size.width * 0.45f * scale).coerceAtLeast(1f)
-                            val frameHeight = (size.height * 0.45f * scale).coerceAtLeast(1f)
+                            val imageScale = props["Scale"] as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
+                            val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)
+                            val imageScaleY = (if (props["Scale Is Uniform"] == ElementValue.Bool(true)) imageScaleX else imageScale.y.toFloat()).coerceIn(0f, 10f)
+                            val frameWidth = (size.width * 0.45f * scale * imageScaleX).coerceAtLeast(1f)
+                            val frameHeight = (size.height * 0.45f * scale * imageScaleY).coerceAtLeast(1f)
                             val fitMode = if (props["Keep Aspect Ratio And Crop To Fit"] == ElementValue.Bool(true)) "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
                             val keepRatio = props["Keep Aspect Ratio"] != ElementValue.Bool(false)
                             val sourceLeft = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * bitmap.width).toInt()

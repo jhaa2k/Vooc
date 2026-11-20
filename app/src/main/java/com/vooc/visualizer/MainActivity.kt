@@ -3057,7 +3057,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 )
                             }
                         } else androidx.compose.ui.graphics.SolidColor(fillColor)
-                        val shapePath = Path().apply {
+                        val baseShapePath = Path().apply {
                             when (shapeType) {
                                 "Circle/Oval" -> {
                                     val oval = androidx.compose.ui.geometry.Rect(left, top, left + w, top + h)
@@ -3097,6 +3097,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                             fillType = if (textValue("Fill Rule", "Non Zero") == "Even Odd") androidx.compose.ui.graphics.PathFillType.EvenOdd else androidx.compose.ui.graphics.PathFillType.NonZero
                         }
+                        val skewX = kotlin.math.tan(Math.toRadians(number("Skew X", 0f).coerceIn(-89f, 89f).toDouble())).toFloat()
+                        val skewY = kotlin.math.tan(Math.toRadians(number("Skew Y", 0f).coerceIn(-89f, 89f).toDouble())).toFloat()
+                        val shapeMatrix = android.graphics.Matrix().apply { setTranslate(-center.x, -center.y); postSkew(skewX, skewY); postTranslate(center.x, center.y) }
+                        val shapePath = baseShapePath.asAndroidPath().apply { transform(shapeMatrix) }.asComposePath()
                         val shadowEnabled = props["Shape Shadow Enabled"] == ElementValue.Bool(true)
                         val shapeBlur = number("Shape Blur", 0f).dp.toPx().coerceIn(0f, 256f)
                         if (shadowEnabled || shapeBlur > 0f) {

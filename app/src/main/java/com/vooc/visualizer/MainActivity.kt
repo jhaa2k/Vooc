@@ -1460,6 +1460,22 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
         clipRect {
         val cx = size.width / 2f
         val cy = size.height / 2f
+        // Paint canonical solid backgrounds before every visual layer so they never cover bars or artwork.
+        elements.filter { it.visible && it.type == StudioElementType.BACKGROUND }.forEach { background ->
+            val properties = background.properties
+            val sourceType = (properties["Source Type"] as? ElementValue.Text)?.value ?: "Solid Color"
+            if (sourceType == "Solid Color") {
+                val colorValue = (properties["Color"] as? ElementValue.Text)?.value ?: "#FF000000"
+                val alphaValue = when (val alpha = properties["Opacity / Alpha"]) {
+                    is ElementValue.Number -> alpha.value.toFloat()
+                    is ElementValue.Integer -> alpha.value.toFloat()
+                    else -> 1f
+                }.coerceIn(0f, 1f)
+                val backgroundColor = runCatching { Color(android.graphics.Color.parseColor(colorValue)) }
+                    .getOrDefault(Color.Black)
+                drawRect(backgroundColor.copy(alpha = alphaValue))
+            }
+        }
         layers.forEach { layer ->
             val alpha = (layer.opacity / 100f).coerceIn(0f, 1f)
             val color = Color(layer.color).copy(alpha = alpha)
@@ -2028,16 +2044,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             drawPath(shapePath, strokeColor, style = Stroke(width = strokeWidth, pathEffect = pathEffect))
                         }
                     }
-                    StudioElementType.BACKGROUND -> {
-                        val sourceType = textValue("Source Type", "Solid Color")
-                        if (sourceType == "Solid Color") {
-                            val backgroundColor = runCatching {
-                                Color(android.graphics.Color.parseColor(textValue("Color", colorText)))
-                            }.getOrDefault(Color.Black)
-                            val alpha = number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * opacity
-                            drawRect(backgroundColor.copy(alpha = alpha))
-                        }
-                    }
+                    StudioElementType.BACKGROUND -> Unit
                     StudioElementType.AUDIO_PROVIDER -> Unit
                 }
             }

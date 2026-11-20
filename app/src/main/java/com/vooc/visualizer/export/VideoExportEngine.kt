@@ -1638,7 +1638,7 @@ object VideoExportEngine {
                         audioReactivityColor(android.graphics.Color.parseColor(textValue("Fill / Color", textValue("Color", "#FFFFFFFF"))), reactivity.colorMultiplier)
                     }.getOrDefault(color)
                     paint.color = fill
-                    paint.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
+                    paint.this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
                     val rect = RectF(cx - shapeWidth / 2f, cy - shapeHeight / 2f, cx + shapeWidth / 2f, cy + shapeHeight / 2f)
                     val shapeType = textValue("Shape Type", "Rectangle")
                     val shapePath = android.graphics.Path().apply {
@@ -1680,7 +1680,7 @@ object VideoExportEngine {
                         }
                     }
                     val shapeFillPaint = Paint(paint).apply {
-                        style = Paint.Style.FILL
+                        this.style = Paint.Style.FILL
                         alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
                         if (element.value("Gradient Fill") == ElementValue.Bool(true)) {
                             val startColor = runCatching { android.graphics.Color.parseColor(textValue("Gradient Start Color", "#FFFFFFFF")) }.getOrDefault(fill)
@@ -1702,8 +1702,8 @@ object VideoExportEngine {
                     if (shapeShadowEnabled || shapeBlurRadius > 0f) {
                         val shapeShadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shape Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
                         val shapeShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            color = if (shapeShadowEnabled) shapeShadowColor else fill
-                            alpha = if (shapeShadowEnabled) (alpha * android.graphics.Color.alpha(shapeShadowColor) / 255f).toInt().coerceIn(0, 255) else (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
+                            this.color = if (shapeShadowEnabled) shapeShadowColor else fill
+                            this.alpha = if (shapeShadowEnabled) (alpha * android.graphics.Color.alpha(shapeShadowColor) / 255f).toInt().coerceIn(0, 255) else (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
                             style = Paint.Style.FILL
                             val blur = (number("Shape Shadow Blur", 8f) + number("Shape Blur", 0f)) * width / 1080f
                             if (blur > 0f) setShadowLayer(blur, number("Shape Shadow Offset X", 0f) * width / 1080f, number("Shape Shadow Offset Y", 4f) * width / 1080f, shapeShadowColor)
@@ -1716,9 +1716,9 @@ object VideoExportEngine {
                     if (strokeWidth > 0f || shapeType == "Line") {
                         val shapeStrokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                         val shapeStrokePaint = Paint(paint).apply {
-                            color = if (shapeType == "Line") fill else shapeStrokeColor
-                            alpha = (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
-                            style = Paint.Style.STROKE
+                            this.color = if (shapeType == "Line") fill else shapeStrokeColor
+                            this.alpha = (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
+                            this.style = Paint.Style.STROKE
                             this.strokeWidth = strokeWidth.coerceAtLeast(if (shapeType == "Line") 1f else 0f)
                             strokeCap = when (textValue("Stroke Cap", "Round")) { "Butt" -> Paint.Cap.BUTT; "Square" -> Paint.Cap.SQUARE; else -> Paint.Cap.ROUND }
                             strokeJoin = when (textValue("Stroke Join", "Round")) { "Miter" -> Paint.Join.MITER; "Bevel" -> Paint.Join.BEVEL; else -> Paint.Join.ROUND }

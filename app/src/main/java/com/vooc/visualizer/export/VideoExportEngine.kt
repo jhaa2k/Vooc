@@ -966,7 +966,7 @@ object VideoExportEngine {
                                 RectF(cx - dw / 2f, cy - dh / 2f, cx + dw / 2f, cy + dh / 2f)
                             }
                         }
-                        val shape = textValue("Shape", textValue("Mask / Shape", "Rectangle"))
+                        val shape = textValue("Shape", "Rectangle").takeIf { it != "Rectangle" } ?: textValue("Mask / Shape", "Rectangle")
                         val clip = android.graphics.Path().apply {
                             when (shape) {
                                 "Circle", "Ellipse", "Circle/Oval" -> addOval(dst, android.graphics.Path.Direction.CW)
@@ -979,7 +979,21 @@ object VideoExportEngine {
                         val imagePaint = Paint(paint).apply {
                             this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
-                            val colorMatrix = ColorMatrix().apply { setSaturation(saturation) }
+                            val colorMatrix = ColorMatrix().apply {
+                                setToSaturation(saturation)
+                                val layerTint = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                                val tintValues = array
+                                val tintChannels = floatArrayOf(
+                                    android.graphics.Color.red(layerTint) / 255f,
+                                    android.graphics.Color.green(layerTint) / 255f,
+                                    android.graphics.Color.blue(layerTint) / 255f
+                                )
+                                for (row in 0..2) {
+                                    val base = row * 5
+                                    for (column in 0..3) tintValues[base + column] *= tintChannels[row]
+                                    tintValues[base + 4] *= tintChannels[row]
+                                }
+                            }
                             if (android.graphics.Color.alpha(overlay) > 0) {
                                 val a = android.graphics.Color.alpha(overlay) / 255f
                                 val values = colorMatrix.array

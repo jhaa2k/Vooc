@@ -2297,19 +2297,25 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 }
                             }
                             if (barSoftnessRadius > 0f) {
-                                val softnessPath = if (design == "Circle / Dot") {
-                                    android.graphics.Path().apply {
-                                        addCircle(left + width / 2f, top + height / 2f, (height / 2f).coerceAtLeast(0.5f), android.graphics.Path.Direction.CW)
+                                val softnessBands = listOf(
+                                    2f to 0.035f,
+                                    1.5f to 0.06f,
+                                    1f to 0.10f,
+                                    0.5f to 0.16f
+                                )
+                                softnessBands.forEach { (widthFactor, alphaFactor) ->
+                                    val softnessColor = fill.copy(alpha = (opacity * alphaFactor).coerceIn(0f, 1f))
+                                    val featherStyle = Stroke(width = (barSoftnessRadius * widthFactor).coerceAtLeast(0.5f))
+                                    if (design == "Circle / Dot") {
+                                        drawCircle(
+                                            color = softnessColor,
+                                            radius = (height * 0.5f).coerceAtLeast(1f),
+                                            center = Offset(left + width / 2f, top + height / 2f),
+                                            style = featherStyle
+                                        )
+                                    } else {
+                                        drawPath(path, softnessColor, style = featherStyle)
                                     }
-                                } else path.asAndroidPath()
-                                drawIntoCanvas { composeCanvas ->
-                                    val softnessPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                        this.color = fill.toArgb()
-                                        alpha = (opacity * 255f).toInt().coerceIn(0, 255)
-                                        style = android.graphics.Paint.Style.FILL
-                                        maskFilter = android.graphics.BlurMaskFilter(barSoftnessRadius, android.graphics.BlurMaskFilter.Blur.NORMAL)
-                                    }
-                                    composeCanvas.nativeCanvas.drawPath(softnessPath, softnessPaint)
                                 }
                             }
                             if (glowEnabled && barGlowRadius > 0f && barGlowColorStrength > 0f) {

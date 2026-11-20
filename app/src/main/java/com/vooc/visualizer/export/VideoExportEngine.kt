@@ -1697,6 +1697,19 @@ object VideoExportEngine {
                                 else android.graphics.LinearGradient(gx - dx, gy - dy, gx + dx, gy + dy, startColor, endColor, tile)
                         }
                     }
+                    val shapeShadowEnabled = element.value("Shape Shadow Enabled") == ElementValue.Bool(true)
+                    val shapeBlurRadius = number("Shape Blur", 0f) * width / 1080f
+                    if (shapeShadowEnabled || shapeBlurRadius > 0f) {
+                        val shapeShadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shape Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                        val shapeShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            color = if (shapeShadowEnabled) shapeShadowColor else fill
+                            alpha = if (shapeShadowEnabled) (alpha * android.graphics.Color.alpha(shapeShadowColor) / 255f).toInt().coerceIn(0, 255) else (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
+                            style = Paint.Style.FILL
+                            val blur = (number("Shape Shadow Blur", 8f) + number("Shape Blur", 0f)) * width / 1080f
+                            if (blur > 0f) setShadowLayer(blur, number("Shape Shadow Offset X", 0f) * width / 1080f, number("Shape Shadow Offset Y", 4f) * width / 1080f, shapeShadowColor)
+                        }
+                        canvas.drawPath(shapePath, shapeShadowPaint)
+                    }
                     canvas.drawPath(shapePath, shapeFillPaint)
                     shapeFillPaint.shader = null
                     val strokeWidth = number("Stroke / Border Width", 0f) * width / 1080f

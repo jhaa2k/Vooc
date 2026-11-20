@@ -2024,7 +2024,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                         } else {
                             rotate(if (orientation == "Horizontal" || textValue("Shape Path", "Horizontal Line") == "Vertical Line") 90f else 0f, center) {
-
+                                repeat(count) { index ->
                             val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                             var level = levels[sourceIndex].coerceIn(0f, 1f)
                             if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
@@ -2071,10 +2071,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     }
                                 }
                             }
-                        }
+                                }
+                            }
                         }
                     }
-                    StudioElementType.PARTICLES -> {                    StudioElementType.PARTICLES -> {
+                    StudioElementType.PARTICLES -> {
                         val count = number("Count Limit", 64f).toInt().coerceIn(1, 300)
                         val particleScale = number("Particle Scale", 100f) / 100f * scale
                         val colorTo = runCatching { Color(android.graphics.Color.parseColor(textValue("Color To", colorText))) }.getOrDefault(elementColor)

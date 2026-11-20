@@ -835,7 +835,7 @@ object ElementPropertyCatalog {
         number("Peak Fall Delay", "Modifiers", 0.0, 0.0, 10.0),
         number("Bar Glow Radius", "Modifiers", 8.0, 0.0, 256.0),
         number("Bar Glow Color Strength", "Modifiers", 1.0, 0.0, 1.0),
-        number("Softness", "Behavior", 0.0, 0.0, 1.0),
+        number("Softness", "Behavior", 0.0, 0.0, 20.0),
         text("Segment 1 Color From", "Segment 1", "#FF56D8FF"),
         text("Segment 1 Color To", "Segment 1", "#FF9B5CFF"),
         bool("Segment 1 Fixed Height", "Segment 1", false),

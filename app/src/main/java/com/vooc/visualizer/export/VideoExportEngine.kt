@@ -10,6 +10,7 @@ import com.vooc.visualizer.analyzer.FftSize
 import com.vooc.visualizer.analyzer.AudioProviderProcessor
 import com.vooc.visualizer.analyzer.ChannelSelect
 import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
+import com.vooc.visualizer.analyzer.SpectrumMapper
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.studio.ElementPropertyCatalog
@@ -108,16 +109,20 @@ object VideoExportEngine {
                 (element.value("Audio Channel") as? ElementValue.Text)?.value in setOf("Left", "Right", "Side")
         }
         val providerSamplesByFrame = Array(frameCount) { FloatArray(providerConfig.sampleOutCount) }
-        val channelsToCapture = project.document.elements.filter { it.type == StudioElementType.BARS_SEGMENTS }
-            .mapNotNull { element ->
-                when ((element.value("Audio Channel") as? ElementValue.Text)?.value) {
-                    "Left" -> ChannelSelect.LEFT
-                    "Right" -> ChannelSelect.RIGHT
-                    "Mid" -> ChannelSelect.MID
-                    "Side" -> ChannelSelect.SIDE
-                    else -> null
-                }
-            }.toSet()
+        val barElements = project.document.elements.filter { it.type == StudioElementType.BARS_SEGMENTS }
+        val channelsToCapture = (barElements.mapNotNull { element ->
+            when ((element.value("Audio Channel") as? ElementValue.Text)?.value) {
+                "Left" -> ChannelSelect.LEFT
+                "Right" -> ChannelSelect.RIGHT
+                "Mid" -> ChannelSelect.MID
+                "Side" -> ChannelSelect.SIDE
+                else -> null
+            }
+        } + if (barElements.any { element ->
+            val start = (element.value("Frequency Range Start") as? ElementValue.Number)?.value?.toFloat() ?: 20f
+            val end = (element.value("Frequency Range End") as? ElementValue.Number)?.value?.toFloat() ?: 18000f
+            start > 20.01f || end < 17999.99f
+        }) listOf(ChannelSelect.MIX) else emptyList()).toSet()
         // Quantized channel snapshots keep export memory bounded (512 bytes/channel/frame).
         val channelSpectrumByFrame = channelsToCapture.associateWith { Array(frameCount) { ByteArray(512) } }
         val providerBeatByFrame = FloatArray(frameCount)
@@ -127,9 +132,11 @@ object VideoExportEngine {
         // Keep the analyzer's measured tempo alongside each offline visual frame.
         val providerBpmByFrame = FloatArray(frameCount) { 120f }
         val providerFrameAssigned = BooleanArray(frameCount)
+        var analysisSampleRate = 44100
         if (audioUri != null) {
             PcmDecoder(context, audioUri).use { decoder ->
                 val stream = decoder.open()
+                analysisSampleRate = stream.sampleRate
                 val energy = DoubleArray(frameCount)
                 val weights = IntArray(frameCount)
                 val offlineAnalyzer = AudioAnalyzer(
@@ -317,7 +324,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
+                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, analysisSampleRate, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -552,7 +559,7 @@ object VideoExportEngine {
         return blurred
     }
 
-    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, channelSamples: Map<ChannelSelect, FloatArray>, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
+    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, channelSamples: Map<ChannelSelect, FloatArray>, analysisSampleRate: Int, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
         val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         canvas.save()
         canvas.clipRect(0, 0, width, height)
@@ -849,16 +856,23 @@ object VideoExportEngine {
                 StudioElementType.BARS_SEGMENTS -> {
                     val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
                     val selectedChannel = textValue("Audio Channel", "Mixed")
+                    val frequencyStartHz = number("Frequency Range Start", 20f).coerceAtLeast(0f)
+                    val frequencyEndHz = number("Frequency Range End", 18000f).coerceAtLeast(frequencyStartHz + 1f)
+                    val customFrequencyRange = frequencyStartHz > 20.01f || frequencyEndHz < 17999.99f
                     val selectedSpectrum = when (selectedChannel) {
                         "Left" -> channelSamples[ChannelSelect.LEFT]
                         "Right" -> channelSamples[ChannelSelect.RIGHT]
-                        "Mid" -> channelSamples[ChannelSelect.MID] ?: providerSamples
+                        "Mid" -> channelSamples[ChannelSelect.MID] ?: channelSamples[ChannelSelect.MIX]
                         "Side" -> channelSamples[ChannelSelect.SIDE]
-                        else -> null
+                        else -> channelSamples[ChannelSelect.MIX]
                     }
-                    val source = if (selectedChannel == "Mixed") {
+                    val baseSource = if (selectedChannel == "Mixed" && !customFrequencyRange) {
                         providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
-                    } else selectedSpectrum?.takeIf { it.isNotEmpty() } ?: providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+                    } else selectedSpectrum?.takeIf { it.isNotEmpty() }
+                        ?: providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+                    val source = if (customFrequencyRange && selectedSpectrum != null) {
+                        SpectrumMapper.cropFrequencyRange(baseSource, analysisSampleRate, frequencyStartHz, frequencyEndHz)
+                    } else baseSource
                     val input = processBarSpectrum(
                         samples = source,
                         amplitudeScale = number("Amplitude Scale", 1f) * number("Sensitivity", 1f),
@@ -877,7 +891,7 @@ object VideoExportEngine {
                         input, count, delta, number("Smoothing / Damping", 0.72f),
                         number("Peak Hold Time", number("Peak Hold", 0.65f)),
                         number("Peak Fall Speed", 0.8f),
-                        logarithmicInput = selectedChannel == "Mixed" && providerSamples == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
+                        logarithmicInput = (selectedChannel != "Mixed" || customFrequencyRange || providerSamples == null) && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                         reactionDelayMs = number("Reaction Delay", 0f),
                         accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),

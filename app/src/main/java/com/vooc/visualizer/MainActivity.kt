@@ -2575,22 +2575,49 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val angle = resolvedAngle
                             val trails = number("Trails / Echo", 0f).toInt().coerceIn(0, 32)
                             val fade = number("Trail Opacity / Fade", 0.75f).coerceIn(0f, 1f)
+                            val centerOffset = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
+                            val showUnder = props["Show Unblurred Content Under"] == ElementValue.Bool(true)
+                            val showOver = props["Show Unblurred Content"] == ElementValue.Bool(true)
+                            val original = elementOriginalImages[element.id]
+                            if (showUnder && original != null) {
+                                drawImage(original, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity)
+                            }
+                            val contentColor = runCatching {
+                                Color(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")))
+                            }.getOrDefault(Color.White)
+                            val contentBlend = when (textValue("Blend Mode Content", "Alpha")) {
+                                "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
+                                "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                                "Multiply" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                                "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
+                                "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
+                                "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Exclusion
+                                "Copy" -> androidx.compose.ui.graphics.BlendMode.Src
+                                else -> androidx.compose.ui.graphics.BlendMode.SrcOver
+                            }
+                            val contentFilter = if (contentColor != Color.White)
+                                androidx.compose.ui.graphics.ColorFilter.tint(contentColor, androidx.compose.ui.graphics.BlendMode.Modulate)
+                                else null
                             for (sample in samples downTo 1) {
                                 val t = sample.toFloat() / samples
                                 val dx = cos(angle) * length * t
                                 val dy = sin(angle) * length * t
                                 val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f + dx).toInt(), (center.y - frameHeight / 2f + dy).toInt())
-                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t * 0.55f))
+                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t * 0.55f), colorFilter = contentFilter, blendMode = contentBlend)
                             }
                             repeat(trails) { index ->
                                 val t = (index + 1f) / (trails + 1f)
                                 val dx = -cos(angle) * length * t
                                 val dy = -sin(angle) * length * t
                                 val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f + dx).toInt(), (center.y - frameHeight / 2f + dy).toInt())
-                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t))
+                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t), colorFilter = contentFilter, blendMode = contentBlend)
                             }
-                            val centerOffset = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
-                            drawImage(bitmap, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity)
+                            if (showOver) {
+                                if (original != null) drawImage(original, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity)
+                                else drawImage(bitmap, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity, colorFilter = contentFilter, blendMode = contentBlend)
+                            } else {
+                                drawImage(bitmap, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity, colorFilter = contentFilter, blendMode = contentBlend)
+                            }
                         }
                     }
                     StudioElementType.SHAPE -> {

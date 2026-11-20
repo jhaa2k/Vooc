@@ -1031,10 +1031,13 @@ object VideoExportEngine {
                     }
                 }
                 StudioElementType.MOTION_BLUR_EFFECT -> {
-                    val image = imageCache[textValue("Target Image")]
+                    val sourceUri = textValue("Target Image")
+                    val image = imageCache["${sourceUri}#${element.id}"] ?: imageCache[sourceUri]
                     if (image != null) {
+                        val original = imageCache[sourceUri]
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
+                        val destination = RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
                         val samples = number("Samples / Iterations", 8f).toInt().coerceIn(1, 64)
                         val strength = number("Blur Amount / Strength", 1f).coerceIn(0f, 64f)
                         val lengthBase = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * strength * width / 1080f
@@ -1052,25 +1055,45 @@ object VideoExportEngine {
                         val angle = resolvedAngle
                         val trails = number("Trails / Echo", 0f).toInt().coerceIn(0, 32)
                         val fade = number("Trail Opacity / Fade", 0.75f).coerceIn(0f, 1f)
+                        val showUnder = (element.value("Show Unblurred Content Under") as? ElementValue.Bool)?.value == true
+                        val showOver = (element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true
+                        if (showUnder && original != null) canvas.drawBitmap(original, null, destination, paint)
+                        val contentColor = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                        val contentMode = when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> android.graphics.PorterDuff.Mode.ADD
+                            "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                            "Multiply" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                            "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                            "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                            "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                            "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                        }
+                        fun contentPaint(a: Int): Paint = Paint(paint).apply {
+                            this.alpha = a.coerceIn(0, 255)
+                            if (contentColor != android.graphics.Color.WHITE) {
+                                colorFilter = android.graphics.PorterDuffColorFilter(contentColor, android.graphics.PorterDuff.Mode.MULTIPLY)
+                            }
+                            if (contentMode != android.graphics.PorterDuff.Mode.SRC_OVER) {
+                                xfermode = android.graphics.PorterDuffXfermode(contentMode)
+                            }
+                        }
                         for (sample in samples downTo 1) {
                             val t = sample.toFloat() / samples
                             val dx = cos(angle) * length * t
                             val dy = sin(angle) * length * t
-                            val p = Paint(paint).apply { this.alpha = (alpha * fade * (1f - t * 0.55f)).toInt().coerceIn(0, 255) }
-                            canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
-                                cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), p)
+                            canvas.drawBitmap(image, null, RectF(destination.left + dx, destination.top + dy, destination.right + dx, destination.bottom + dy),
+                                contentPaint((alpha * fade * (1f - t * 0.55f)).toInt()))
                         }
                         repeat(trails) { index ->
                             val t = (index + 1f) / (trails + 1f)
                             val dx = -cos(angle) * length * t
                             val dy = -sin(angle) * length * t
-                            val p = Paint(paint).apply { this.alpha = (alpha * fade * (1f - t)).toInt().coerceIn(0, 255) }
-                            canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
-                                cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), p)
+                            canvas.drawBitmap(image, null, RectF(destination.left + dx, destination.top + dy, destination.right + dx, destination.bottom + dy),
+                                contentPaint((alpha * fade * (1f - t)).toInt()))
                         }
-                        if ((element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true) {
-                            canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f), paint)
-                        }
+                        if (showOver && original != null) canvas.drawBitmap(original, null, destination, paint)
+                        else canvas.drawBitmap(image, null, destination, contentPaint(alpha))
                     }
                 }
                 StudioElementType.SHAPE -> {

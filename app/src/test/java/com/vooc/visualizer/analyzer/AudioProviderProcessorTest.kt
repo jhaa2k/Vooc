@@ -34,8 +34,10 @@ class AudioProviderProcessorTest {
     }
 
     @Test fun outputMultiplierScalesSamples() {
-        val base = AudioProviderProcessor().process(frame(), AudioProviderConfig(sampleOutCount = 32, smooth = 0f))
-        val doubled = AudioProviderProcessor().process(frame(), AudioProviderConfig(sampleOutCount = 32, smooth = 0f, outputMultiplier = 2f))
+        val quietFrame = frame(FloatArray(1024) { 0.01f })
+        val base = AudioProviderProcessor().process(quietFrame, AudioProviderConfig(sampleOutCount = 32, smooth = 0f, outputMultiplier = 1f))
+        val doubled = AudioProviderProcessor().process(quietFrame, AudioProviderConfig(sampleOutCount = 32, smooth = 0f, outputMultiplier = 2f))
+        assertTrue(base.samples[8] > 0f)
         assertEquals(base.samples[8] * 2f, doubled.samples[8], 1e-4f)
     }
 

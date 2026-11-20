@@ -1370,8 +1370,21 @@ private fun ElementStudioEditor(
                                     }
                                 } else if (spec.name.contains("image", ignoreCase = true) || spec.name.contains("target", ignoreCase = true)) {
                                     Column(Modifier.fillMaxWidth()) {
-                                        CompactTextInput(spec.name.uppercase(), current) { onChange(selected.withValue(spec.name, ElementValue.Text(it))) }
-                                        TextButton(onClick = { onPickImage(spec.name) }) { Text("BROWSE IMAGE", color = Lime) }
+                                        Text(
+                                            if (current.isBlank()) "NO IMAGE SELECTED" else "IMAGE IMPORTED",
+                                            color = if (current.isBlank()) Muted else Lime,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TextButton(onClick = { onPickImage(spec.name) }) {
+                                                Text(if (current.isBlank()) "IMPORT IMAGE" else "REPLACE IMAGE", color = Lime)
+                                            }
+                                            if (current.isNotBlank()) {
+                                                TextButton(onClick = { onChange(selected.withValue(spec.name, ElementValue.Text(""))) }) {
+                                                    Text("REMOVE", color = Muted)
+                                                }
+                                            }
+                                        }
                                     }
                                 } else {
                                     CompactTextInput(spec.name.uppercase(), current) {
@@ -1584,9 +1597,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
         value = withContext(Dispatchers.IO) {
             elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.mapNotNull { element ->
                 val uriText = if (element.type == StudioElementType.IMAGE) {
-                    listOf("Custom Image", "Image Source / File").firstNotNullOfOrNull { key ->
-                        (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
-                    }.orEmpty()
+                    (element.value("Import Image") as? ElementValue.Text)?.value.orEmpty()
+                        .ifBlank {
+                            listOf("Custom Image", "Image Source / File").firstNotNullOfOrNull { key ->
+                                (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
+                            }.orEmpty()
+                        }
                 } else (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
                 if (uriText.isBlank()) null else runCatching {
                     context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
@@ -1600,7 +1616,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     ) {
         value = withContext(Dispatchers.IO) {
             elements.mapNotNull { element ->
-                val uriText = listOf("Custom Bar Image", "Custom Image", "Image Source / File", "Target Image")
+                val uriText = listOf("Import Image", "Custom Bar Image", "Custom Image", "Image Source / File", "Target Image")
                     .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
                 if (uriText.isBlank()) null else {
                     val bitmap = runCatching {
@@ -3091,7 +3107,7 @@ private fun ThinSlider(
                     val step = (valueRange.endInclusive - valueRange.start) / count
                     return (valueRange.start + kotlin.math.round((raw - valueRange.start) / step) * step).coerceIn(valueRange)
                 }
-                detectTapGestures(onTap = { updateValue(valueAt(it.x)) }, onDoubleTap = { resetAction() })
+                detectTapGestures(onDoubleTap = { resetAction() })
             }
             .pointerInput(valueRange) {
                 fun update(x: Float) {

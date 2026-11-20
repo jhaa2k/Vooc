@@ -1140,7 +1140,9 @@ object VideoExportEngine {
                             val prefix = if (segmentNumber <= 2) "Segment $segmentNumber " else ""
                             val fixedHeight = prefix.isNotEmpty() && (element.value(prefix + "Fixed Height") as? ElementValue.Bool)?.value == true
                             val multiplier = if (prefix.isNotEmpty()) number(prefix + "Bar Height Multiplier", 1f).coerceIn(0f, 10f) else 1f
-                            val renderedHeight = (if (fixedHeight) maxHeight / segmentsPerBar else segmentHeight) * multiplier
+                            val fixedSegmentBase = if (radialLayout) radialMaxHeight else maxHeight
+                            val renderedHeight = ((if (fixedHeight) fixedSegmentBase / segmentsPerBar else segmentHeight) * multiplier)
+                                .coerceAtLeast(0.5f)
                             val from = if (prefix.isNotEmpty()) runCatching { android.graphics.Color.parseColor(textValue(prefix + "Color From", "#FF56D8FF")) }.getOrDefault(fill) else fill
                             val to = if (prefix.isNotEmpty()) runCatching { android.graphics.Color.parseColor(textValue(prefix + "Color To", "#FF9B5CFF")) }.getOrDefault(fill) else fill
                             val segmentFill = lerpColor(from, to, level)

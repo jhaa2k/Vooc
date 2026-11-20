@@ -8,6 +8,36 @@ import org.junit.Test
 
 class ElementSystemTest {
     @Test
+    fun everyCatalogHasUniqueNamesValidDefaultsAndConsistentBounds() {
+        StudioElementType.entries.forEach { type ->
+            val specs = ElementPropertyCatalog.forElement(type)
+            val duplicateNames = specs.groupBy { it.name }.filterValues { it.size > 1 }.keys
+            assertTrue("$type has duplicate property names: $duplicateNames", duplicateNames.isEmpty())
+            specs.forEach { spec ->
+                assertTrue("$type/${spec.name} has a blank category", spec.category.isNotBlank())
+                assertNotNull("$type/${spec.name} default fails its own schema", spec.validate(spec.defaultValue))
+                if (spec.type == ElementValueType.ENUM) {
+                    val default = (spec.defaultValue as ElementValue.Text).value
+                    assertTrue("$type/${spec.name} default '$default' is not in ${spec.options}", default in spec.options)
+                }
+                if (spec.min != null && spec.max != null) {
+                    assertTrue("$type/${spec.name} has inverted bounds", spec.min <= spec.max)
+                }
+                when (val value = spec.defaultValue) {
+                    is ElementValue.Number -> {
+                        spec.min?.let { assertTrue("$type/${spec.name} default below minimum", value.value >= it) }
+                        spec.max?.let { assertTrue("$type/${spec.name} default above maximum", value.value <= it) }
+                    }
+                    is ElementValue.Integer -> {
+                        spec.min?.let { assertTrue("$type/${spec.name} default below minimum", value.value.toDouble() >= it) }
+                        spec.max?.let { assertTrue("$type/${spec.name} default above maximum", value.value.toDouble() <= it) }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+    @Test
     fun catalogContainsAllSpecificationElementTypes() {
         assertEquals(
             setOf("Audio Provider", "Image", "Background", "Rgb Split", "Blur Effect", "Bars/Segments", "Particles", "Text", "Motion Blur Effect", "Shape", "Mirror Effect", "Custom Shader", "Composition"),

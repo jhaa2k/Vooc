@@ -1667,6 +1667,29 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     val poppinsTypeface = remember(context) {
         androidx.core.content.res.ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable)
     }
+    val elementFonts by produceState(
+        initialValue = emptyMap<String, android.graphics.Typeface>(),
+        key1 = elements.filter { it.type == StudioElementType.TEXT }.map { element ->
+            Triple(element.id, element.value("Font Asset"), element.value("Font File"))
+        }
+    ) {
+        value = withContext(Dispatchers.IO) {
+            elements.filter { it.type == StudioElementType.TEXT &&
+                (it.value("Font Asset") as? ElementValue.Text)?.value == "Imported Font"
+            }.mapNotNull { element ->
+                val uriText = (element.value("Font File") as? ElementValue.Text)?.value.orEmpty()
+                if (uriText.isBlank()) null else runCatching {
+                    val cacheFile = java.io.File(context.cacheDir, "vooc-font-" + uriText.hashCode() + ".font")
+                    if (!cacheFile.exists() || cacheFile.length() == 0L) {
+                        context.contentResolver.openInputStream(Uri.parse(uriText))?.use { input ->
+                            cacheFile.outputStream().use { output -> input.copyTo(output) }
+                        } ?: throw IllegalStateException("Unable to open imported font.")
+                    }
+                    android.graphics.Typeface.createFromFile(cacheFile)
+                }.getOrNull()?.let { element.id to it }
+            }.toMap()
+        }
+    }
     val imageBitmaps by produceState(initialValue = emptyMap<Long, androidx.compose.ui.graphics.ImageBitmap>(), key1 = layers.map { it.id to it.imageUri }) {
         value = withContext(Dispatchers.IO) {
             layers.mapNotNull { layer: VisualLayer ->

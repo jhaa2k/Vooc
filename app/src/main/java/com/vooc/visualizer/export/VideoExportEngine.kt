@@ -96,11 +96,13 @@ object VideoExportEngine {
         // Decode audio once for deterministic offline spectrum analysis. The original AAC
         // packets are muxed untouched below; analysis only drives rendered visual frames.
         val audioEnvelope = FloatArray(frameCount)
-        val providerElement = project.document.elements.firstOrNull {
+        val providerElements = project.document.elements.filter {
             it.type == StudioElementType.AUDIO_PROVIDER && it.visible
-        } ?: ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-export-default")
-        val providerConfig = providerElement.toAudioProviderConfig()
-        val needsStereoReactivity = project.document.elements.any { element ->
+        }.ifEmpty { listOf(ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-export-default")) }
+        val providerConfigs = providerElements.map { it.toAudioProviderConfig() }
+        val providerConfig = providerConfigs.first()
+        val needsStereoReactivity = providerConfigs.any { it.channelMode != com.vooc.visualizer.analyzer.ProviderChannelMode.MONO_MIX } ||
+            project.document.elements.any { element ->
             val source = (element.value("Audio Reactivity Source") as? ElementValue.Text)?.value
             (element.value("Audio Reactivity Enabled") as? ElementValue.Bool)?.value == true &&
                 (source == "Left Channel" || source == "Right Channel")
@@ -108,7 +110,10 @@ object VideoExportEngine {
             element.type == StudioElementType.BARS_SEGMENTS &&
                 (element.value("Audio Channel") as? ElementValue.Text)?.value in setOf("Left", "Right", "Side")
         }
-        val providerSamplesByFrame = Array(frameCount) { FloatArray(providerConfig.sampleOutCount) }
+        val providerSamplesByIndexByFrame = Array(providerConfigs.size) { providerIndex ->
+            Array(frameCount) { FloatArray(providerConfigs[providerIndex].sampleOutCount) }
+        }
+        val providerSamplesByFrame = providerSamplesByIndexByFrame.first()
         val barElements = project.document.elements.filter { it.type == StudioElementType.BARS_SEGMENTS }
         val channelsToCapture = (barElements.mapNotNull { element ->
             when ((element.value("Audio Channel") as? ElementValue.Text)?.value) {
@@ -145,21 +150,26 @@ object VideoExportEngine {
                         if (needsStereoReactivity) config.copy(channelMode = com.vooc.visualizer.analyzer.ChannelMode.STEREO_SPLIT) else config
                     }
                 )
-                val providerProcessor = AudioProviderProcessor()
+                val providerProcessors = providerConfigs.map { AudioProviderProcessor() }
                 decoder.decode { samples, frames, ptsUs ->
                     if (frames > 0) {
                         offlineAnalyzer.pushInterleaved(samples, frames, stream.channels)
                         val chunkDurationUs = frames * 1_000_000L / stream.sampleRate
                         val endTimeSec = (ptsUs + chunkDurationUs) / 1_000_000.0
                         val analysis = offlineAnalyzer.analyzeLive(endTimeSec, alignToClock = false)
-                        val shaped = providerProcessor.process(analysis, providerConfig)
+                        val shapedProviders = providerProcessors.mapIndexed { providerIndex, processor ->
+                            processor.process(analysis, providerConfigs[providerIndex])
+                        }
+                        val shaped = shapedProviders.first()
                         val relativeStartUs = ptsUs - trimStartUs
                         val relativeEndUs = ptsUs + chunkDurationUs - trimStartUs
                         if (relativeEndUs >= 0L) {
                             val firstFrame = ((relativeStartUs.coerceAtLeast(0L) * fps) / 1_000_000L).toInt().coerceIn(0, frameCount - 1)
                             val lastFrame = ((relativeEndUs.coerceAtLeast(0L) * fps) / 1_000_000L).toInt().coerceIn(0, frameCount - 1)
                             for (frameIndex in firstFrame..lastFrame) {
-                                shaped.samples.copyInto(providerSamplesByFrame[frameIndex])
+                                shapedProviders.forEachIndexed { providerIndex, providerFrame ->
+                                    providerFrame.samples.copyInto(providerSamplesByIndexByFrame[providerIndex][frameIndex])
+                                }
                                 providerBeatByFrame[frameIndex] = shaped.beatValue
                                 providerBpmByFrame[frameIndex] = analysis.beat.bpm.takeIf { it in 40f..240f } ?: 120f
                                 leftLevelByFrame[frameIndex] = analysis.channel(ChannelSelect.LEFT).rms
@@ -202,7 +212,7 @@ object VideoExportEngine {
                     if (weights[i] > 0) last = (energy[i] / weights[i]).toFloat()
                     audioEnvelope[i] = last.coerceIn(0f, 1f)
                 }
-                var lastSamples: FloatArray? = null
+                val lastProviderSamples = arrayOfNulls<FloatArray>(providerConfigs.size)
                 var lastBeat = 0f
                 var lastBpm = 120f
                 var lastLeft = 0f
@@ -211,15 +221,19 @@ object VideoExportEngine {
                 val lastChannelSamples = mutableMapOf<ChannelSelect, ByteArray>()
                 for (i in providerSamplesByFrame.indices) {
                     if (providerFrameAssigned[i]) {
-                        lastSamples = providerSamplesByFrame[i]
+                        providerSamplesByIndexByFrame.forEachIndexed { providerIndex, frames ->
+                            lastProviderSamples[providerIndex] = frames[i]
+                        }
                         lastBeat = providerBeatByFrame[i]
                         lastBpm = providerBpmByFrame[i]
                         lastLeft = leftLevelByFrame[i]
                         lastRight = rightLevelByFrame[i]
                         lastWaveform = waveformLevelByFrame[i]
                         channelSpectrumByFrame.forEach { (channel, frames) -> lastChannelSamples[channel] = frames[i].copyOf() }
-                    } else if (lastSamples != null) {
-                        lastSamples.copyInto(providerSamplesByFrame[i])
+                    } else if (lastProviderSamples.any { it != null }) {
+                        providerSamplesByIndexByFrame.forEachIndexed { providerIndex, frames ->
+                            lastProviderSamples[providerIndex]?.copyInto(frames[i])
+                        }
                         providerBeatByFrame[i] = lastBeat
                         providerBpmByFrame[i] = lastBpm
                         leftLevelByFrame[i] = lastLeft
@@ -233,7 +247,9 @@ object VideoExportEngine {
                 val firstAssigned = providerFrameAssigned.indexOfFirst { it }
                 if (firstAssigned > 0) {
                     for (i in 0 until firstAssigned) {
-                        providerSamplesByFrame[firstAssigned].copyInto(providerSamplesByFrame[i])
+                        providerSamplesByIndexByFrame.forEach { frames ->
+                            frames[firstAssigned].copyInto(frames[i])
+                        }
                         providerBeatByFrame[i] = providerBeatByFrame[firstAssigned]
                         providerBpmByFrame[i] = providerBpmByFrame[firstAssigned]
                         leftLevelByFrame[i] = leftLevelByFrame[firstAssigned]

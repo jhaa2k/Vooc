@@ -201,7 +201,7 @@ object VideoExportEngine {
                             } else null
                             val processed = processImageForExport(source, element, maskBitmap)
                             imageCache["${uriText}#${element.id}"] = processed
-                            if (processed !== source) source.recycle()
+                            imageCache[uriText] = source
                             maskBitmap?.recycle()
                         } else if (element.type == StudioElementType.BLUR_EFFECT) {
                             val blurred = processBlurEffectForExport(source, element)
@@ -1164,9 +1164,19 @@ object VideoExportEngine {
                                 xfermode = android.graphics.PorterDuffXfermode(layerBlend)
                             }
                         }
+                        val original = imageCache[uriText]
+                        val showUnblurredUnder = enabled("Show Unblurred Content Under")
+                        val showUnblurredOver = enabled("Show Unblurred Content")
+                        val unblurredPaint = Paint(imagePaint).apply { colorFilter = null }
                         canvas.save()
                         canvas.clipPath(clip)
+                        if (showUnblurredUnder && original != null) {
+                            canvas.drawBitmap(original, src, dst, unblurredPaint)
+                        }
                         canvas.drawBitmap(image, src, dst, imagePaint)
+                        if (showUnblurredOver && original != null) {
+                            canvas.drawBitmap(original, src, dst, unblurredPaint)
+                        }
                         canvas.restore()
                     }
                 }

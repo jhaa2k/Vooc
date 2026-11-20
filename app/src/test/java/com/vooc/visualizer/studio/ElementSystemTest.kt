@@ -82,4 +82,55 @@ class ElementSystemTest {
         assertNotNull(image.value("Custom Image"))
         assertFalse(image.locked)
     }
+    @Test
+    fun legacyLayersConvertToStableSpecificationElements() {
+        val oldBars = VisualLayer(
+            id = 42L,
+            kind = LayerKind.BARSH,
+            name = "Main Spectrum",
+            enabled = false,
+            barCount = 96,
+            thickness = 3f,
+            spacing = 2f,
+            sensitivity = 150f,
+            smoothing = 35f
+        )
+        val converted = LegacyLayerAdapter.toElement(oldBars)
+        assertEquals("legacy-layer-42", converted.id)
+        assertEquals(StudioElementType.BARS_SEGMENTS, converted.type)
+        assertEquals("Main Spectrum", converted.tag)
+        assertEquals(ElementValue.Bool(false), converted.value("Visible"))
+        assertEquals(ElementValue.Integer(96L), converted.value("Bar Count"))
+        assertEquals(ElementValue.Bool(true), converted.value("Mirror"))
+        assertEquals(ElementValue.Text("Logarithmic"), converted.value("Frequency Scale"))
+        assertEquals(converted, LegacyLayerAdapter.toElement(oldBars))
+    }
+
+    @Test
+    fun legacyTextImageAndBackgroundKeepTheirContentWhenAdapted() {
+        val text = LegacyLayerAdapter.toElement(
+            VisualLayer(7L, LayerKind.TEXT, textContent = "VOOC Studio")
+        )
+        val image = LegacyLayerAdapter.toElement(
+            VisualLayer(8L, LayerKind.IMAGE, imageUri = "content://media/image/8")
+        )
+        val background = LegacyLayerAdapter.toElement(
+            VisualLayer(9L, LayerKind.BACKGROUND, imageUri = "content://media/image/9")
+        )
+        assertEquals(StudioElementType.TEXT, text.type)
+        assertEquals(ElementValue.Text("VOOC Studio"), text.value("Text"))
+        assertEquals(ElementValue.Text("content://media/image/8"), image.value("Image Source / File"))
+        assertEquals(ElementValue.Text("content://media/image/9"), background.value("Image File / Source"))
+    }
+
+    @Test
+    fun legacyLayerConversionDoesNotMutateOriginalProjectLayers() {
+        val layers = listOf(VisualLayer(1L, LayerKind.BARS), VisualLayer(2L, LayerKind.PARTICLES))
+        val before = layers.toList()
+        val converted = LegacyLayerAdapter.toElements(layers)
+        assertEquals(before, layers)
+        assertEquals(2, converted.size)
+        assertEquals(listOf("legacy-layer-1", "legacy-layer-2"), converted.map { it.id })
+    }
+
 }

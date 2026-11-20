@@ -608,7 +608,7 @@ object ElementPropertyCatalog {
         number("Max Height", "Layout", 300.0, 0.0, 10000.0),
         text("Bar Design", "Design", "Rounded Rect", listOf(
             "Rectangle", "Rounded Rect", "Capsule / Pill", "Line", "Circle / Dot",
-            "Triangle", "Diamond", "Hexagon", "Star", "Chevron", "Arrow", "Cross", "Wave", "Custom Image"
+            "Triangle", "Diamond", "Hexagon", "Pentagon", "Octagon", "Trapezoid", "Parallelogram", "Star", "Chevron", "Arrow", "Cross", "Wave", "Lightning", "Custom Image"
         )),
         number("Bar Width", "Layout", 8.0, 0.5, 256.0),
         number("Corner Radius", "Design", 4.0, 0.0, 128.0),

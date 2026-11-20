@@ -197,7 +197,9 @@ data class AudioReactivityTransform(
     val yOffset: Float = 0f,
     val scaleMultiplier: Float = 1f,
     val rotationOffset: Float = 0f,
-    val opacityMultiplier: Float = 1f
+    val opacityMultiplier: Float = 1f,
+    val colorMultiplier: Float = 1f,
+    val effectStrengthMultiplier: Float = 1f
 )
 
 fun audioReactivityTransform(properties: Map<String, ElementValue>, value: Float?): AudioReactivityTransform {
@@ -210,6 +212,18 @@ fun audioReactivityTransform(properties: Map<String, ElementValue>, value: Float
         yOffset = if (all || target == "Position") amount * 100f else 0f,
         scaleMultiplier = if (all || target == "Scale" || target == "Size") (1f + amount).coerceAtLeast(0f) else 1f,
         rotationOffset = if (all || target == "Rotation") amount else 0f,
-        opacityMultiplier = if (all || target == "Opacity") amount.coerceIn(0f, 1f) else 1f
+        opacityMultiplier = if (all || target == "Opacity") amount.coerceIn(0f, 1f) else 1f,
+        colorMultiplier = if (all || target == "Color") (0.25f + amount.coerceIn(0f, 1f) * 0.75f) else 1f,
+        effectStrengthMultiplier = if (all || target == "Effect Strength") amount.coerceIn(0f, 4f) else 1f
     )
+}
+
+/** Scales RGB intensity without changing the source alpha channel. */
+fun audioReactivityColor(color: Int, multiplier: Float): Int {
+    val factor = multiplier.takeIf { it.isFinite() }?.coerceIn(0f, 4f) ?: 1f
+    val alpha = color ushr 24 and 0xFF
+    val red = ((color ushr 16 and 0xFF) * factor).toInt().coerceIn(0, 255)
+    val green = ((color ushr 8 and 0xFF) * factor).toInt().coerceIn(0, 255)
+    val blue = ((color and 0xFF) * factor).toInt().coerceIn(0, 255)
+    return (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 }

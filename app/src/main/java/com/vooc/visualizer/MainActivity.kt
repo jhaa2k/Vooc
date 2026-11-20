@@ -2300,7 +2300,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                             if (design == "Custom Image" && customImage != null) {
                                 drawImage(customImage, dstOffset = androidx.compose.ui.unit.IntOffset(left.toInt(), top.toInt()),
-                                    dstSize = androidx.compose.ui.unit.IntSize(width.toInt().coerceAtLeast(1), height.toInt().coerceAtLeast(1)))
+                                    dstSize = androidx.compose.ui.unit.IntSize(width.toInt().coerceAtLeast(1), height.toInt().coerceAtLeast(1)),
+                                    alpha = opacity)
                             } else {
                                 when (design) {
                                     "Circle / Dot" -> drawCircle(fill, (height * 0.5f).coerceAtLeast(1f), Offset(left + width / 2f, top + height / 2f))

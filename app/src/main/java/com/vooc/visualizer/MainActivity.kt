@@ -54,7 +54,6 @@ import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -1416,7 +1415,9 @@ private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLaye
 
 @Composable
 private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, elements: List<ElementDocument>, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, playing: Boolean) {
-    var phase by remember { mutableFloatStateOf(0f) }
+    // AnalysisFrame.timeSec is anchored to Media3's current playback position.
+    // Using it for motion keeps preview animation synchronized through pause, seek and track changes.
+    val playbackSeconds = (frame?.timeSec ?: 0.0).toFloat().coerceAtLeast(0f)
     val context = androidx.compose.ui.platform.LocalContext.current
     val poppinsTypeface = remember(context) {
         androidx.core.content.res.ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable)
@@ -1454,19 +1455,6 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     val layerSmoothing = remember { mutableMapOf<Long, FloatArray>() }
     val barRuntimes = remember { mutableMapOf<String, SpectrumBarsRuntime>() }
     val barLastUpdateMs = remember { mutableMapOf<String, Long>() }
-    LaunchedEffect(playing) {
-        var previousFrameNanos = 0L
-        while (playing) {
-            withFrameNanos { frameNanos ->
-                if (previousFrameNanos != 0L) {
-                    val deltaSeconds = ((frameNanos - previousFrameNanos).coerceAtLeast(0L) / 1_000_000_000f)
-                        .coerceIn(0f, 0.1f)
-                    phase += deltaSeconds
-                }
-                previousFrameNanos = frameNanos
-            }
-        }
-    }
     Canvas(modifier.background(Color.Black)) {
         clipRect {
         val cx = size.width / 2f
@@ -1513,7 +1501,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 ?.average()?.toFloat() ?: (frame?.band(2) ?: 0f)
             val motion = MeasureWhatEngine.evaluate(
                 mode = layer.measureWhat,
-                runtimeSeconds = phase,
+                runtimeSeconds = playbackSeconds,
                 trackPositionSeconds = (frame?.timeSec ?: 0.0).toFloat(),
                 playing = playing,
                 beatPulse = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f,
@@ -1521,7 +1509,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 treble = trebleLevel,
                 bpm = frame?.beat?.bpm ?: 120f,
                 seed = layer.id,
-                playingSeconds = phase
+                playingSeconds = playbackSeconds
             )
             val center = Offset(
                 baseCenter.x + motion.offsetX * size.width,
@@ -1662,7 +1650,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     LayerKind.DOTS, LayerKind.PARTICLES -> {
                         val n = if (layer.kind == LayerKind.PARTICLES) layer.particleCount else count
                         repeat(n) { i ->
-                            val a = i * 2f * PI.toFloat() / n + phase * (if (layer.kind == LayerKind.PARTICLES) 1f else 0f)
+                            val a = i * 2f * PI.toFloat() / n + playbackSeconds * (if (layer.kind == LayerKind.PARTICLES) 1f else 0f)
                             val v = responsiveValueAt(i % count)
                             val r = size.minDimension * (0.08f + (i % 9) * 0.035f) * scale * (1f + v * 0.25f)
                             drawCircle(if (i % 2 == 0) color else accent, (layer.thickness * 0.55f + v * 3f).dp.toPx(),
@@ -1727,12 +1715,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             val treble = elementSamples.takeLast(bandSize).average().toFloat().coerceIn(0f, 1f)
             fun motionFor(property: String) = MeasureWhatEngine.evaluate(
                 mode = textValue(property, "Nothing"),
-                runtimeSeconds = phase,
+                runtimeSeconds = playbackSeconds,
                 trackPositionSeconds = (frame?.timeSec ?: 0.0).toFloat(),
                 playing = playing,
                 beatPulse = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f,
                 bass = bass, treble = treble, bpm = frame?.beat?.bpm ?: 120f,
-                seed = element.id.hashCode().toLong(), playingSeconds = phase
+                seed = element.id.hashCode().toLong(), playingSeconds = playbackSeconds
             )
             val posMotion = motionFor("Measure Pos (Measure What)")
             val scaleMotion = motionFor("Measure Scale (Measure What)")
@@ -1951,7 +1939,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val particleScale = number("Particle Scale", 100f) / 100f * scale
                         val colorTo = runCatching { Color(android.graphics.Color.parseColor(textValue("Color To", colorText))) }.getOrDefault(elementColor)
                         repeat(count) { index ->
-                            val angle = index * 2f * PI.toFloat() / count + phase * 0.35f
+                            val angle = index * 2f * PI.toFloat() / count + playbackSeconds * 0.35f
                             val radius = size.minDimension * (0.06f + (index % 11) * 0.018f) * particleScale
                             drawCircle(if (index % 2 == 0) elementColor else colorTo.copy(alpha = opacity),
                                 (2f + number("Start Size", 8f) * 0.08f).dp.toPx(),

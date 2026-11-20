@@ -1697,6 +1697,16 @@ object VideoExportEngine {
                                 else android.graphics.LinearGradient(gx - dx, gy - dy, gx + dx, gy + dy, startColor, endColor, tile)
                         }
                     }
+                    shapePath.fillType = if (textValue("Fill Rule", "Non Zero") == "Even Odd") android.graphics.Path.FillType.EVEN_ODD else android.graphics.Path.FillType.WINDING
+                    val shapeMatrix = android.graphics.Matrix().apply {
+                        setTranslate(-cx, -cy)
+                        postSkew(
+                            kotlin.math.tan(Math.toRadians(number("Skew X", 0f).coerceIn(-89f, 89f).toDouble())).toFloat(),
+                            kotlin.math.tan(Math.toRadians(number("Skew Y", 0f).coerceIn(-89f, 89f).toDouble())).toFloat()
+                        )
+                        postTranslate(cx, cy)
+                    }
+                    shapePath.transform(shapeMatrix)
                     val shapeShadowEnabled = element.value("Shape Shadow Enabled") == ElementValue.Bool(true)
                     val shapeBlurRadius = number("Shape Blur", 0f) * width / 1080f
                     if (shapeShadowEnabled || shapeBlurRadius > 0f) {

@@ -1358,6 +1358,16 @@ object VideoExportEngine {
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
                             val colorMatrix = ColorMatrix().apply {
                                 setSaturation(saturation)
+                                val brightness = number("Image Brightness", 1f).coerceIn(0f, 4f)
+                                val contrast = number("Image Contrast", 1f).coerceIn(0f, 4f)
+                                val temperature = ((number("Image Color Temperature", 6500f) - 6500f) / 5500f).coerceIn(-1f, 1f)
+                                val temperatureChannels = floatArrayOf(1f + 0.12f * temperature, 1f + 0.02f * temperature, 1f - 0.12f * temperature)
+                                val values = array
+                                for (row in 0..2) {
+                                    val base = row * 5
+                                    for (column in 0..3) values[base + column] *= brightness * contrast * temperatureChannels[row]
+                                    values[base + 4] = values[base + 4] * brightness * temperatureChannels[row] + 128f * (1f - contrast)
+                                }
                                 val layerTint = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                                 val tintValues = array
                                 val tintChannels = floatArrayOf(

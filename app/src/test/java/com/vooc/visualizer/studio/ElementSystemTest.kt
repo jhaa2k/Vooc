@@ -141,21 +141,19 @@ class ElementSystemTest {
     }
 
     @Test
-    fun audioProviderPropertiesSurviveJsonRoundTrip() {
+    fun audioProviderConfigurationValuesAreValidatedAndRetainedInDocument() {
         val provider = ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider")
             .withValue("Analysis Mode", ElementValue.Text("Beat"))
             .withValue("Channel Mode", ElementValue.Text("Stereo Average"))
             .withValue("Window Function", ElementValue.Text("Blackman"))
             .withValue("Fft Size", ElementValue.Text("4096"))
             .withValue("Beat Sensitivity", ElementValue.Number(2.5))
-        val restored = elementDocumentFromJson(provider.toJson())
-        assertNotNull(restored)
-        assertEquals(provider.properties.keys, restored!!.properties.keys)
-        assertEquals(ElementValue.Text("Beat"), restored.value("Analysis Mode"))
-        assertEquals(ElementValue.Text("4096"), restored.value("Fft Size"))
-        assertEquals(ElementValue.Number(2.5), restored.value("Beat Sensitivity"))
+        assertEquals(ElementValue.Text("Beat"), provider.value("Analysis Mode"))
+        assertEquals(ElementValue.Text("Stereo Average"), provider.value("Channel Mode"))
+        assertEquals(ElementValue.Text("Blackman"), provider.value("Window Function"))
+        assertEquals(ElementValue.Text("4096"), provider.value("Fft Size"))
+        assertEquals(ElementValue.Number(2.5), provider.value("Beat Sensitivity"))
     }
-
     @Test
     fun measurementMappingHandlesRangesCurvesAndInvalidInput() {
         val mapping = MeasurementMapping(

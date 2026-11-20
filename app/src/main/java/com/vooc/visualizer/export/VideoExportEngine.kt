@@ -937,7 +937,8 @@ object VideoExportEngine {
                     paint.style = Paint.Style.FILL
                 }
                 StudioElementType.IMAGE -> {
-                    val uriText = textValue("Custom Image", textValue("Image Source / File"))
+                    val uriText = listOf("Custom Image", "Image Source / File", "Target Image")
+                        .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
                     val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
                     if (image != null) {
                         val frameWidth = width * 0.45f * scale

@@ -984,7 +984,7 @@ object VideoExportEngine {
                             this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
                             val colorMatrix = ColorMatrix().apply {
-                                setToSaturation(saturation)
+                                setSaturation(saturation)
                                 val layerTint = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                                 val tintValues = array
                                 val tintChannels = floatArrayOf(

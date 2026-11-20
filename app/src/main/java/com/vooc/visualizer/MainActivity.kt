@@ -120,6 +120,9 @@ import com.vooc.visualizer.studio.ProjectEntry
 import com.vooc.visualizer.studio.ProjectKeyframe
 import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.MeasureWhatEngine
+import com.vooc.visualizer.studio.AudioReactivityRuntime
+import com.vooc.visualizer.studio.audioReactivitySources
+import com.vooc.visualizer.studio.audioReactivityTransform
 import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.TemplateStore
 import com.vooc.visualizer.studio.VisualLayer
@@ -1648,6 +1651,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
         }
     }
     val layerSmoothing = remember { mutableMapOf<Long, FloatArray>() }
+    val audioReactivityRuntimes = remember { mutableMapOf<String, AudioReactivityRuntime>() }
     val barRuntimes = remember { mutableMapOf<String, SpectrumBarsRuntime>() }
     val barLastUpdateMs = remember { mutableMapOf<String, Long>() }
     Canvas(modifier.background(Color.Black)) {
@@ -1905,6 +1909,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
             val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
             val elementSamples = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(0)
+            val overallLevel = frame?.rms ?: 0f
+            val reactivitySources = audioReactivitySources(
+                samples = elementSamples,
+                overall = overallLevel,
+                beat = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f
+            )
+            val reactivityValue = audioReactivityRuntimes.getOrPut(element.id) { AudioReactivityRuntime() }
+                .update(props, reactivitySources, 1f / 60f)
+            val reactivity = audioReactivityTransform(props, reactivityValue)
             val bandSize = (elementSamples.size / 5).coerceAtLeast(1)
             val bass = elementSamples.take(bandSize).average().toFloat().coerceIn(0f, 1f)
             val treble = elementSamples.takeLast(bandSize).average().toFloat().coerceIn(0f, 1f)
@@ -1921,11 +1934,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             val scaleMotion = motionFor("Measure Scale (Measure What)")
             val rotMotion = motionFor("Measure Rot (Measure What)")
             val center = Offset(
-                cx + (position.x.toFloat() / 200f + posMotion.offsetX) * size.width,
-                cy + (position.y.toFloat() / 200f + posMotion.offsetY) * size.height
+                cx + ((position.x.toFloat() + reactivity.xOffset) / 200f + posMotion.offsetX) * size.width,
+                cy + ((position.y.toFloat() + reactivity.yOffset) / 200f + posMotion.offsetY) * size.height
             )
-            val scale = (number("Scale", 100f) / 100f * scaleMotion.scale).coerceIn(0f, 10f)
-            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation
+            val scale = (number("Scale", 100f) / 100f * scaleMotion.scale * reactivity.scaleMultiplier).coerceIn(0f, 10f)
+            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation + reactivity.rotationOffset
             val opacityMode = textValue("Measure Opacity (Measure What)", "Nothing")
             val opacityMotion = motionFor("Measure Opacity (Measure What)")
             val measuredOpacity = if (opacityMode == "Nothing") 1f else maxOf(
@@ -1934,7 +1947,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 kotlin.math.abs(opacityMotion.offsetX) / 0.05f,
                 kotlin.math.abs(opacityMotion.offsetY) / 0.05f
             ).coerceIn(0f, 1f)
-            val opacity = (number("Opacity", 100f) / 100f * measuredOpacity).coerceIn(0f, 1f)
+            val opacity = (number("Opacity", 100f) / 100f * measuredOpacity * reactivity.opacityMultiplier).coerceIn(0f, 1f)
             val colorText = textValue("Color", "#FFFFFFFF")
             val elementColor = runCatching { Color(android.graphics.Color.parseColor(colorText)).copy(alpha = opacity) }.getOrDefault(Color.White.copy(alpha = opacity))
             val label = textValue("Text", element.tag).take(120)

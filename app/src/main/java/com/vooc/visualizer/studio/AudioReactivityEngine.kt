@@ -130,25 +130,38 @@ fun audioReactivitySources(
         if (data == null) return overall.coerceIn(0f, 1f)
         val start = from.coerceIn(0, data.size - 1)
         val end = until.coerceIn(start + 1, data.size)
-        return data.copyOfRange(start, end).map { it.takeIf(Float::isFinite)?.coerceIn(0f, 1f) ?: 0f }
-            .average().toFloat().coerceIn(0f, 1f)
+        var sum = 0f
+        for (index in start until end) {
+            val sample = data[index]
+            if (sample.isFinite()) sum += sample.coerceIn(0f, 1f)
+        }
+        return (sum / (end - start)).coerceIn(0f, 1f)
     }
     val size = data?.size ?: 0
     val fifth = (size / 5).coerceAtLeast(1)
-    val safe = data?.map { it.takeIf(Float::isFinite)?.coerceIn(0f, 1f) ?: 0f }.orEmpty()
+    var spectrumSum = 0f
+    var spectrumMaximum = 0f
+    if (data != null) {
+        for (sample in data) {
+            val safeSample = if (sample.isFinite()) sample.coerceIn(0f, 1f) else 0f
+            spectrumSum += safeSample
+            if (safeSample > spectrumMaximum) spectrumMaximum = safeSample
+        }
+    }
+    val fallback = overall.coerceIn(0f, 1f)
     return AudioReactivitySources(
-        overall = overall.coerceIn(0f, 1f),
+        overall = fallback,
         bass = average(0, fifth),
         mid = average(size / 2 - fifth / 2, size / 2 + fifth / 2),
         treble = average(size - fifth, size),
         beat = beat.coerceIn(0f, 1f),
         peak = peak.coerceIn(0f, 1f),
         rms = rms.coerceIn(0f, 1f),
-        waveform = overall.coerceIn(0f, 1f),
-        spectrumAverage = if (safe.isEmpty()) overall.coerceIn(0f, 1f) else safe.average().toFloat(),
-        spectrumMaximum = safe.maxOrNull() ?: overall.coerceIn(0f, 1f),
-        left = overall.coerceIn(0f, 1f),
-        right = overall.coerceIn(0f, 1f)
+        waveform = fallback,
+        spectrumAverage = if (size == 0) fallback else spectrumSum / size,
+        spectrumMaximum = if (size == 0) fallback else spectrumMaximum,
+        left = fallback,
+        right = fallback
     )
 }
 

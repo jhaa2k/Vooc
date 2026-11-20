@@ -603,6 +603,7 @@ object ElementPropertyCatalog {
         integer("Segments Per Bar", "Layout", 1, 1.0, 64.0),
         text("Orientation", "Layout", "Vertical", listOf("Horizontal", "Vertical", "Radial", "Mirror")),
         text("Shape Path", "Layout", "Horizontal Line", listOf("Horizontal Line", "Vertical Line", "Circle", "Custom Path")),
+        text("Custom Path Points", "Layout", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5"),
         number("Min Height", "Layout", 0.0, 0.0, 10000.0),
         number("Max Height", "Layout", 300.0, 0.0, 10000.0),
         text("Bar Design", "Design", "Rounded Rect", listOf(

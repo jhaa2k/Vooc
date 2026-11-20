@@ -6,6 +6,37 @@ package com.vooc.visualizer.studio
  * legacy project data, so older projects remain recoverable during the staged migration.
  */
 object LegacyLayerAdapter {
+    /** Creates a new spectrum style directly in the canonical element stack. */
+    fun createSpectrumElement(kind: LayerKind, id: String): ElementDocument {
+        require(kind !in setOf(
+            LayerKind.PARTICLES, LayerKind.SHAPE, LayerKind.TEXT,
+            LayerKind.IMAGE, LayerKind.BACKGROUND
+        )) { "Only spectrum styles can be created as spectrum elements" }
+        val legacy = VisualLayer(id = id.hashCode().toLong(), kind = kind)
+        return toElement(legacy).copy(id = id, tag = kind.title).let { element ->
+            val design = when (kind) {
+                LayerKind.BARSH -> "Rounded Rect"
+                LayerKind.CIRCLE, LayerKind.MULTIRING, LayerKind.CONCENTRIC,
+                LayerKind.RING, LayerKind.PULSE, LayerKind.DOTS -> "Circle / Dot"
+                LayerKind.WAVE, LayerKind.WAVEC -> "Wave"
+                LayerKind.SCOPE, LayerKind.LINES -> "Line"
+                LayerKind.BLOCKS -> "Rectangle"
+                LayerKind.GRID -> "Rectangle"
+                else -> "Rounded Rect"
+            }
+            var configured = element.withValue("Bar Design", ElementValue.Text(design))
+            if (kind == LayerKind.BARSH || kind == LayerKind.MULTIRING || kind == LayerKind.CONCENTRIC) {
+                configured = configured.withValue("Mirror", ElementValue.Bool(true))
+                configured = configured.withValue("Mirror Mode", ElementValue.Text("Horizontal"))
+            }
+            if (kind == LayerKind.PULSE || kind == LayerKind.RING || kind == LayerKind.MULTIRING || kind == LayerKind.CONCENTRIC) {
+                configured = configured.withValue("Center Symmetry", ElementValue.Bool(true))
+                configured = configured.withValue("Alignment", ElementValue.Text("Center"))
+            }
+            configured.normalized()
+        }
+    }
+
     fun toElement(layer: VisualLayer): ElementDocument {
         val type = when (layer.kind) {
             LayerKind.PARTICLES -> StudioElementType.PARTICLES

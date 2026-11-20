@@ -10,12 +10,22 @@ class ElementSystemTest {
     @Test
     fun catalogContainsAllSpecificationElementTypes() {
         assertEquals(
-            setOf("Audio Provider", "Image", "Background", "Rgb Split", "Blur Effect", "Bars/Segments", "Particles", "Text", "Motion Blur Effect", "Shape"),
+            setOf("Audio Provider", "Image", "Background", "Rgb Split", "Blur Effect", "Bars/Segments", "Particles", "Text", "Motion Blur Effect", "Shape", "Mirror Effect", "Custom Shader", "Composition"),
             StudioElementType.entries.map { it.displayName }.toSet()
         )
         StudioElementType.entries.forEach { type ->
             assertTrue("$type should expose a property schema", ElementPropertyCatalog.forElement(type).isNotEmpty())
         }
+    }
+
+    @Test
+    fun mirrorShaderAndCompositionExposeTheirFullControlGroups() {
+        val mirror = ElementPropertyCatalog.forElement(StudioElementType.MIRROR_EFFECT).map { it.name }.toSet()
+        val shader = ElementPropertyCatalog.forElement(StudioElementType.CUSTOM_SHADER).map { it.name }.toSet()
+        val composition = ElementPropertyCatalog.forElement(StudioElementType.COMPOSITION).map { it.name }.toSet()
+        assertTrue(mirror.containsAll(setOf("Target Image", "Mirror Axis", "Mirror Position", "Mirror Offset X", "Mirror Offset Y", "Mirror Gap", "Mirror Feather", "Reflection Count", "Reflection Opacity", "Mirror Original", "Mirror Flip", "Mirror Blend Mode")))
+        assertTrue(shader.containsAll(setOf("Shader Name", "Shader Source", "Shader Enabled", "Shader Language", "Shader Entry Point", "Shader Version", "Shader Time Scale", "Shader Amount", "Shader Input Scale", "Shader Output Opacity", "Shader Uniform 1 Name", "Shader Uniform 1 Value", "Shader Uniform 2 Name", "Shader Uniform 2 Value", "Shader Uniform 3 Name", "Shader Uniform 3 Value", "Shader Blend Mode", "Shader Use Audio", "Shader Audio Source")))
+        assertTrue(composition.containsAll(setOf("Composition Name", "Composition Enabled", "Composition Width", "Composition Height", "Composition FPS", "Composition Background", "Composition Blend Mode", "Composition Opacity", "Composition Source Index", "Parent Composition Index", "Composition Start Time", "Composition Duration", "Composition Time Offset", "Composition Loop", "Composition Isolated Audio", "Composition Export Enabled")))
     }
 
     @Test

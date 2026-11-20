@@ -607,6 +607,128 @@ object VideoExportEngine {
         canvas.save()
         canvas.clipRect(0, 0, width, height)
         canvas.drawColor((project.document.backgroundArgb or (0xFFL shl 24)).toInt())
+        project.document.elements.filter { it.visible && it.type == StudioElementType.BACKGROUND }.forEach { element ->
+            fun bgNumber(name: String, fallback: Float): Float = when (val value = element.value(name)) {
+                is ElementValue.Number -> value.value.toFloat()
+                is ElementValue.Integer -> value.value.toFloat()
+                else -> fallback
+            }
+            fun bgText(name: String, fallback: String = ""): String =
+                (element.value(name) as? ElementValue.Text)?.value ?: fallback
+            fun bgBool(name: String): Boolean = (element.value(name) as? ElementValue.Bool)?.value == true
+            val sourceType = bgText("Source Type", "Solid Color")
+            val opacity = (bgNumber("Opacity", 100f).coerceIn(0f, 100f) / 100f *
+                bgNumber("Opacity / Alpha", 1f).coerceIn(0f, 1f))
+            val blendMode = when (bgText("Blend Mode Content", "Alpha")) {
+                "Add" -> android.graphics.PorterDuff.Mode.ADD
+                "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                else -> android.graphics.PorterDuff.Mode.SRC_OVER
+            }
+            val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                alpha = (opacity * 255f).toInt().coerceIn(0, 255)
+                style = Paint.Style.FILL
+                xfermode = if (blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
+            }
+            when (sourceType) {
+                "Solid Color" -> {
+                    backgroundPaint.color = runCatching {
+                        android.graphics.Color.parseColor(bgText("Color", "#FF000000"))
+                    }.getOrDefault(android.graphics.Color.BLACK)
+                    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
+                }
+                "Gradient" -> {
+                    val startColor = runCatching {
+                        android.graphics.Color.parseColor(bgText("Background Gradient Start", "#FF000000"))
+                    }.getOrDefault(android.graphics.Color.BLACK)
+                    val endColor = runCatching {
+                        android.graphics.Color.parseColor(bgText("Background Gradient End", "#FFFFFFFF"))
+                    }.getOrDefault(android.graphics.Color.WHITE)
+                    val radius = kotlin.math.sqrt(width.toFloat() * width + height.toFloat() * height) * 0.5f
+                    val angle = Math.toRadians(bgNumber("Background Gradient Angle", 0f).toDouble())
+                    val dx = kotlin.math.cos(angle).toFloat() * radius
+                    val dy = kotlin.math.sin(angle).toFloat() * radius
+                    backgroundPaint.shader = if (bgText("Background Gradient Type", "Linear") == "Radial") {
+                        android.graphics.RadialGradient(width * 0.5f, height * 0.5f, radius, startColor, endColor, Shader.TileMode.CLAMP)
+                    } else {
+                        LinearGradient(width * 0.5f - dx, height * 0.5f - dy, width * 0.5f + dx, height * 0.5f + dy, startColor, endColor, Shader.TileMode.CLAMP)
+                    }
+                    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
+                    backgroundPaint.shader = null
+                }
+                "Image" -> {
+                    val sourceUri = bgText("Image File / Source")
+                    val image = imageCache["${sourceUri}#${element.id}"] ?: imageCache[sourceUri]
+                    if (image != null) {
+                        val imageRatio = image.width.toFloat() / image.height.coerceAtLeast(1)
+                        val frameRatio = width.toFloat() / height.coerceAtLeast(1)
+                        val fit = bgText("Fit Mode (Scale Type)", "Fill (Cover)")
+                        val destWidth: Float
+                        val destHeight: Float
+                        when {
+                            fit == "Stretch" -> { destWidth = width.toFloat(); destHeight = height.toFloat() }
+                            fit == "Fit (Contain)" -> {
+                                destWidth = if (imageRatio > frameRatio) width.toFloat() else height * imageRatio
+                                destHeight = if (imageRatio > frameRatio) width / imageRatio else height.toFloat()
+                            }
+                            else -> {
+                                destWidth = if (imageRatio > frameRatio) height * imageRatio else width.toFloat()
+                                destHeight = if (imageRatio > frameRatio) height.toFloat() else width / imageRatio
+                            }
+                        }
+                        val alignment = bgText("Background Fit Alignment", "Center")
+                        val offsetX = bgNumber("Background Image Offset X", 0f) * width / 1080f
+                        val offsetY = bgNumber("Background Image Offset Y", 0f) * height / 1080f
+                        val left = when (alignment) {
+                            "Left" -> 0f
+                            "Right" -> width - destWidth
+                            else -> (width - destWidth) * 0.5f
+                        } + offsetX
+                        val top = when (alignment) {
+                            "Top" -> 0f
+                            "Bottom" -> height - destHeight
+                            else -> (height - destHeight) * 0.5f
+                        } + offsetY
+                        if (bgBool("Background Tile")) {
+                            val tileScale = bgNumber("Background Tile Scale", 1f).coerceIn(0.01f, 100f)
+                            val tileShader = android.graphics.BitmapShader(image,
+                                Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+                            val tileMatrix = android.graphics.Matrix().apply {
+                                setScale(tileScale, tileScale)
+                                postTranslate(offsetX, offsetY)
+                            }
+                            tileShader.setLocalMatrix(tileMatrix)
+                            backgroundPaint.shader = tileShader
+                            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
+                            backgroundPaint.shader = null
+                        } else {
+                            canvas.drawBitmap(image, null, RectF(left, top, left + destWidth, top + destHeight), backgroundPaint)
+                        }
+                        val overlay = runCatching {
+                            android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))
+                        }.getOrDefault(android.graphics.Color.TRANSPARENT)
+                        if (android.graphics.Color.alpha(overlay) > 0) {
+                            val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = overlay
+                                alpha = (android.graphics.Color.alpha(overlay) * opacity).toInt().coerceIn(0, 255)
+                                xfermode = if (blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
+                            }
+                            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
+                        }
+                    } else {
+                        backgroundPaint.color = runCatching {
+                            android.graphics.Color.parseColor(bgText("Color", "#FF000000"))
+                        }.getOrDefault(android.graphics.Color.BLACK)
+                        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
+                    }
+                }
+                else -> Unit // Video backgrounds require a decoded video-frame source.
+            }
+        }
         val seconds = timeMs / 1000f
         project.layers.filter { it.enabled }.map { evaluateLayer(project, it, timeMs) }.forEach { layer ->
             val color = layer.color.toInt()

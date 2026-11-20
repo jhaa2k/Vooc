@@ -10,6 +10,7 @@ class ElementSystemTest {
     @Test
     fun everyCatalogHasUniqueNamesValidDefaultsAndConsistentBounds() {
         val invalidDefaults = mutableListOf<String>()
+        val invalidEnumDefaults = mutableListOf<String>()
         StudioElementType.entries.forEach { type ->
             val specs = ElementPropertyCatalog.forElement(type)
             val duplicateNames = specs.groupBy { it.name }.filterValues { it.size > 1 }.keys
@@ -19,7 +20,7 @@ class ElementSystemTest {
                 if (spec.validate(spec.defaultValue) == null) invalidDefaults += "$type/${spec.name}: type=${spec.type}, default=${spec.defaultValue}, options=${spec.options}"
                 if (spec.type == ElementValueType.ENUM) {
                     val default = (spec.defaultValue as ElementValue.Text).value
-                    assertTrue("$type/${spec.name} default '$default' is not in ${spec.options}", default in spec.options)
+                    if (default !in spec.options) invalidEnumDefaults += "$type/${spec.name}: default='$default', options=${spec.options}"
                 }
                 if (spec.min != null && spec.max != null) {
                     assertTrue("$type/${spec.name} has inverted bounds", spec.min <= spec.max)
@@ -38,6 +39,7 @@ class ElementSystemTest {
             }
         }
         assertTrue("Invalid catalog defaults: " + invalidDefaults.joinToString("; "), invalidDefaults.isEmpty())
+        assertTrue("Invalid enum defaults: " + invalidEnumDefaults.joinToString("; "), invalidEnumDefaults.isEmpty())
     }
     @Test
     fun catalogContainsAllSpecificationElementTypes() {

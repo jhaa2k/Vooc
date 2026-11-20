@@ -965,7 +965,7 @@ private fun VoocStudio(
                         onPickImage = { property -> pendingElementImageProperty = property; elementImagePicker.launch(arrayOf("image/*")) },
                         onChange = { updated ->
                             val next = project.copy(document = project.document.copy(
-                                elements = project.document.elements.filterNot { it.id == updated.id } + updated
+                                elements = project.document.elements.replacePreservingOrder(updated)
                             ))
                             project = next
                             onSave(next)

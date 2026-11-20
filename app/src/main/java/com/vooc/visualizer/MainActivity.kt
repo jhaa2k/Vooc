@@ -1983,8 +1983,48 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         val segmentsPerBar = number("Segments Per Bar", 1f).toInt().coerceIn(1, 64)
                         val segmentGap = (gap * 0.55f).coerceAtMost(6.dp.toPx())
-                        rotate(if (orientation == "Horizontal") 90f else 0f, center) {
-                        repeat(count) { index ->
+                        val radialLayout = orientation == "Radial" || textValue("Shape Path", "Horizontal Line") == "Circle"
+                        if (radialLayout) {
+                            val innerRadius = (size.minDimension * 0.16f + barOffset).coerceIn(0f, size.minDimension * 0.42f)
+                            val radialMax = minOf(maxHeight, size.minDimension * 0.42f)
+                            repeat(count) { index ->
+                                val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
+                                var level = levels[sourceIndex].coerceIn(0f, 1f)
+                                if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
+                                val barHeight = (minHeight + level * radialMax).coerceIn(0f, radialMax)
+                                val angle = index * (360f / count) + number("Bar Rotation", 0f)
+                                val radialColor = when (colorMode) {
+                                    "Alternating" -> if (index % 2 == 0) colorA else colorB
+                                    "Per Bar" -> runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor)
+                                    "Gradient", "By Amplitude" -> Color(
+                                        colorA.red + (colorB.red - colorA.red) * level,
+                                        colorA.green + (colorB.green - colorA.green) * level,
+                                        colorA.blue + (colorB.blue - colorA.blue) * level,
+                                        opacity
+                                    )
+                                    else -> elementColor
+                                }
+                                val radialTop = center.y - innerRadius - barHeight
+                                rotate(angle, center) {
+                                    val segmentHeight = ((barHeight - segmentGap * (segmentsPerBar - 1)) / segmentsPerBar).coerceAtLeast(0.5f)
+                                    repeat(segmentsPerBar) { segment ->
+                                        val segmentTop = radialTop + segment * (segmentHeight + segmentGap)
+                                        drawBarShape(center.x - barWidth / 2f, segmentTop, barWidth, segmentHeight, radialColor, 0f, index)
+                                    }
+                                    val peakStyle = textValue("Peak Indicator Style", "Line")
+                                    if (peakEnabled && peakStyle != "None") {
+                                        val peakY = center.y - innerRadius - peaks[sourceIndex].coerceIn(0f, 1f) * radialMax
+                                        when (peakStyle) {
+                                            "Dot" -> drawCircle(peakColor.copy(alpha = opacity), (peakWidth * 1.5f).coerceAtLeast(1f), Offset(center.x, peakY))
+                                            "Bar" -> drawRect(peakColor.copy(alpha = opacity), Offset(center.x - barWidth / 2f, peakY - peakWidth), androidx.compose.ui.geometry.Size(barWidth, peakWidth * 2f))
+                                            "Line" -> drawLine(peakColor.copy(alpha = opacity), Offset(center.x - barWidth / 2f - peakWidth, peakY), Offset(center.x + barWidth / 2f + peakWidth, peakY), peakWidth)
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            rotate(if (orientation == "Horizontal" || textValue("Shape Path", "Horizontal Line") == "Vertical Line") 90f else 0f, center) {
+
                             val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                             var level = levels[sourceIndex].coerceIn(0f, 1f)
                             if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
@@ -2034,7 +2074,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         }
                     }
-                    StudioElementType.PARTICLES -> {
+                    StudioElementType.PARTICLES -> {                    StudioElementType.PARTICLES -> {
                         val count = number("Count Limit", 64f).toInt().coerceIn(1, 300)
                         val particleScale = number("Particle Scale", 100f) / 100f * scale
                         val colorTo = runCatching { Color(android.graphics.Color.parseColor(textValue("Color To", colorText))) }.getOrDefault(elementColor)

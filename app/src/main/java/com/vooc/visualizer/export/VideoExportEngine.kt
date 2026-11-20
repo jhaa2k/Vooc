@@ -1010,7 +1010,7 @@ object VideoExportEngine {
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
                         val destination = RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
                         if ((element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true) {
-                            imageCache[sourceUri]?.let { original -> canvas.drawBitmap(original, null, destination, Paint(paint).apply { alpha = (alpha * 0.35f).toInt() }) }
+                            imageCache[sourceUri]?.let { original -> canvas.drawBitmap(original, null, destination, Paint(paint).apply { this.alpha = (this.alpha * 0.35f).toInt() }) }
                         }
                         canvas.drawBitmap(image, null, destination, paint)
                     }

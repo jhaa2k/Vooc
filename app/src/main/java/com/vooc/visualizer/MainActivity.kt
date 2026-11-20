@@ -2789,7 +2789,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         drawImage(customParticle,
                                             dstOffset = androidx.compose.ui.unit.IntOffset((x - particleWidth / 2f).toInt(), (y - particleHeight / 2f).toInt()),
                                             dstSize = androidx.compose.ui.unit.IntSize(particleWidth.toInt().coerceAtLeast(1), particleHeight.toInt().coerceAtLeast(1)),
-                                            alpha = alpha, blendMode = particleBlendMode)
+                                            alpha = alpha,
+                                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(particleColor, androidx.compose.ui.graphics.BlendMode.SrcIn),
+                                            blendMode = particleBlendMode)
                                     }
                                 } else {
                                     rotate(visualAngle, Offset(x, y)) {

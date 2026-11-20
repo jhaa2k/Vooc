@@ -2304,7 +2304,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 } else path.asAndroidPath()
                                 drawIntoCanvas { composeCanvas ->
                                     val softnessPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                        color = fill.toArgb()
+                                        this.color = fill.toArgb()
                                         alpha = (opacity * 255f).toInt().coerceIn(0, 255)
                                         style = android.graphics.Paint.Style.FILL
                                         maskFilter = android.graphics.BlurMaskFilter(barSoftnessRadius, android.graphics.BlurMaskFilter.Blur.NORMAL)

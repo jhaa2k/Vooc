@@ -111,6 +111,21 @@ class ElementSystemTest {
     }
 
     @Test
+    fun blurEffectExposesThreeLayerScaleColorAndIndependentOriginalControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.BLUR_EFFECT).associateBy { it.name }
+        val required = setOf(
+            "Target Image", "Blend Mode Content", "Color", "Source Composition Index",
+            "Mask Image", "Show Unblurred Content", "Show Unblurred Content Under",
+            "Blur Radius", "Blur Multiplier", "1layer Scale", "2layer Scale",
+            "3layer Scale", "1layer Color", "2layer Color", "3layer Color"
+        )
+        assertTrue("Missing Blur Effect controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(ElementValue.Vector2(1.0, 1.0), specs.getValue("1layer Scale").defaultValue)
+        assertEquals(ElementValue.Vector2(0.0, 0.0), specs.getValue("2layer Scale").defaultValue)
+        assertEquals(ElementValue.Vector2(0.0, 0.0), specs.getValue("3layer Scale").defaultValue)
+    }
+
+    @Test
     fun motionBlurExposesMaskAndContentAppearanceControls() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.MOTION_BLUR_EFFECT).associateBy { it.name }
         val required = setOf(

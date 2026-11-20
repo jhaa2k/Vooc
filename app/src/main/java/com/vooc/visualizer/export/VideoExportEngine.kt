@@ -1081,8 +1081,6 @@ object VideoExportEngine {
                                 val bitmapPaint = Paint(paint).apply {
                                     style = Paint.Style.FILL
                                     pathEffect = null
-                                    colorFilter = null
-                                    maskFilter = null
                                 }
                                 canvas.drawBitmap(customBitmap, null, rect, bitmapPaint)
                                 if (outline) {

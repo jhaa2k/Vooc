@@ -851,3 +851,4 @@ object VideoExportEngine {
             opacity = value("OPACITY", layer.opacity).coerceIn(0f, 100f)
         )
     }
+}

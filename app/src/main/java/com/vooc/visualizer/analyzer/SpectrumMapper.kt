@@ -8,6 +8,24 @@ import kotlin.math.roundToInt
 
 /** Maps FFT bins to N display bars using linear / logarithmic / custom frequency spacing. */
 object SpectrumMapper {
+    /** Extracts a bounded frequency window from a full-Nyquist spectrum without changing its values. */
+    fun cropFrequencyRange(
+        spectrum: FloatArray,
+        sampleRate: Int,
+        startHz: Float,
+        endHz: Float
+    ): FloatArray {
+        if (spectrum.isEmpty()) return spectrum
+        val nyquist = (sampleRate / 2f).coerceAtLeast(1f)
+        val lowHz = startHz.takeIf { it.isFinite() }?.coerceIn(0f, nyquist - 1f) ?: 0f
+        val highHz = endHz.takeIf { it.isFinite() }?.coerceIn(lowHz + 1f, nyquist) ?: nyquist
+        val first = kotlin.math.floor(lowHz / nyquist * spectrum.size).toInt()
+            .coerceIn(0, spectrum.lastIndex)
+        val endExclusive = kotlin.math.ceil(highHz / nyquist * spectrum.size).toInt()
+            .coerceIn(first + 1, spectrum.size)
+        return spectrum.copyOfRange(first, endExclusive)
+    }
+
     fun map(
         spectrum: FloatArray,
         sampleRate: Int,

@@ -122,6 +122,7 @@ import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.MeasureWhatEngine
 import com.vooc.visualizer.studio.AudioReactivityRuntime
 import com.vooc.visualizer.studio.audioReactivitySources
+import com.vooc.visualizer.studio.audioReactivityColor
 import com.vooc.visualizer.studio.audioReactivityTransform
 import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.TemplateStore
@@ -1965,7 +1966,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             ).coerceIn(0f, 1f)
             val opacity = (number("Opacity", 100f) / 100f * measuredOpacity * reactivity.opacityMultiplier).coerceIn(0f, 1f)
             val colorText = textValue("Color", "#FFFFFFFF")
-            val elementColor = runCatching { Color(android.graphics.Color.parseColor(colorText)).copy(alpha = opacity) }.getOrDefault(Color.White.copy(alpha = opacity))
+            val baseColor = runCatching { android.graphics.Color.parseColor(colorText) }.getOrDefault(android.graphics.Color.WHITE)
+            val elementColor = Color(audioReactivityColor(baseColor, reactivity.colorMultiplier)).copy(alpha = opacity)
             val label = textValue("Text", element.tag).take(120)
             rotate(rotation, center) {
                 when (element.type) {
@@ -2715,7 +2717,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val originalDestination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
                             val originalSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
                             if (showUnder && original != null) drawImage(original, dstOffset = originalDestination, dstSize = originalSize, alpha = opacity)
-                            val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * scale
+                            val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * scale * reactivity.effectStrengthMultiplier
                             val angle = (number("Angle / Direction", 0f) + playbackSeconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
                             val focus = props["Center / Focus Point"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                             val falloff = number("Falloff / Radial Split", 0f).coerceAtLeast(0f)
@@ -2767,7 +2769,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             if (props["Show Unblurred Content Under"] == ElementValue.Bool(true) && original != null) {
                                 drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
                             }
-                            drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
+                            drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * reactivity.effectStrengthMultiplier.coerceIn(0f, 1f))
                             if (props["Show Unblurred Content"] == ElementValue.Bool(true) && original != null) {
                                 drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
                             }
@@ -2781,7 +2783,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val destinationSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
                             val samples = number("Samples / Iterations", 8f).toInt().coerceIn(1, 64)
                             val strength = number("Blur Amount / Strength", 1f).coerceIn(0f, 64f)
-                            val lengthBase = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * strength * scale
+                            val lengthBase = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * strength * scale * reactivity.effectStrengthMultiplier
                             val focus = props["Center / Focus Point"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                             val focusX = focus.x.toFloat() * size.width
                             val focusY = focus.y.toFloat() * size.height

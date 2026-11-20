@@ -818,7 +818,18 @@ object VideoExportEngine {
                         val imagePaint = Paint(paint).apply {
                             this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f) * number("Transparency Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
-                            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })
+                            val colorMatrix = ColorMatrix().apply { setSaturation(saturation) }
+                            if (android.graphics.Color.alpha(overlay) > 0) {
+                                val a = android.graphics.Color.alpha(overlay) / 255f
+                                val values = colorMatrix.array
+                                val channels = intArrayOf(android.graphics.Color.red(overlay), android.graphics.Color.green(overlay), android.graphics.Color.blue(overlay))
+                                for (row in 0..2) {
+                                    val base = row * 5
+                                    for (column in 0..3) values[base + column] *= (1f - a)
+                                    values[base + 4] = values[base + 4] * (1f - a) + channels[row] * a
+                                }
+                            }
+                            colorFilter = ColorMatrixColorFilter(colorMatrix)
                             colorFilter = if (android.graphics.Color.alpha(overlay) > 0) android.graphics.PorterDuffColorFilter(overlay, android.graphics.PorterDuff.Mode.SRC_ATOP) else null
                         }
                         canvas.save()

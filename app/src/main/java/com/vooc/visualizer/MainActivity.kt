@@ -2115,7 +2115,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 }
                                 val peakStyle = textValue("Peak Indicator Style", "Line")
                                 if (peakEnabled && peakStyle != "None") {
-                                    val peakY = top - peaks[sourceIndex].coerceIn(0f, 1f) * maxHeight
+                                    val peakLevel = peaks[sourceIndex].coerceIn(0f, 1f)
+                                    val peakTravel = peakLevel * maxHeight * if (centerSymmetry) 0.5f else 1f
+                                    val peakY = if (alignment == "Top" && !customPathMode) baseline + peakTravel else baseline - peakTravel
                                     when (peakStyle) {
                                         "Dot" -> drawCircle(peakColor.copy(alpha = opacity), (peakWidth * 1.5f).coerceAtLeast(1f), Offset(x + barWidth / 2f, peakY))
                                         "Bar" -> drawRect(peakColor.copy(alpha = opacity), Offset(x, peakY - peakWidth), androidx.compose.ui.geometry.Size(barWidth, peakWidth * 2f))

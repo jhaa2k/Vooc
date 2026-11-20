@@ -920,6 +920,17 @@ object VideoExportEngine {
                                     values[base + 4] = values[base + 4] * (1f - a) + channels[row] * a
                                 }
                             }
+                            val blendAmount = number("Measure Color Blend", 0f).coerceIn(0f, 1f)
+                            if (blendAmount > 0f) {
+                                val target = runCatching { android.graphics.Color.parseColor(textValue("Color To", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                                val values = colorMatrix.array
+                                val channels = intArrayOf(android.graphics.Color.red(target), android.graphics.Color.green(target), android.graphics.Color.blue(target))
+                                for (row in 0..2) {
+                                    val base = row * 5
+                                    for (column in 0..3) values[base + column] *= (1f - blendAmount)
+                                    values[base + 4] = values[base + 4] * (1f - blendAmount) + channels[row] * blendAmount
+                                }
+                            }
                             colorFilter = ColorMatrixColorFilter(colorMatrix)
                         }
                         canvas.save()

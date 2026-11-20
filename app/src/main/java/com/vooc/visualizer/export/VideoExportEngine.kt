@@ -931,7 +931,6 @@ object VideoExportEngine {
                         val sourceIndex = if (mirrorX) minOf(index, count - 1 - index) else index
                         var level = levels[sourceIndex].coerceIn(0f, 1f)
                         if ((element.value("Flip Input") as? ElementValue.Bool)?.value == true) level = 1f - level
-                        val layoutRandom = kotlin.math.abs(kotlin.math.sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
                         val heightRandom = number("Bar Height Random", 0f).coerceIn(0f, 1f)
                         val activeMaxHeight = if (radialLayout) radialMaxHeight else maxHeight
                         val barHeight = ((minHeight + level * activeMaxHeight) * (1f + (layoutRandom * 2f - 1f) * heightRandom)).coerceIn(0f, height * 0.95f)
@@ -943,7 +942,12 @@ object VideoExportEngine {
                         val spacingRandom = number("Bar Spacing Random", 0f).coerceIn(0f, 1f)
                         val spacingJitter = (layoutRandom * 2f - 1f) * slot * 0.45f * spacingRandom
                         val x = if (radialLayout || !customPathMode) (if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + spacingJitter + barOffset) else currentPathPoint.first - barWidth / 2f + barOffset
-                        val baseline = if (radialLayout) cy - radialInnerRadius else if (customPathMode) currentPathPoint.second else when (alignment) {
+                        val alternateDirection = (element.value("Alternate Bar Direction") as? ElementValue.Bool)?.value == true &&
+                            !radialLayout && !customPathMode && !mirrorY
+                        val alternateFromTop = alternateDirection && index % 2 == 1
+                        val baseline = if (radialLayout) cy - radialInnerRadius else if (customPathMode) currentPathPoint.second else if (alternateDirection) {
+                            if (alternateFromTop) cy - height * 0.38f else cy + height * 0.38f
+                        } else when (alignment) {
                             "Top" -> cy - height * 0.38f
                             "Center" -> cy
                             "Stretch" -> cy + height * 0.44f
@@ -951,7 +955,7 @@ object VideoExportEngine {
                         }
                         val drawHeight = if (mirrorY) barHeight / 2f else barHeight
                         val h = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(height * 0.95f) else drawHeight
-                        val top = if (radialLayout) baseline - h else if (mirrorY) baseline - h else if (alignment == "Center") baseline - barHeight / 2f else if (alignment == "Top") baseline else baseline - h
+                        val top = if (radialLayout) baseline - h else if (mirrorY) baseline - h else if (alternateFromTop) baseline else if (alternateDirection) baseline - h else if (alignment == "Center") baseline - barHeight / 2f else if (alignment == "Top") baseline else baseline - h
                         val bottom = top + h
                         val gradientT = if (textValue("Gradient Direction", "Vertical") == "Horizontal")
                             (index.toFloat() / (count - 1).coerceAtLeast(1) + colorBlendOffset).coerceIn(0f, 1f)

@@ -20,7 +20,10 @@ enum class StudioElementType(val displayName: String) {
     PARTICLES("Particles"),
     TEXT("Text"),
     MOTION_BLUR_EFFECT("Motion Blur Effect"),
-    SHAPE("Shape")
+    SHAPE("Shape"),
+    MIRROR_EFFECT("Mirror Effect"),
+    CUSTOM_SHADER("Custom Shader"),
+    COMPOSITION("Composition")
 }
 
 enum class ElementValueType { BOOLEAN, NUMBER, INTEGER, TEXT, COLOR, ENUM, VECTOR2 }
@@ -931,6 +934,62 @@ object ElementPropertyCatalog {
         number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0)
     )
 
+    private val mirrorEffect = listOf(
+        text("Target Image", "Mirror", ""),
+        text("Mirror Axis", "Mirror", "Horizontal", listOf("Horizontal", "Vertical", "Both", "Diagonal")),
+        number("Mirror Position", "Mirror", 0.5, 0.0, 1.0),
+        number("Mirror Offset X", "Mirror", 0.0, -1.0, 1.0),
+        number("Mirror Offset Y", "Mirror", 0.0, -1.0, 1.0),
+        number("Mirror Gap", "Mirror", 0.0, 0.0, 512.0),
+        number("Mirror Feather", "Mirror", 0.0, 0.0, 256.0),
+        integer("Reflection Count", "Mirror", 2, 1.0, 16.0),
+        number("Reflection Opacity", "Mirror", 1.0, 0.0, 1.0),
+        bool("Mirror Original", "Mirror", true),
+        bool("Mirror Flip", "Mirror", false),
+        text("Mirror Blend Mode", "Mirror", "Alpha", listOf("Alpha", "Add", "Screen", "Multiply", "Overlay"))
+    )
+
+    private val customShader = listOf(
+        text("Shader Name", "Shader", "Custom Shader"),
+        text("Shader Source", "Shader", ""),
+        bool("Shader Enabled", "Shader", false),
+        text("Shader Language", "Shader", "GLSL", listOf("GLSL", "AGSL")),
+        text("Shader Entry Point", "Shader", "main"),
+        integer("Shader Version", "Shader", 100, 100.0, 320.0),
+        number("Shader Time Scale", "Shader", 1.0, -20.0, 20.0),
+        number("Shader Amount", "Shader", 1.0, 0.0, 10.0),
+        number("Shader Input Scale", "Shader", 1.0, 0.0, 20.0),
+        number("Shader Output Opacity", "Shader", 1.0, 0.0, 1.0),
+        text("Shader Uniform 1 Name", "Shader", "uAmount"),
+        number("Shader Uniform 1 Value", "Shader", 1.0, -10000.0, 10000.0),
+        text("Shader Uniform 2 Name", "Shader", "uSpeed"),
+        number("Shader Uniform 2 Value", "Shader", 1.0, -10000.0, 10000.0),
+        text("Shader Uniform 3 Name", "Shader", "uColor"),
+        text("Shader Uniform 3 Value", "Shader", "#FFFFFFFF"),
+        text("Shader Blend Mode", "Shader", "Alpha", listOf("Alpha", "Add", "Screen", "Multiply", "Overlay")),
+        bool("Shader Use Audio", "Shader", false),
+        text("Shader Audio Source", "Shader", "Overall Audio Level", listOf("Overall Audio Level", "Bass", "Mid", "Treble", "Beat", "Peak", "RMS"))
+    )
+
+    private val composition = listOf(
+        text("Composition Name", "Composition", "Composition"),
+        bool("Composition Enabled", "Composition", true),
+        integer("Composition Width", "Composition", 1920, 1.0, 16384.0),
+        integer("Composition Height", "Composition", 1080, 1.0, 16384.0),
+        integer("Composition FPS", "Composition", 30, 1.0, 240.0),
+        text("Composition Background", "Composition", "#FF000000"),
+        text("Composition Blend Mode", "Composition", "Alpha", listOf("Alpha", "Add", "Screen", "Multiply", "Overlay")),
+        number("Composition Opacity", "Composition", 1.0, 0.0, 1.0),
+        integer("Composition Source Index", "Composition", 0, 0.0, 255.0),
+        integer("Parent Composition Index", "Composition", -1, -1.0, 255.0),
+        number("Composition Start Time", "Composition", 0.0, 0.0, 86400.0),
+        number("Composition Duration", "Composition", 0.0, 0.0, 86400.0),
+        number("Composition Time Offset", "Composition", 0.0, -86400.0, 86400.0),
+        bool("Composition Loop", "Composition", false),
+        bool("Composition Isolated Audio", "Composition", false),
+        bool("Composition Export Enabled", "Composition", true)
+    )
+
     // Shared advanced controls are exposed on every visual layer so the first editor
     // pass has a complete, consistent control surface before renderer-specific wiring.
     private val sharedAdvanced = listOf(
@@ -963,6 +1022,9 @@ object ElementPropertyCatalog {
 
     fun forElement(type: StudioElementType): List<ElementPropertySpec> {
         if (type == StudioElementType.AUDIO_PROVIDER) return provider
+        if (type == StudioElementType.MIRROR_EFFECT) return (sharedGeneral + mirrorEffect + sharedAdvanced).groupBy { it.name }.values.map { it.last() }
+        if (type == StudioElementType.CUSTOM_SHADER) return (sharedGeneral + customShader + sharedAdvanced).groupBy { it.name }.values.map { it.last() }
+        if (type == StudioElementType.COMPOSITION) return (sharedGeneral + composition + sharedAdvanced).groupBy { it.name }.values.map { it.last() }
         if (type == StudioElementType.BLUR_EFFECT) {
             return (blurGeneral + blurAppearance + blurEffect + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
@@ -1010,6 +1072,9 @@ object ElementPropertyCatalog {
             StudioElementType.MOTION_BLUR_EFFECT -> motionBlur
             StudioElementType.SHAPE -> shapeSpecific
             StudioElementType.AUDIO_PROVIDER -> emptyList()
+            StudioElementType.MIRROR_EFFECT -> mirrorEffect
+            StudioElementType.CUSTOM_SHADER -> customShader
+            StudioElementType.COMPOSITION -> composition
         }
         return (sharedGeneral + specific + sharedAdvanced).groupBy { it.name }.values.map { sameName -> sameName.last() }
     }

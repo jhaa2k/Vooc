@@ -1902,7 +1902,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             )
             val scale = (number("Scale", 100f) / 100f * scaleMotion.scale).coerceIn(0f, 10f)
             val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation
-            val opacity = (number("Opacity", 100f) / 100f).coerceIn(0f, 1f)
+            val opacityMode = textValue("Measure Opacity (Measure What)", "Nothing")
+            val opacityMotion = motionFor("Measure Opacity (Measure What)")
+            val measuredOpacity = if (opacityMode == "Nothing") 1f else maxOf(
+                kotlin.math.abs(opacityMotion.scale - 1f) / 0.32f,
+                kotlin.math.abs(opacityMotion.rotation) / 8f,
+                kotlin.math.abs(opacityMotion.offsetX) / 0.05f,
+                kotlin.math.abs(opacityMotion.offsetY) / 0.05f
+            ).coerceIn(0f, 1f)
+            val opacity = (number("Opacity", 100f) / 100f * measuredOpacity).coerceIn(0f, 1f)
             val colorText = textValue("Color", "#FFFFFFFF")
             val elementColor = runCatching { Color(android.graphics.Color.parseColor(colorText)).copy(alpha = opacity) }.getOrDefault(Color.White.copy(alpha = opacity))
             val label = textValue("Text", element.tag).take(120)

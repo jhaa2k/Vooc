@@ -542,6 +542,7 @@ object ElementPropertyCatalog {
     )
 
     private val blurAppearance = listOf(
+        text("Target Image", "Appearance", ""),
         text("Blend Mode Content", "Appearance", "Alpha", listOf(
             "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
             "Lighten", "Exclusion", "Subtractive", "Copy"

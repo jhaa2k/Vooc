@@ -189,6 +189,22 @@ class ElementSystemTest {
         assertEquals(listOf("Fit (Contain)", "Fill (Cover)", "Stretch"), specs.getValue("Fit Mode (Scale Type)").options)
     }
 
+
+    @Test
+    fun textLayerExposesTypographyAndGradientControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.TEXT).associateBy { it.name }
+        val required = setOf(
+            "Text", "Font Family", "Font Size", "Font Style", "Underline",
+            "Letter Spacing", "Line Spacing", "Alignment", "Text Gradient Start",
+            "Text Gradient End", "Stroke Enabled", "Stroke Color", "Stroke Thickness",
+            "Shadow Enabled", "Shadow Color", "Shadow Offset X", "Shadow Offset Y",
+            "Shadow Blur", "Max Width", "Wrap Text", "Auto-Scale", "Case"
+        )
+        assertTrue("Missing text typography controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(listOf("Left", "Center", "Right", "Justified"), specs.getValue("Alignment").options)
+        assertEquals(listOf("Original", "Uppercase", "Lowercase", "Capitalize"), specs.getValue("Case").options)
+    }
+
     @Test
     fun everyMeasureWhatOptionHasAWorkingDeterministicMotionResponse() {
         val runtime = 1.23f

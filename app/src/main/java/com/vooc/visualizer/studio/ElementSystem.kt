@@ -500,8 +500,7 @@ object ElementPropertyCatalog {
     )
 
     private val imageSpecific = listOf(
-        text("Custom Image", "Image", ""),
-        text("Image Source / File", "Compatibility", ""),
+        text("Import Image", "Image", ""),
         text("Fit Mode (Scale Type)", "Image", "Fit (Contain)", listOf(
             "Fit (Contain)", "Fill (Cover)", "Stretch"
         )),

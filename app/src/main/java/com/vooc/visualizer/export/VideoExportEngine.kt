@@ -966,7 +966,22 @@ object VideoExportEngine {
                     val spawnInterval = number("Spawn Time", 0.02f).coerceIn(0f, 10f)
                     val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * width * 0.25f
                     val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * height * 0.25f
-                    val spawnArea = textValue("Spawn Area", "Point")
+                    val spawnArea = textValue("Particle Emitter Shape", textValue("Spawn Area", "Point"))
+                    val emitterPosition = element.value("Emitter Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                    val emitterX = cx + (emitterPosition.x.toFloat() - 0.5f) * width
+                    val emitterY = cy + (emitterPosition.y.toFloat() - 0.5f) * height
+                    val emitterRotation = number("Emitter Rotation", 0f) * PI.toFloat() / 180f
+                    val emitterRadius = number("Emitter Radius", 100f).coerceAtLeast(0f) * width / 1080f
+                    val emitterInnerRadius = number("Emitter Inner Radius", 0f).coerceIn(0f, number("Emitter Radius", 100f)) * width / 1080f
+                    val emitterArcStart = number("Emitter Arc Start", 0f) * PI.toFloat() / 180f
+                    val emitterArcSweep = number("Emitter Arc Sweep", 360f).coerceIn(-360f, 360f) * PI.toFloat() / 180f
+                    val emitterBurstCount = number("Emitter Burst Count", 0f).toInt().coerceAtLeast(0)
+                    val emitterBurstInterval = number("Emitter Burst Interval", 1f).coerceAtLeast(0.001f)
+                    val emitterLoop = (element.value("Emitter Loop") as? ElementValue.Bool)?.value != false
+                    val particleMass = number("Particle Mass", 1f).coerceAtLeast(0.001f)
+                    val particleDamping = number("Particle Damping", 0f).coerceIn(0f, 1f)
+                    val angularVelocity = number("Particle Angular Velocity", number("Rotation Speed", 0f))
+                    val angularVelocityRandom = number("Particle Angular Velocity Random", 0f).coerceAtLeast(0f)
                     val relativeToCenter = (element.value("Vector Relative To Center") as? ElementValue.Bool)?.value == true
                     val randomVector = (element.value("Use Random Vector Instead") as? ElementValue.Bool)?.value == true
                     val baseAngle = Math.toRadians(number("Vector Angle", number("Direction / Angle", -90f)).toDouble()).toFloat()
@@ -1016,29 +1031,32 @@ object VideoExportEngine {
                         val randomC = abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
                         val age = ((seconds + index * spawnInterval) % lifetime).coerceIn(0f, lifetime)
                         val lifeT = (age / lifetime).coerceIn(0f, 1f)
-                        val spawnX = when (spawnArea) {
-                            "Rectangle" -> cx + (randomA * 2f - 1f) * spawnWidth
-                            "Circle" -> cx + cos(randomA * 2f * PI.toFloat()) * spawnWidth * randomB
-                            "Line" -> cx + (randomA * 2f - 1f) * spawnWidth
-                            "Edge" -> cx + (if (randomA < 0.5f) -spawnWidth else spawnWidth)
-                            else -> cx
+                        val emitterAngle = emitterArcStart + randomA * emitterArcSweep
+                        val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
+                        val localX: Float
+                        val localY: Float
+                        when (spawnArea) {
+                            "Rectangle" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
+                            "Ellipse", "Circle" -> { localX = cos(emitterAngle) * radialDistance.coerceAtLeast(spawnWidth * randomB); localY = sin(emitterAngle) * (if (spawnArea == "Circle") radialDistance else emitterRadius * spawnHeight / spawnWidth.coerceAtLeast(1f)) }
+                            "Ring" -> { localX = cos(emitterAngle) * radialDistance; localY = sin(emitterAngle) * radialDistance }
+                            "Line" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = 0f }
+                            "Edge" -> { localX = if (randomA < 0.5f) -spawnWidth else spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
+                            else -> { localX = 0f; localY = 0f }
                         }
-                        val spawnY = when (spawnArea) {
-                            "Rectangle" -> cy + (randomB * 2f - 1f) * spawnHeight
-                            "Circle" -> cy + sin(randomA * 2f * PI.toFloat()) * spawnHeight * randomB
-                            "Line" -> cy
-                            "Edge" -> cy + (randomB * 2f - 1f) * spawnHeight
-                            else -> cy
-                        }
+                        val spawnX = emitterX + localX * cos(emitterRotation) - localY * sin(emitterRotation)
+                        val spawnY = emitterY + localX * sin(emitterRotation) + localY * cos(emitterRotation)
                         val radialAngle = kotlin.math.atan2(spawnY - cy, spawnX - cx)
                         val angle = when {
                             randomVector -> randomA * 2f * PI.toFloat()
                             relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle
                             else -> baseAngle + (randomA - 0.5f) * spreadAngle
                         }
-                        val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom)
+                        val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                         var vx = cos(angle) * velocity
                         var vy = sin(angle) * velocity
+                        val burstIndex = if (emitterBurstCount > 0) (seconds / emitterBurstInterval).toInt() else 0
+                        val inBurst = emitterBurstCount <= 0 || (index % count.coerceAtLeast(1)) < emitterBurstCount
+                        if (emitterBurstCount > 0 && (!inBurst || (!emitterLoop && burstIndex > 0))) { vx = 0f; vy = 0f }
                         val fieldX = forcePosition.x.toFloat() * width
                         val fieldY = forcePosition.y.toFloat() * height
                         val dx = fieldX - spawnX
@@ -1052,8 +1070,10 @@ object VideoExportEngine {
                         val frequency = sineFrequency * (1f + randomB * sineFrequencyRandom)
                         val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
                             sineMagnitude * (1f + randomA * sineMagnitudeRandom)
-                        val px = spawnX + vx * age * 0.01f + gravity.x.toFloat() * age * age * 0.005f + wave
-                        val py = spawnY + vy * age * 0.01f + gravity.y.toFloat() * age * age * 0.005f
+                        val dampingFactor = (1f - particleDamping).coerceAtLeast(0f)
+                        val travelTime = if (particleDamping > 0f) (1f - kotlin.math.exp(-particleDamping * age)) / particleDamping else age
+                        val px = spawnX + vx * travelTime * 0.01f + gravity.x.toFloat() * age * age * 0.005f + wave * dampingFactor
+                        val py = spawnY + vy * travelTime * 0.01f + gravity.y.toFloat() * age * age * 0.005f
                         val depth = randomB * perspectiveDepth
                         val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)
                         val depthScale = (1f + number("End Size ZFactor", 0f) * depth / 1000f).coerceAtLeast(0.05f)
@@ -1073,7 +1093,8 @@ object VideoExportEngine {
                         )
                         val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).coerceAtLeast(0.5f)
                         val particleHeight = (sizeT * particleScale * perspective * depthScale).coerceAtLeast(0.5f)
-                        val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Rotation Speed", 0f) * age
+                        val randomAngularVelocity = angularVelocity + (randomB * 2f - 1f) * angularVelocityRandom
+                        val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
                         val trailX = vx * trailLength * 0.001f
                         val trailY = vy * trailLength * 0.001f
                         fun drawParticleAt(x: Float, y: Float) {

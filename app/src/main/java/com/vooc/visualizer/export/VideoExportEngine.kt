@@ -1085,7 +1085,8 @@ object VideoExportEngine {
                 StudioElementType.PARTICLES -> {
                     val count = number("Count Limit", number("Particle Count", 128f)).toInt().coerceIn(1, 10000)
                     val lifetime = number("Lifetime", number("Life Span", 3f)).coerceIn(0.01f, 3600f)
-                    val spawnInterval = number("Spawn Time", 0.02f).coerceIn(0f, 10f)
+                    val emissionRate = number("Emission Rate", 0f).coerceAtLeast(0f)
+                        val spawnInterval = if (emissionRate > 0f) 1f / emissionRate.coerceAtLeast(0.001f) else number("Spawn Time", 0.02f).coerceIn(0f, 10f)
                     val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * width * 0.25f
                     val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * height * 0.25f
                     val spawnArea = textValue("Particle Emitter Shape", textValue("Spawn Area", "Point"))
@@ -1126,6 +1127,20 @@ object VideoExportEngine {
                     val baseSpeed = number("Speed", number("Start Velocity", 80f)) +
                         measuredSpeed * (number("Measure Overall Speed A (X Amount)", 0f) + number("Measure Overall Speed B (Y Amount)", 0f))
                     val speedRandom = number("Speed Random", number("Velocity Random", 0f)).coerceIn(0f, 1f)
+                        val endVelocity = number("End Velocity", number("Speed", number("Start Velocity", 80f)))
+                        val friction = number("Friction / Drag", 0f).coerceIn(0f, 100f) / 100f
+                        val turbulence = number("Turbulence / Noise", 0f).coerceAtLeast(0f)
+                        val lifetimeRandom = number("Lifetime Random", 0f).coerceIn(0f, 1f)
+                        val wind = props["Wind"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+                        val collisionEnabled = props["Collision"] == ElementValue.Bool(true)
+                        val bounce = number("Bounce", 0.5f).coerceIn(0f, 1f)
+                        val trailWidth = number("Particle Trail Width", 1f).coerceAtLeast(0f)
+                        val trailFade = number("Particle Trail Fade", 0.8f).coerceIn(0f, 1f)
+                        val opacityRandom = number("Particle Opacity Random", 0f).coerceIn(0f, 1f)
+                        val colorRandom = number("Particle Color Random", 0f).coerceIn(0f, 1f)
+                        val particleShape = textValue("Particle Shape", "Circle")
+                        val screenBlend = props["Particle Screen Blend"] == ElementValue.Bool(true)
+                        val additiveBlend = props["Particle Additive Blend"] == ElementValue.Bool(true)
                     val startSize = number("Start Size", 8f).coerceAtLeast(0f) * width / 1080f
                     val endSize = number("End Size", 2f).coerceAtLeast(0f) * width / 1080f
                     val endRandom = number("End Size Random", number("Particle Size Random", 0f)).coerceIn(0f, 1f)
@@ -1151,7 +1166,8 @@ object VideoExportEngine {
                         val randomA = abs(sin(seed * 12.9898f) * 43758.5453f) % 1f
                         val randomB = abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
                         val randomC = abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
-                        val age = ((seconds + index * spawnInterval) % lifetime).coerceIn(0f, lifetime)
+                        val particleLifetime = (lifetime * (1f + (randomC * 2f - 1f) * lifetimeRandom)).coerceAtLeast(0.01f)
+                            val age = ((seconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
                         val lifeT = (age / lifetime).coerceIn(0f, 1f)
                         val emitterAngle = emitterArcStart + randomA * emitterArcSweep
                         val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
@@ -1173,7 +1189,8 @@ object VideoExportEngine {
                             relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle
                             else -> baseAngle + (randomA - 0.5f) * spreadAngle
                         }
-                        val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
+                        val particleSpeed = baseSpeed + (endVelocity - baseSpeed) * lifeT
+                            val velocity = particleSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                         var vx = cos(angle) * velocity
                         var vy = sin(angle) * velocity
                         val burstIndex = if (emitterBurstCount > 0) (seconds / emitterBurstInterval).toInt() else 0
@@ -1193,9 +1210,11 @@ object VideoExportEngine {
                         val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
                             sineMagnitude * (1f + randomA * sineMagnitudeRandom)
                         val dampingFactor = (1f - particleDamping).coerceAtLeast(0f)
-                        val travelTime = if (particleDamping > 0f) (1f - kotlin.math.exp(-particleDamping * age)) / particleDamping else age
-                        val px = spawnX + vx * travelTime * 0.01f + gravity.x.toFloat() * age * age * 0.005f + wave * dampingFactor
-                        val py = spawnY + vy * travelTime * 0.01f + gravity.y.toFloat() * age * age * 0.005f
+                        val totalDrag = (1f - (1f - particleDamping) * (1f - friction)).coerceIn(0f, 0.999f)
+                            val travelTime = if (totalDrag > 0f) (1f - kotlin.math.exp(-totalDrag * age)) / totalDrag else age
+                        var px = spawnX + vx * travelTime * 0.01f + gravity.x.toFloat() * age * age * 0.005f + wind.x.toFloat() * age * age * 0.005f + wave * dampingFactor + sin(age * 7f + randomA * 19f) * turbulence * age * 0.01f
+                        var py = spawnY + vy * travelTime * 0.01f + gravity.y.toFloat() * age * age * 0.005f + wind.y.toFloat() * age * age * 0.005f + cos(age * 6f + randomB * 17f) * turbulence * age * 0.01f
+                        if (collisionEnabled) { if (px < 0f || px > width) vx = -vx * bounce; if (py < 0f || py > height) vy = -vy * bounce; px = px.coerceIn(0f, width.toFloat()); py = py.coerceIn(0f, height.toFloat()) }
                         val depth = randomB * perspectiveDepth
                         val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)
                         val depthScale = (1f + number("End Size ZFactor", 0f) * depth / 1000f).coerceAtLeast(0.05f)
@@ -1205,8 +1224,8 @@ object VideoExportEngine {
                             (1f + (fadeInScale - 1f) * number("Fade In Size", 1f).coerceIn(0f, 10f))
                         val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
                         val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
-                        val particleAlpha = (alpha * fadeInScale * fadeOut * nearFade).toInt().coerceIn(0, 255)
-                        val colorT = lifeT.coerceIn(0f, 1f)
+                        val particleAlpha = (alpha * fadeInScale * fadeOut * nearFade * (1f - randomA * opacityRandom)).toInt().coerceIn(0, 255)
+                        val colorT = (lifeT + (randomC - 0.5f) * colorRandom).coerceIn(0f, 1f)
                         val particleColor = android.graphics.Color.argb(
                             (particleAlpha * (android.graphics.Color.alpha(colorFrom) / 255f)).toInt(),
                             (android.graphics.Color.red(colorFrom) + (android.graphics.Color.red(colorTo) - android.graphics.Color.red(colorFrom)) * colorT).toInt(),
@@ -1222,9 +1241,11 @@ object VideoExportEngine {
                         fun drawParticleAt(x: Float, y: Float) {
                             paint.color = particleColor
                             paint.alpha = particleAlpha
+                            paint.xfermode = if (screenBlend) android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SCREEN) else if (additiveBlend) android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD) else null
                             paint.style = Paint.Style.FILL
                             if (trailLength > 0f) {
-                                paint.strokeWidth = (particleHeight * 0.35f).coerceAtLeast(0.5f)
+                                paint.strokeWidth = (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f)
+                                paint.alpha = (particleAlpha * trailFade).toInt().coerceIn(0, 255)
                                 paint.strokeCap = Paint.Cap.ROUND
                                 canvas.drawLine(x - trailX, y - trailY, x, y, paint)
                             }
@@ -1243,6 +1264,7 @@ object VideoExportEngine {
                         if (mirrorX && mirrorY) drawParticleAt(width - px, height - py)
                         drawParticleAt(px, py)
                     }
+                    paint.xfermode = null
                     paint.color = color
                     paint.alpha = alpha
                     paint.style = Paint.Style.FILL

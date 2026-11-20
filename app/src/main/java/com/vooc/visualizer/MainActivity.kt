@@ -511,6 +511,11 @@ private fun VoocStudio(
             ?: ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-default")
     }
     val providerConfig = remember(providerElement) { providerElement.toAudioProviderConfig() }
+    val needsStereoReactivity = project.document.elements.any { element ->
+        val source = (element.properties["Audio Reactivity Source"] as? ElementValue.Text)?.value
+        (element.properties["Audio Reactivity Enabled"] as? ElementValue.Bool)?.value == true &&
+            source in setOf("Left Channel", "Right Channel")
+    }
     var analyzerConfig by remember { mutableStateOf(analyzer.config) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var projectEntries by remember { mutableStateOf(ProjectRepository.list(context)) }
@@ -612,9 +617,10 @@ private fun VoocStudio(
         if (id != null) ProjectRepository.save(context, id, project)
         projectEntries = ProjectRepository.list(context)
     }
-    LaunchedEffect(player, analyzer, providerConfig) {
+    LaunchedEffect(player, analyzer, providerConfig, needsStereoReactivity) {
         providerProcessor.reset()
-        val providerAnalyzerConfig = providerConfig.applyTo(analyzer.config)
+        val baseProviderConfig = providerConfig.applyTo(analyzer.config)
+        val providerAnalyzerConfig = if (needsStereoReactivity) baseProviderConfig.copy(channelMode = ChannelMode.STEREO_SPLIT) else baseProviderConfig
         if (providerAnalyzerConfig != analyzer.config) {
             analyzer.updateConfig(providerAnalyzerConfig)
             analyzerConfig = providerAnalyzerConfig

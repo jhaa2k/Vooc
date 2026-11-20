@@ -976,6 +976,7 @@ object VideoExportEngine {
                     val glowStrength = number("Glow Strength", 0.35f).coerceIn(0f, 1f)
                     val barGlowRadius = number("Bar Glow Radius", 8f) * width / 1080f
                     val barGlowColorStrength = number("Bar Glow Color Strength", 1f).coerceIn(0f, 1f)
+                    val barSoftnessRadius = number("Softness", 0f).coerceIn(0f, 20f) * width / 1080f
                     val peakEnabled = (element.value("Peak / Cap") as? ElementValue.Bool)?.value == true
                     val peakWidth = (number("Peak Width", 2f) * width / 1080f).coerceAtLeast(0.5f)
                     val segmentsPerBar = number("Segments Per Bar", 1f).toInt().coerceIn(1, 64)
@@ -1073,6 +1074,29 @@ object VideoExportEngine {
                                     "Wave" -> { moveTo(x, yTop + h * 0.2f); lineTo(x + barWidth * 0.5f, yTop); lineTo(x + barWidth, yTop + h * 0.2f); lineTo(x + barWidth, yBottom); lineTo(x + barWidth * 0.5f, yTop + h * 0.8f); lineTo(x, yBottom); close() }
                                     else -> { addRoundRect(rect, corner, corner, android.graphics.Path.Direction.CW) }
                                 }
+                            }
+                            if (barSoftnessRadius > 0f) {
+                                val softnessPath = if (design == "Circle / Dot") {
+                                    android.graphics.Path().apply {
+                                        addCircle(
+                                            x + barWidth / 2f,
+                                            (yTop + yBottom) / 2f,
+                                            (h / 2f).coerceAtLeast(0.5f),
+                                            android.graphics.Path.Direction.CW
+                                        )
+                                    }
+                                } else path
+                                val softnessAlpha = alpha
+                                val softnessPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                    color = shapeFill
+                                    this.alpha = softnessAlpha
+                                    style = Paint.Style.FILL
+                                    maskFilter = android.graphics.BlurMaskFilter(
+                                        barSoftnessRadius,
+                                        android.graphics.BlurMaskFilter.Blur.NORMAL
+                                    )
+                                }
+                                canvas.drawPath(softnessPath, softnessPaint)
                             }
                             paint.color = if (outline) strokeColor else shapeFill
                             paint.alpha = alpha

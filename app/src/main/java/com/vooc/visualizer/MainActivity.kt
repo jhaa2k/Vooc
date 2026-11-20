@@ -2640,15 +2640,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     androidx.compose.ui.geometry.Rect(center.x - w / 2f, center.y - h / 2f, center.x + w / 2f, center.y + h / 2f)
                                 }
                             }
+                            val parallaxX = number("Image Parallax X", 0f).coerceIn(-1f, 1f) * frameWidth
+                            val parallaxY = number("Image Parallax Y", 0f).coerceIn(-1f, 1f) * frameHeight
+                            val imageDestination = destination.translate(parallaxX, parallaxY)
+                            val flipX = props["Image Flip Horizontal"] == ElementValue.Bool(true)
+                            val flipY = props["Image Flip Vertical"] == ElementValue.Bool(true)
                             val shapeName = textValue("Shape", "Rectangle").takeIf { it != "Rectangle" } ?: textValue("Mask / Shape", "Rectangle")
                             val clip = Path().apply {
                                 when (shapeName) {
-                                    "Circle", "Ellipse", "Circle/Oval" -> addOval(destination)
+                                    "Circle", "Ellipse", "Circle/Oval" -> addOval(imageDestination)
                                     "Square" -> {
-                                        val side = minOf(destination.width, destination.height)
-                                        addRect(androidx.compose.ui.geometry.Rect(destination.center.x - side / 2f, destination.center.y - side / 2f, destination.center.x + side / 2f, destination.center.y + side / 2f))
+                                        val side = minOf(imageDestination.width, imageDestination.height)
+                                        addRect(androidx.compose.ui.geometry.Rect(imageDestination.center.x - side / 2f, imageDestination.center.y - side / 2f, imageDestination.center.x + side / 2f, imageDestination.center.y + side / 2f))
                                     }
-                                    "Triangle" -> { moveTo(destination.center.x, destination.top); lineTo(destination.right, destination.bottom); lineTo(destination.left, destination.bottom); close() }
+                                    "Triangle" -> { moveTo(imageDestination.center.x, imageDestination.top); lineTo(imageDestination.right, imageDestination.bottom); lineTo(imageDestination.left, imageDestination.bottom); close() }
                                     "Rounded Rectangle", "Rounded Rect" -> addRoundRect(androidx.compose.ui.geometry.RoundRect(destination, androidx.compose.ui.geometry.CornerRadius((number("Corner Radius", 0f) * size.width / 1080f).coerceAtLeast(0f))))
                                     else -> addRect(destination)
                                 }
@@ -2723,13 +2728,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val showUnblurredUnder = props["Show Unblurred Content Under"] == ElementValue.Bool(true)
                             val showUnblurredOver = props["Show Unblurred Content"] == ElementValue.Bool(true)
                             val originalBitmap = elementOriginalImages[element.id]
+                            if (flipX || flipY) drawContext.transform.scale(if (flipX) -1f else 1f, if (flipY) -1f else 1f, pivot = Offset(imageDestination.center.x, imageDestination.center.y))
                             clipPath(clip) {
                                 if (showUnblurredUnder && originalBitmap != null) {
                                     drawImage(originalBitmap,
                                         srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
                                         srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
-                                        dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
-                                        dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
+                                        dstOffset = androidx.compose.ui.unit.IntOffset(imageDestination.left.toInt(), imageDestination.top.toInt()),
+                                        dstSize = androidx.compose.ui.unit.IntSize(imageDestination.width.toInt().coerceAtLeast(1), imageDestination.height.toInt().coerceAtLeast(1)),
                                         alpha = imageAlpha,
                                         blendMode = layerBlend
                                     )
@@ -2737,8 +2743,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 drawImage(bitmap,
                                     srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
                                     srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
-                                    dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
-                                    dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
+                                    dstOffset = androidx.compose.ui.unit.IntOffset(imageDestination.left.toInt(), imageDestination.top.toInt()),
+                                    dstSize = androidx.compose.ui.unit.IntSize(imageDestination.width.toInt().coerceAtLeast(1), imageDestination.height.toInt().coerceAtLeast(1)),
                                     alpha = imageAlpha,
                                     colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix),
                                     blendMode = contentBlend,
@@ -2752,12 +2758,18 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     drawImage(originalBitmap,
                                         srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
                                         srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
-                                        dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
-                                        dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
+                                        dstOffset = androidx.compose.ui.unit.IntOffset(imageDestination.left.toInt(), imageDestination.top.toInt()),
+                                        dstSize = androidx.compose.ui.unit.IntSize(imageDestination.width.toInt().coerceAtLeast(1), imageDestination.height.toInt().coerceAtLeast(1)),
                                         alpha = imageAlpha,
                                         blendMode = layerBlend
                                     )
                                 }
+                            }
+                            if (flipX || flipY) drawContext.transform.scale(if (flipX) -1f else 1f, if (flipY) -1f else 1f, pivot = Offset(imageDestination.center.x, imageDestination.center.y))
+                            val borderWidth = number("Image Border Width", 0f).coerceIn(0f, 256f) * size.width / 1080f
+                            if (borderWidth > 0f) {
+                                val borderColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Image Border Color", "#00000000"))) }.getOrDefault(Color.Transparent)
+                                drawPath(clip, borderColor, style = Stroke(width = borderWidth))
                             }
                         }
                     }

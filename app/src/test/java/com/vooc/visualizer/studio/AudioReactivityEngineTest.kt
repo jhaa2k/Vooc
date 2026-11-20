@@ -69,9 +69,9 @@ class AudioReactivityEngineTest {
         val attacked = runtime.update(properties, AudioReactivitySources(beat = 1f), 1f / 60f)!!
         assertEquals(0f, first, 0.0001f)
         assertTrue(attacked > 0f && attacked < 1f)
-        val disabled = runtime.update(emptyMap(), sources, 1f / 60f)
+        val disabled = runtime.update(emptyMap(), AudioReactivitySources(beat = 1f), 1f / 60f)
         assertNull(disabled)
-        assertEquals(1f, runtime.update(properties, sources, 1f / 60f)!!, 0.0001f)
+        assertEquals(1f, runtime.update(properties, AudioReactivitySources(beat = 1f), 1f / 60f)!!, 0.0001f)
     }
 
     @Test fun applyToRoutesMappedSignalToSelectedTransform() {

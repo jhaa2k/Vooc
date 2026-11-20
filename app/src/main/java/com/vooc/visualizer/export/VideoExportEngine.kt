@@ -340,7 +340,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, analysisSampleRate, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
+                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerSamplesByIndexByFrame.map { frames -> frames.getOrElse(submittedFrames) { FloatArray(0) } }, channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, analysisSampleRate, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -575,7 +575,7 @@ object VideoExportEngine {
         return blurred
     }
 
-    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, channelSamples: Map<ChannelSelect, FloatArray>, analysisSampleRate: Int, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
+    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerSamplesByIndex: List<FloatArray>?, channelSamples: Map<ChannelSelect, FloatArray>, analysisSampleRate: Int, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
         val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         canvas.save()
         canvas.clipRect(0, 0, width, height)
@@ -882,9 +882,12 @@ object VideoExportEngine {
                         "Side" -> channelSamples[ChannelSelect.SIDE]
                         else -> channelSamples[ChannelSelect.MIX]
                     }
+                    val providerIndex = number("Audio Provider Index", 0f).toInt()
+                        .coerceIn(0, ((providerSamplesByIndex?.size ?: 1) - 1).coerceAtLeast(0))
+                    val selectedProviderSamples = providerSamplesByIndex?.getOrNull(providerIndex) ?: providerSamples
                     val useProviderSmoothing = (element.value("Use Audio Provider Smoothing") as? ElementValue.Bool)?.value != false
                     val baseSource = if (selectedChannel == "Mixed" && !customFrequencyRange && useProviderSmoothing) {
-                        providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+                        selectedProviderSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
                     } else selectedSpectrum?.takeIf { it.isNotEmpty() }
                         ?: floatArrayOf(audioLevel)
                     val source = if (customFrequencyRange && selectedSpectrum != null) {
@@ -908,7 +911,7 @@ object VideoExportEngine {
                         input, count, delta, number("Smoothing / Damping", 0.72f),
                         number("Peak Hold Time", number("Peak Hold", 0.65f)),
                         number("Peak Fall Speed", 0.8f),
-                        logarithmicInput = (selectedChannel != "Mixed" || customFrequencyRange || providerSamples == null) && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
+                        logarithmicInput = (selectedChannel != "Mixed" || customFrequencyRange || selectedProviderSamples == null) && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                         reactionDelayMs = number("Reaction Delay", 0f),
                         accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),

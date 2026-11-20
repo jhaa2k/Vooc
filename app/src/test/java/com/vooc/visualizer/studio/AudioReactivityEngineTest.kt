@@ -49,12 +49,18 @@ class AudioReactivityEngineTest {
         val sources = audioReactivitySources(
             samples = floatArrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1f),
             overall = 0.4f,
-            beat = 0.75f
+            beat = 0.75f,
+            waveform = 0.31f,
+            left = 0.22f,
+            right = 0.67f
         )
         assertEquals(0.4f, sources.overall, 0.0001f)
         assertEquals(0.75f, sources.beat, 0.0001f)
         assertEquals(0.15f, sources.bass, 0.0001f)
         assertEquals(0.95f, sources.treble, 0.0001f)
+        assertEquals(0.31f, sources.value("Waveform"), 0.0001f)
+        assertEquals(0.22f, sources.value("Left Channel"), 0.0001f)
+        assertEquals(0.67f, sources.value("Right Channel"), 0.0001f)
     }
 
     @Test fun runtimeHonorsAttackAndReleaseAndResetsWhenDisabled() {

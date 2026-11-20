@@ -166,6 +166,30 @@ class ElementSystemTest {
     }
 
     @Test
+    fun imageLayerExposesTransformMaskColorAndAnimationControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).associateBy { it.name }
+        val required = setOf(
+            "Custom Image", "Image Source / File", "Fit Mode (Scale Type)",
+            "Keep Aspect Ratio And Crop To Fit", "Keep Aspect Ratio", "Shape",
+            "Crop Left", "Crop Top", "Crop Right", "Crop Bottom", "Corner Radius",
+            "Mask / Shape", "Edge Blur", "Color Overlay", "Opacity / Alpha",
+            "Measure Animation Speed", "Measure Animation Speed (Measure What)",
+            "Measure Animation Speed A (Speed)", "Measure Animation Speed B (Beat Amount)",
+            "Measure Color Blend (Measure What)", "Measure Color Blend Min",
+            "Measure Color Blend Max", "Blurred Border", "Mask Image", "Mask Mode",
+            "Mask Strength", "Color To", "Measure Color Blend", "Saturation",
+            "Color Key Enabled", "Auto Detect Color Key", "Color Key",
+            "Color Key Tolerance", "Transparency Strength", "Opacity Strength",
+            "Blur Enabled", "Blur Divider", "Blur Radius", "Generated Album Art Hint Shift Hue",
+            "Generated Album Art Hint No Text", "Generated Album Art Hint Force Gen",
+            "Generated Album Art Color", "Blend Mode Content", "Source Composition Index"
+        )
+        assertTrue("Missing Image controls: " + (required - specs.keys), specs.keys.containsAll(required))
+        assertEquals(ElementValue.Vector2(1.0, 1.0), specs.getValue("Scale").defaultValue)
+        assertEquals(listOf("Fit (Contain)", "Fill (Cover)", "Stretch"), specs.getValue("Fit Mode (Scale Type)").options)
+    }
+
+    @Test
     fun everyMeasureWhatOptionHasAWorkingDeterministicMotionResponse() {
         val runtime = 1.23f
         val track = 1.37f

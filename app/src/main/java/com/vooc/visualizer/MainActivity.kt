@@ -3060,11 +3060,13 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             when (shapeType) {
                                 "Circle/Oval" -> {
                                     val oval = androidx.compose.ui.geometry.Rect(left, top, left + w, top + h)
-                                    val sweep = number("Ellipse Sweep Angle", 360f) * number("Trim Paths / Progress", 1f)
-                                    arcTo(oval, number("Ellipse Start Angle", 0f) + number("Trim Offset", 0f) * 360f, sweep, true)
+                                    val trimStart = number("Trim Start", 0f).coerceIn(0f, 1f)
+                                    val trimEnd = number("Trim End", 1f).coerceIn(trimStart, 1f)
+                                    val sweep = number("Ellipse Sweep Angle", 360f) * (trimEnd - trimStart) * number("Trim Paths / Progress", 1f).coerceIn(0f, 1f)
+                                    arcTo(oval, number("Ellipse Start Angle", 0f) + (trimStart + number("Trim Offset", 0f)) * 360f, sweep, true)
                                     if (kotlin.math.abs(sweep) >= 359.9f) close()
                                 }
-                                "Line" -> { moveTo(left, center.y); lineTo(left + w * number("Trim Paths / Progress", 1f).coerceIn(0f, 1f), center.y) }
+                                "Line" -> { val progress = number("Trim Paths / Progress", 1f).coerceIn(0f, 1f); val a = number("Trim Start", 0f).coerceIn(0f, 1f); val z = number("Trim End", 1f).coerceIn(a, 1f); moveTo(left + w * a, center.y); lineTo(left + w * (a + (z - a) * progress), center.y) }
                                 "Triangle" -> { moveTo(center.x, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
                                 "Polygon", "Star" -> {
                                     val count = if (shapeType == "Star") number("Star Points", 5f).toInt().coerceIn(3, 128) * 2 else number("Polygon Sides", 6f).toInt().coerceIn(3, 128)

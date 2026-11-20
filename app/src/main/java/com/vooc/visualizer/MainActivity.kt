@@ -100,6 +100,7 @@ import com.vooc.visualizer.analyzer.AudioAnalyzer
 import com.vooc.visualizer.analyzer.AudioProviderFrame
 import com.vooc.visualizer.analyzer.AudioProviderProcessor
 import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
+import com.vooc.visualizer.analyzer.SpectrumMapper
 import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.analyzer.FftSize
@@ -2155,16 +2156,22 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     }
                     StudioElementType.BARS_SEGMENTS -> {
                         val selectedChannel = textValue("Audio Channel", "Mixed")
+                        val frequencyStartHz = number("Frequency Range Start", 20f).coerceAtLeast(0f)
+                        val frequencyEndHz = number("Frequency Range End", 18000f).coerceAtLeast(frequencyStartHz + 1f)
+                        val customFrequencyRange = frequencyStartHz > 20.01f || frequencyEndHz < 17999.99f
                         val selectedSpectrum = when (selectedChannel) {
                             "Left" -> frame?.channel(ChannelSelect.LEFT)?.spectrum
                             "Right" -> frame?.channel(ChannelSelect.RIGHT)?.spectrum
                             "Mid" -> frame?.channel(ChannelSelect.MID)?.spectrum
                             "Side" -> frame?.channel(ChannelSelect.SIDE)?.spectrum
-                            else -> null
+                            else -> frame?.channel(ChannelSelect.MIX)?.spectrum
                         }
-                        val rawSamples: FloatArray = if (selectedChannel == "Mixed") {
+                        val sourceSamples: FloatArray = if (selectedChannel == "Mixed" && !customFrequencyRange) {
                             providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
                         } else selectedSpectrum ?: frame?.spectrum ?: FloatArray(64)
+                        val rawSamples = if (customFrequencyRange && frame != null) SpectrumMapper.cropFrequencyRange(
+                            sourceSamples, frame!!.sampleRate, frequencyStartHz, frequencyEndHz
+                        ) else sourceSamples
                         val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
                         val input = processBarSpectrum(
                             samples = rawSamples,
@@ -2188,7 +2195,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             damping = number("Smoothing / Damping", 0.72f),
                             peakHold = number("Peak Hold Time", number("Peak Hold", 0.65f)),
                             peakFallSpeed = number("Peak Fall Speed", 0.8f),
-                            logarithmicInput = selectedChannel == "Mixed" && providerFrame == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
+                            logarithmicInput = (selectedChannel != "Mixed" || customFrequencyRange || providerFrame == null) && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                             reactionDelayMs = number("Reaction Delay", 0f),
                             accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),

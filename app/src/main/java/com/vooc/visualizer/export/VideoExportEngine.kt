@@ -1165,8 +1165,8 @@ object VideoExportEngine {
                             }
                         }
                         val original = imageCache[uriText]
-                        val showUnblurredUnder = enabled("Show Unblurred Content Under")
-                        val showUnblurredOver = enabled("Show Unblurred Content")
+                        val showUnblurredUnder = (element.value("Show Unblurred Content Under") as? ElementValue.Bool)?.value == true
+                        val showUnblurredOver = (element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true
                         val unblurredPaint = Paint(imagePaint).apply { colorFilter = null }
                         canvas.save()
                         canvas.clipPath(clip)

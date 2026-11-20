@@ -47,7 +47,7 @@ class ElementSystemTest {
     fun propertyValuesAreTypeCheckedAndClamped() {
         val element = ElementPropertyCatalog.create(StudioElementType.BARS_SEGMENTS, "bars-1")
         val bounded = element.withValue("Bar Count", ElementValue.Number(5000.0))
-        assertEquals(ElementValue.Integer(2048L), bounded.value("Bar Count"))
+        assertEquals(ElementValue.Integer(512L), bounded.value("Bar Count"))
         val invalid = element.withValue("Visible", ElementValue.Text("yes"))
         assertEquals(ElementValue.Bool(true), invalid.value("Visible"))
     }
@@ -78,7 +78,7 @@ class ElementSystemTest {
         val image = ElementPropertyCatalog.create(StudioElementType.IMAGE, "image-1", "Album Art")
         assertEquals("Album Art", image.tag)
         assertEquals(ElementValue.Bool(true), image.value("Visible"))
-        assertEquals(ElementValue.Text("Rectangle"), image.value("Shape"))
+        assertEquals(ElementValue.Text("Rectangle"), image.value("Mask / Shape"))
         assertNotNull(image.value("Custom Image"))
         assertFalse(image.locked)
     }

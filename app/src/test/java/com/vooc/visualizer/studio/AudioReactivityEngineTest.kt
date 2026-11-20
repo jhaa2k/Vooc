@@ -110,4 +110,29 @@ class AudioReactivityEngineTest {
         assertEquals(0x80FF8040.toInt(), audioReactivityColor(0x80FF8040.toInt(), 1f))
     }
 
+    @Test fun barSpectrumProcessorAppliesThresholdOffsetAndAmplitudeModes() {
+        val normal = processBarSpectrum(floatArrayOf(0.25f, 0.5f, 1f))
+        assertEquals(0.2f, normal[0], 0.0001f)
+        assertEquals(1f / 3f, normal[1], 0.0001f)
+        assertEquals(0.5f, normal[2], 0.0001f)
+
+        val gated = processBarSpectrum(
+            floatArrayOf(0.25f, 0.5f, 1f), threshold = 0.3f, offset = 0.1f
+        )
+        assertEquals(0.1f, gated[0], 0.0001f)
+        assertEquals(1f / 3f + 0.1f, gated[1], 0.0001f)
+        val power = processBarSpectrum(floatArrayOf(0.5f), amplitudeMode = "Power")
+        assertEquals(0.2f, power[0], 0.0001f)
+    }
+
+    @Test fun barSpectrumProcessorMapsFrequencyBinsAndHandlesInvalidSamples() {
+        val shifted = processBarSpectrum(floatArrayOf(0.25f, 0.5f, 1f), bandOffset = 1)
+        assertEquals(1f / 3f, shifted[0], 0.0001f)
+        assertEquals(0.5f, shifted[1], 0.0001f)
+        assertEquals(0.2f, shifted[2], 0.0001f)
+        val safe = processBarSpectrum(floatArrayOf(Float.NaN, Float.POSITIVE_INFINITY))
+        assertEquals(0f, safe[0], 0.0001f)
+        assertEquals(0f, safe[1], 0.0001f)
+    }
+
 }

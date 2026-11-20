@@ -212,6 +212,13 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
     val edgeBlur = number("Edge Blur", 0f).coerceIn(0f, 128f)
     val blurredBorder = enabled("Blurred Border")
     val keyEnabled = enabled("Color Key Enabled")
+    val brightness = number("Image Brightness", 1f).coerceIn(0f, 4f)
+    val contrast = number("Image Contrast", 1f).coerceIn(0f, 4f)
+    val hueShift = number("Image Hue", 0f).coerceIn(-360f, 360f)
+    val gamma = number("Image Gamma", 1f).coerceIn(0.1f, 4f)
+    val temperature = number("Image Color Temperature", 6500f).coerceIn(1000f, 12000f)
+    val warm = ((temperature - 6500f) / 5500f).coerceIn(-1f, 1f)
+    val adjustImageColor = brightness != 1f || contrast != 1f || hueShift != 0f || gamma != 1f || temperature != 6500f
     if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled && maskSource == null) return source
     val output = source.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
     val w = output.width
@@ -234,7 +241,7 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
     val keyG = android.graphics.Color.green(keyColor).toFloat()
     val keyB = android.graphics.Color.blue(keyColor).toFloat()
     val edge = edgeBlur * min(w, h) / 1080f
-    if (keyEnabled || edge > 0f || maskPixels != null) {
+    if (keyEnabled || edge > 0f || maskPixels != null || adjustImageColor) {
         for (y in 0 until h) for (x in 0 until w) {
             val index = y * w + x
             val pixel = pixels[index]
@@ -265,7 +272,23 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
                 val edgeFactor = if (blurredBorder) edgeLinear * edgeLinear * (3f - 2f * edgeLinear) else edgeLinear
                 alpha *= edgeFactor
             }
-            pixels[index] = (pixel and 0x00FFFFFF) or (alpha.toInt().coerceIn(0, 255) shl 24)
+            if (adjustImageColor) {
+                var red = android.graphics.Color.red(pixel).toFloat() / 255f
+                var green = android.graphics.Color.green(pixel).toFloat() / 255f
+                var blue = android.graphics.Color.blue(pixel).toFloat() / 255f
+                val pivot = 0.5f
+                red = ((red - pivot) * contrast + pivot) * brightness * (1f + warm * 0.10f)
+                green = ((green - pivot) * contrast + pivot) * brightness * (1f + warm * 0.025f)
+                blue = ((blue - pivot) * contrast + pivot) * brightness * (1f - warm * 0.10f)
+                red = kotlin.math.pow(red.coerceAtLeast(0f), 1f / gamma).coerceIn(0f, 1f)
+                green = kotlin.math.pow(green.coerceAtLeast(0f), 1f / gamma).coerceIn(0f, 1f)
+                blue = kotlin.math.pow(blue.coerceAtLeast(0f), 1f / gamma).coerceIn(0f, 1f)
+                val hsv = FloatArray(3)
+                android.graphics.Color.RGBToHSV((red * 255f).toInt(), (green * 255f).toInt(), (blue * 255f).toInt(), hsv)
+                hsv[0] = (hsv[0] + hueShift + 360f) % 360f
+                val adjusted = android.graphics.Color.HSVToColor(alpha.toInt().coerceIn(0, 255), hsv)
+                pixels[index] = adjusted
+            } else pixels[index] = (pixel and 0x00FFFFFF) or (alpha.toInt().coerceIn(0, 255) shl 24)
         }
     }
     output.setPixels(pixels, 0, w, 0, 0, w, h)

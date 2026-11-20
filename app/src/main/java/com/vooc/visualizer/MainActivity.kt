@@ -3241,6 +3241,31 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                         }
                     }
+                    StudioElementType.MIRROR_EFFECT -> {
+                        val bitmap = elementImages[element.id]
+                        if (bitmap != null) {
+                            val imageScale = props["Scale"] as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
+                            val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)
+                            val imageScaleY = (if (props["Scale Is Uniform"] == ElementValue.Bool(true)) imageScaleX else imageScale.y.toFloat()).coerceIn(0f, 10f)
+                            val frameWidth = (size.width * 0.45f * scale * imageScaleX).coerceAtLeast(1f)
+                            val frameHeight = (frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)) *
+                                (imageScaleY / imageScaleX.coerceAtLeast(0.001f))
+                            val blend = when (textValue("Blend Mode Content", "Alpha")) {
+                                "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
+                                "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                                "Multiply" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                                "Overlay" -> androidx.compose.ui.graphics.BlendMode.Overlay
+                                else -> androidx.compose.ui.graphics.BlendMode.SrcOver
+                            }
+                            drawImage(
+                                bitmap,
+                                dstOffset = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt()),
+                                dstSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1)),
+                                alpha = opacity,
+                                blendMode = blend
+                            )
+                        }
+                    }
                     StudioElementType.RGB_SPLIT -> {
                         val bitmap = elementImages[element.id]
                         if (bitmap != null) {

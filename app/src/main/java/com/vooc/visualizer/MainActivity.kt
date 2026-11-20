@@ -2586,10 +2586,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
                             val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
                             val destinationSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
-                            if (props["Show Unblurred Content"] == ElementValue.Bool(true)) {
-                                elementOriginalImages[element.id]?.let { original -> drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity * 0.35f) }
+                            val original = elementOriginalImages[element.id]
+                            if (props["Show Unblurred Content Under"] == ElementValue.Bool(true) && original != null) {
+                                drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
                             }
                             drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
+                            if (props["Show Unblurred Content"] == ElementValue.Bool(true) && original != null) {
+                                drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
+                            }
                         }
                     }
                     StudioElementType.MOTION_BLUR_EFFECT -> {

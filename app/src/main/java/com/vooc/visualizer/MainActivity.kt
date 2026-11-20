@@ -1,6 +1,7 @@
 package com.vooc.visualizer
 
 import com.vooc.visualizer.studio.replacePreservingOrder
+import com.vooc.visualizer.studio.buildNormalizedImageShapePath
 
 import android.net.Uri
 import android.Manifest
@@ -64,6 +65,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -2647,8 +2649,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val flipX = props["Image Flip Horizontal"] == ElementValue.Bool(true)
                             val flipY = props["Image Flip Vertical"] == ElementValue.Bool(true)
                             val shapeName = textValue("Shape", "Rectangle").takeIf { it != "Rectangle" } ?: textValue("Mask / Shape", "Rectangle")
+                            val customShape = buildNormalizedImageShapePath(
+                                textValue("Image Custom Shape Path", ""),
+                                android.graphics.RectF(imageDestination.left, imageDestination.top, imageDestination.right, imageDestination.bottom)
+                            )
                             val clip = Path().apply {
-                                when (shapeName) {
+                                if (customShape != null) addPath(customShape.asComposePath()) else when (shapeName) {
                                     "Circle", "Ellipse", "Circle/Oval" -> addOval(imageDestination)
                                     "Square" -> {
                                         val side = minOf(imageDestination.width, imageDestination.height)

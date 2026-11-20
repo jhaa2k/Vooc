@@ -133,4 +133,33 @@ class ElementSystemTest {
         assertEquals(listOf("legacy-layer-1", "legacy-layer-2"), converted.map { it.id })
     }
 
+    @Test
+    fun spectrumStyleMenuCreatesCanonicalElementsInsteadOfLegacyLayers() {
+        val styles = LayerAddMenuCatalog.spectrumStyles
+        assertTrue(styles.isNotEmpty())
+        styles.forEachIndexed { index, kind ->
+            val element = LegacyLayerAdapter.createSpectrumElement(kind, "spectrum-$index")
+            assertEquals(kind.title, element.tag)
+            assertEquals(StudioElementType.BARS_SEGMENTS, element.type)
+            assertNotNull(element.value("Bar Design"))
+            assertTrue(element.value("Bar Count") is ElementValue.Integer)
+        }
+    }
+
+    @Test
+    fun spectrumStyleMappingUsesSupportedBarDesignOptions() {
+        val expected = mapOf(
+            LayerKind.BARSH to "Rounded Rect",
+            LayerKind.CIRCLE to "Circle / Dot",
+            LayerKind.WAVE to "Wave",
+            LayerKind.SCOPE to "Line",
+            LayerKind.DOTS to "Circle / Dot",
+            LayerKind.BLOCKS to "Rectangle"
+        )
+        expected.forEach { (kind, design) ->
+            val element = LegacyLayerAdapter.createSpectrumElement(kind, "mapping-${kind.name}")
+            assertEquals(ElementValue.Text(design), element.value("Bar Design"))
+        }
+    }
+
 }

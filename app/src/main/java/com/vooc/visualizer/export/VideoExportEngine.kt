@@ -954,6 +954,8 @@ object VideoExportEngine {
                     val extrusionDepth = number("Extrusion Depth", 5f) * width / 1080f
                     val glow = (element.value("Glow / Shadow") as? ElementValue.Bool)?.value == true
                     val glowStrength = number("Glow Strength", 0.35f).coerceIn(0f, 1f)
+                    val barGlowRadius = number("Bar Glow Radius", 8f) * width / 1080f
+                    val barGlowColorStrength = number("Bar Glow Color Strength", 1f).coerceIn(0f, 1f)
                     val peakEnabled = (element.value("Peak / Cap") as? ElementValue.Bool)?.value == true
                     val peakWidth = (number("Peak Width", 2f) * width / 1080f).coerceAtLeast(0.5f)
                     val segmentsPerBar = number("Segments Per Bar", 1f).toInt().coerceIn(1, 64)
@@ -1057,10 +1059,10 @@ object VideoExportEngine {
                             paint.style = if (outline) Paint.Style.STROKE else Paint.Style.FILL
                             paint.strokeWidth = strokeWidth
                             paint.pathEffect = dash
-                            if (glow) {
+                            if (glow && barGlowRadius > 0f && barGlowColorStrength > 0f) {
                                 paint.style = Paint.Style.STROKE
-                                paint.strokeWidth = strokeWidth + capSize * 2f
-                                paint.alpha = (alpha * glowStrength * 0.2f).toInt()
+                                paint.strokeWidth = barGlowRadius * 2f + strokeWidth
+                                paint.alpha = (alpha * glowStrength * barGlowColorStrength * 0.2f).toInt()
                                 canvas.drawPath(path, paint)
                                 paint.alpha = alpha
                                 paint.strokeWidth = strokeWidth

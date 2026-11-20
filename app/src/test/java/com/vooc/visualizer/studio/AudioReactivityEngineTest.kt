@@ -91,4 +91,23 @@ class AudioReactivityEngineTest {
         assertEquals(1.5f, scale.scaleMultiplier, 0.0001f)
     }
 
+    @Test fun applyToRoutesColorAndEffectStrengthIndependently() {
+        val color = audioReactivityTransform(
+            mapOf("Audio Reactivity Apply To" to ElementValue.Text("Color")), 0.5f
+        )
+        assertEquals(0.625f, color.colorMultiplier, 0.0001f)
+        assertEquals(1f, color.effectStrengthMultiplier, 0.0001f)
+
+        val effect = audioReactivityTransform(
+            mapOf("Audio Reactivity Apply To" to ElementValue.Text("Effect Strength")), 0.75f
+        )
+        assertEquals(1f, effect.colorMultiplier, 0.0001f)
+        assertEquals(0.75f, effect.effectStrengthMultiplier, 0.0001f)
+    }
+
+    @Test fun audioReactiveColorScalesRgbAndPreservesAlpha() {
+        assertEquals(0x80402010.toInt(), audioReactivityColor(0x80FF8040.toInt(), 0.25f))
+        assertEquals(0x80FF8040.toInt(), audioReactivityColor(0x80FF8040.toInt(), 1f))
+    }
+
 }

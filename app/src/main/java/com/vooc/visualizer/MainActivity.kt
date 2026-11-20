@@ -3,6 +3,7 @@ package com.vooc.visualizer
 import com.vooc.visualizer.studio.replacePreservingOrder
 import com.vooc.visualizer.studio.buildNormalizedImageShapePath
 import com.vooc.visualizer.studio.BackgroundImageProcessor
+import com.vooc.visualizer.studio.MirrorEffectProcessor
 
 import android.net.Uri
 import android.Manifest
@@ -1748,6 +1749,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
                                 StudioElementType.MOTION_BLUR_EFFECT, StudioElementType.RGB_SPLIT -> processImageForPreview(decoded, element, maskBitmap)
                                 StudioElementType.BACKGROUND -> BackgroundImageProcessor.process(decoded, element, maskBitmap)
+                                StudioElementType.MIRROR_EFFECT -> MirrorEffectProcessor.process(decoded, element)
                                 else -> decoded
                             }
                             val image = processed.asImageBitmap()

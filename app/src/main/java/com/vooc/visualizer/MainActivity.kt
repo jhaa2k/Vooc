@@ -1579,11 +1579,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     }
     val elementOriginalImages by produceState(
         initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
-        key1 = elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.map { element -> element.id to element.properties }
+        key1 = elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.map { element -> element.id to element.properties }
     ) {
         value = withContext(Dispatchers.IO) {
-            elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.mapNotNull { element ->
-                val uriText = (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
+            elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.mapNotNull { element ->
+                val uriText = if (element.type == StudioElementType.IMAGE) {
+                    listOf("Custom Image", "Image Source / File").firstNotNullOfOrNull { key ->
+                        (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
+                    }.orEmpty()
+                } else (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
                 if (uriText.isBlank()) null else runCatching {
                     context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
                 }.getOrNull()?.let { element.id to it }
@@ -2605,7 +2609,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     }
                                 }
                             }
+                            val showUnblurredUnder = props["Show Unblurred Content Under"] == ElementValue.Bool(true)
+                            val showUnblurredOver = props["Show Unblurred Content"] == ElementValue.Bool(true)
+                            val originalBitmap = elementOriginalImages[element.id]
                             clipPath(clip) {
+                                if (showUnblurredUnder && originalBitmap != null) {
+                                    drawImage(originalBitmap,
+                                        srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
+                                        srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
+                                        dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
+                                        dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
+                                        alpha = imageAlpha,
+                                        blendMode = layerBlend
+                                    )
+                                }
                                 drawImage(bitmap,
                                     srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
                                     srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
@@ -2615,6 +2632,16 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix),
                                     blendMode = layerBlend
                                 )
+                                if (showUnblurredOver && originalBitmap != null) {
+                                    drawImage(originalBitmap,
+                                        srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
+                                        srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
+                                        dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
+                                        dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
+                                        alpha = imageAlpha,
+                                        blendMode = layerBlend
+                                    )
+                                }
                             }
                         }
                     }

@@ -751,7 +751,7 @@ object ElementPropertyCatalog {
         bool("Mirror Y", "Overall", false),
         number("Perspective Depth", "Overall", 0.0, 0.0, 1000.0),
         number("Perspective Fov", "Overall", 60.0, 1.0, 179.0),
-        bool("Vector Relative To Center", "Overall", true),
+        bool("Vector Relative To Center", "Overall", false),
         bool("Use Random Vector Instead", "Overall", false),
         number("Vector Angle", "Overall", -90.0, -360.0, 360.0),
         number("Vector Angle Z", "Overall", 0.0, -360.0, 360.0),

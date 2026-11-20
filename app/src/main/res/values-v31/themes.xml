@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+: system splash screen with the animated equalizer mark. -->
+    <style name="Theme.Vooc" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/vooc_ink</item>
+        <item name="android:colorBackground">@color/vooc_ink</item>
+        <item name="android:statusBarColor">@color/vooc_ink</item>
+        <item name="android:navigationBarColor">@color/vooc_ink</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">@color/vooc_lime</item>
+        <item name="android:windowSplashScreenBackground">@color/vooc_ink</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_animated</item>
+        <item name="android:windowSplashScreenAnimationDuration">900</item>
+    </style>
+</resources>

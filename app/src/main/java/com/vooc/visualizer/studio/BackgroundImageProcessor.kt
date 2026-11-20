@@ -9,7 +9,7 @@ import kotlin.math.pow
  * Keeps pixel adjustments deterministic across both renderers.
  */
 object BackgroundImageProcessor {
-    fun process(source: Bitmap, element: ElementDocument): Bitmap {
+    fun process(source: Bitmap, element: ElementDocument, maskSource: Bitmap? = null): Bitmap {
         fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
             is ElementValue.Number -> value.value.toFloat()
             is ElementValue.Integer -> value.value.toFloat()
@@ -27,7 +27,19 @@ object BackgroundImageProcessor {
         val invert = enabled("Background Invert")
         val pixelAdjustments = brightness != 1f || contrast != 1f || saturation != 1f || grayscale || invert
 
-        if (blurRadius <= 0f && !edgeBlur && !pixelAdjustments) return source
+        val outputMask = maskSource?.let {
+            if (it.width == source.width && it.height == source.height) it
+            else Bitmap.createScaledBitmap(it, source.width, source.height, true)
+        }
+        val maskPixels = outputMask?.let { mask ->
+            IntArray(mask.width * mask.height).also { values ->
+                mask.getPixels(values, 0, mask.width, 0, 0, mask.width, mask.height)
+            }
+        }
+        if (blurRadius <= 0f && !edgeBlur && !pixelAdjustments && maskPixels == null) {
+            if (outputMask != null && outputMask !== maskSource) outputMask.recycle()
+            return source
+        }
 
         val output = source.copy(Bitmap.Config.ARGB_8888, true)
         val width = output.width
@@ -41,12 +53,17 @@ object BackgroundImageProcessor {
             (blurRadius * 2f * blurQuality).coerceIn(1f, maximumEdgeWidth)
         } else 0f
 
-        if (pixelAdjustments || edgeBlur) {
+        if (pixelAdjustments || edgeBlur || maskPixels != null) {
+            val maskStrength = number("Mask Strength", 1f).coerceIn(0f, 1f)
             for (y in 0 until height) {
                 for (x in 0 until width) {
                     val index = y * width + x
                     val pixel = pixels[index]
                     var alpha = android.graphics.Color.alpha(pixel).toFloat()
+                    if (maskPixels != null) {
+                        val maskAlpha = android.graphics.Color.alpha(maskPixels[index]).toFloat() / 255f
+                        alpha *= 1f - (1f - maskAlpha) * maskStrength
+                    }
                     var red = android.graphics.Color.red(pixel).toFloat() / 255f
                     var green = android.graphics.Color.green(pixel).toFloat() / 255f
                     var blue = android.graphics.Color.blue(pixel).toFloat() / 255f
@@ -89,6 +106,7 @@ object BackgroundImageProcessor {
             }
             output.setPixels(pixels, 0, width, 0, 0, width, height)
         }
+        if (outputMask != null && outputMask !== maskSource && !outputMask.isRecycled) outputMask.recycle()
 
         if (blurRadius <= 0f) return output
 

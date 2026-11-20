@@ -3097,16 +3097,6 @@ private fun ThinSlider(
     Canvas(
         modifier.fillMaxWidth().height(24.dp)
             .pointerInput(valueRange, safeReset) {
-                fun valueAt(x: Float): Float {
-                    val inset = 6.dp.toPx()
-                    val usable = (size.width - inset * 2f).coerceAtLeast(1f)
-                    val fraction = ((x - inset) / usable).coerceIn(0f, 1f)
-                    val raw = valueRange.start + fraction * (valueRange.endInclusive - valueRange.start)
-                    if (steps <= 0) return raw.coerceIn(valueRange)
-                    val count = steps + 1
-                    val step = (valueRange.endInclusive - valueRange.start) / count
-                    return (valueRange.start + kotlin.math.round((raw - valueRange.start) / step) * step).coerceIn(valueRange)
-                }
                 detectTapGestures(onDoubleTap = { resetAction() })
             }
             .pointerInput(valueRange) {

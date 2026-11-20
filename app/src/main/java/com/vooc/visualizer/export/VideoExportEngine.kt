@@ -1681,6 +1681,16 @@ object VideoExportEngine {
                         }
                     }
                     val shapeFillPaint = Paint(paint).apply {
+                        xfermode = android.graphics.PorterDuffXfermode(when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> android.graphics.PorterDuff.Mode.ADD
+                            "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                            "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                            "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                            "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                            "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                            "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                        })
                         this.style = Paint.Style.FILL
                         this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
                         if (element.value("Gradient Fill") == ElementValue.Bool(true)) {
@@ -1727,6 +1737,16 @@ object VideoExportEngine {
                     if (strokeWidth > 0f || shapeType == "Line") {
                         val shapeStrokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                         val shapeStrokePaint = Paint(paint).apply {
+                            xfermode = android.graphics.PorterDuffXfermode(when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> android.graphics.PorterDuff.Mode.ADD
+                            "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                            "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                            "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                            "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                            "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                            "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                        })
                             this.color = if (shapeType == "Line") fill else shapeStrokeColor
                             this.alpha = (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
                             this.style = Paint.Style.STROKE

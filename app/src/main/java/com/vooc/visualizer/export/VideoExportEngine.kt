@@ -103,8 +103,23 @@ object VideoExportEngine {
             val source = (element.value("Audio Reactivity Source") as? ElementValue.Text)?.value
             (element.value("Audio Reactivity Enabled") as? ElementValue.Bool)?.value == true &&
                 (source == "Left Channel" || source == "Right Channel")
+        } || project.document.elements.any { element ->
+            element.type == StudioElementType.BARS_SEGMENTS &&
+                (element.value("Audio Channel") as? ElementValue.Text)?.value in setOf("Left", "Right", "Side")
         }
         val providerSamplesByFrame = Array(frameCount) { FloatArray(providerConfig.sampleOutCount) }
+        val channelsToCapture = project.document.elements.filter { it.type == StudioElementType.BARS_SEGMENTS }
+            .mapNotNull { element ->
+                when ((element.value("Audio Channel") as? ElementValue.Text)?.value) {
+                    "Left" -> ChannelSelect.LEFT
+                    "Right" -> ChannelSelect.RIGHT
+                    "Mid" -> ChannelSelect.MID
+                    "Side" -> ChannelSelect.SIDE
+                    else -> null
+                }
+            }.toSet()
+        // Quantized channel snapshots keep export memory bounded (512 bytes/channel/frame).
+        val channelSpectrumByFrame = channelsToCapture.associateWith { Array(frameCount) { ByteArray(512) } }
         val providerBeatByFrame = FloatArray(frameCount)
         val leftLevelByFrame = FloatArray(frameCount)
         val rightLevelByFrame = FloatArray(frameCount)
@@ -142,6 +157,15 @@ object VideoExportEngine {
                                 providerBpmByFrame[frameIndex] = analysis.beat.bpm.takeIf { it in 40f..240f } ?: 120f
                                 leftLevelByFrame[frameIndex] = analysis.channel(ChannelSelect.LEFT).rms
                                 rightLevelByFrame[frameIndex] = analysis.channel(ChannelSelect.RIGHT).rms
+                                channelSpectrumByFrame.forEach { (channel, frames) ->
+                                    val spectrum = analysis.channel(channel).spectrum
+                                    val encoded = frames[frameIndex]
+                                    for (sampleIndex in encoded.indices) {
+                                        val sourceIndex = (sampleIndex.toLong() * spectrum.size / encoded.size)
+                                            .toInt().coerceIn(0, spectrum.lastIndex.coerceAtLeast(0))
+                                        encoded[sampleIndex] = ((spectrum.getOrElse(sourceIndex) { 0f }.coerceIn(0f, 1f) * 255f).toInt()).toByte()
+                                    }
+                                }
                                 waveformLevelByFrame[frameIndex] = if (analysis.waveform.isEmpty()) analysis.rms else kotlin.math.sqrt(
                                     analysis.waveform.sumOf { sample -> sample.toDouble() * sample.toDouble() } / analysis.waveform.size
                                 ).toFloat()
@@ -177,6 +201,7 @@ object VideoExportEngine {
                 var lastLeft = 0f
                 var lastRight = 0f
                 var lastWaveform = 0f
+                val lastChannelSamples = mutableMapOf<ChannelSelect, ByteArray>()
                 for (i in providerSamplesByFrame.indices) {
                     if (providerFrameAssigned[i]) {
                         lastSamples = providerSamplesByFrame[i]
@@ -185,6 +210,7 @@ object VideoExportEngine {
                         lastLeft = leftLevelByFrame[i]
                         lastRight = rightLevelByFrame[i]
                         lastWaveform = waveformLevelByFrame[i]
+                        channelSpectrumByFrame.forEach { (channel, frames) -> lastChannelSamples[channel] = frames[i].copyOf() }
                     } else if (lastSamples != null) {
                         lastSamples.copyInto(providerSamplesByFrame[i])
                         providerBeatByFrame[i] = lastBeat
@@ -192,6 +218,9 @@ object VideoExportEngine {
                         leftLevelByFrame[i] = lastLeft
                         rightLevelByFrame[i] = lastRight
                         waveformLevelByFrame[i] = lastWaveform
+                        channelSpectrumByFrame.forEach { (channel, frames) ->
+                            lastChannelSamples[channel]?.copyInto(frames[i])
+                        }
                     }
                 }
                 val firstAssigned = providerFrameAssigned.indexOfFirst { it }
@@ -203,6 +232,9 @@ object VideoExportEngine {
                         leftLevelByFrame[i] = leftLevelByFrame[firstAssigned]
                         rightLevelByFrame[i] = rightLevelByFrame[firstAssigned]
                         waveformLevelByFrame[i] = waveformLevelByFrame[firstAssigned]
+                        channelSpectrumByFrame.forEach { (channel, frames) ->
+                            frames[firstAssigned].copyInto(frames[i])
+                        }
                     }
                 }
             }
@@ -285,7 +317,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
+                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -520,7 +552,7 @@ object VideoExportEngine {
         return blurred
     }
 
-    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
+    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, channelSamples: Map<ChannelSelect, FloatArray>, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
         val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         canvas.save()
         canvas.clipRect(0, 0, width, height)
@@ -816,7 +848,17 @@ object VideoExportEngine {
                 }
                 StudioElementType.BARS_SEGMENTS -> {
                     val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
-                    val source = providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+                    val selectedChannel = textValue("Audio Channel", "Mixed")
+                    val selectedSpectrum = when (selectedChannel) {
+                        "Left" -> channelSamples[ChannelSelect.LEFT]
+                        "Right" -> channelSamples[ChannelSelect.RIGHT]
+                        "Mid" -> channelSamples[ChannelSelect.MID] ?: providerSamples
+                        "Side" -> channelSamples[ChannelSelect.SIDE]
+                        else -> null
+                    }
+                    val source = if (selectedChannel == "Mixed") {
+                        providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+                    } else selectedSpectrum?.takeIf { it.isNotEmpty() } ?: providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
                     val input = processBarSpectrum(
                         samples = source,
                         amplitudeScale = number("Amplitude Scale", 1f) * number("Sensitivity", 1f),
@@ -835,7 +877,7 @@ object VideoExportEngine {
                         input, count, delta, number("Smoothing / Damping", 0.72f),
                         number("Peak Hold Time", number("Peak Hold", 0.65f)),
                         number("Peak Fall Speed", 0.8f),
-                        logarithmicInput = providerSamples == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
+                        logarithmicInput = selectedChannel == "Mixed" && providerSamples == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                         reactionDelayMs = number("Reaction Delay", 0f),
                         accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),

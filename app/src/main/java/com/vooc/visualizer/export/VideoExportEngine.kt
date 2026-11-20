@@ -796,7 +796,7 @@ object VideoExportEngine {
                         } else Typeface.create(family, fontStyle)
                     val measureFontMode = textValue("Measure Font Size (Measure What)", "Nothing")
                     val measureFontMotion = motionFor("Measure Font Size (Measure What)")
-                    val measureFontResponse = if (measureFontMode == "Nothing") 0f else maxOf(
+                    val measureFontResponse = if (measureFontMode == "Nothing" || measureFontMode == "None") 0f else maxOf(
                         kotlin.math.abs(measureFontMotion.scale - 1f) / 0.32f,
                         kotlin.math.abs(measureFontMotion.rotation) / 8f,
                         kotlin.math.abs(measureFontMotion.offsetX) / 0.05f,

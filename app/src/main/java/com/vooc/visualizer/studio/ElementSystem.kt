@@ -991,6 +991,24 @@ object ElementPropertyCatalog {
         bool("Composition Export Enabled", "Composition", true)
     )
 
+    private val sharedAnimation = listOf(
+        bool("Animation Enabled", "Animation", true),
+        number("Animation Start Delay", "Animation", 0.0, 0.0, 86400.0),
+        number("Animation Duration", "Animation", 0.0, 0.0, 86400.0),
+        text("Animation Playback Mode", "Animation", "Loop", listOf("Once", "Loop", "Ping Pong", "Reverse")),
+        text("Animation Time Mode", "Animation", "Composition Time", listOf("Composition Time", "Track Position", "Beat", "Manual")),
+        number("Animation Time Offset", "Animation", 0.0, -86400.0, 86400.0),
+        number("Animation Speed", "Animation", 1.0, -100.0, 100.0),
+        text("Animation Easing", "Animation", "Linear", listOf("Linear", "Ease In", "Ease Out", "Ease In Out", "Cubic", "Back", "Bounce", "Elastic")),
+        text("Animation Interpolation", "Animation", "Linear", listOf("Step", "Linear", "Smooth", "Cubic")),
+        integer("Animation Loop Count", "Animation", 0, 0.0, 100000.0),
+        bool("Animation Start On Beat", "Animation", false),
+        number("Animation Beat Offset", "Animation", 0.0, -64.0, 64.0),
+        bool("Animation Reset On Track Change", "Animation", false),
+        bool("Animation Hold First Frame", "Animation", true),
+        bool("Animation Hold Last Frame", "Animation", false)
+    )
+
     // Shared advanced controls are exposed on every visual layer so the first editor
     // pass has a complete, consistent control surface before renderer-specific wiring.
     private val sharedAdvanced = listOf(
@@ -1023,43 +1041,43 @@ object ElementPropertyCatalog {
 
     fun forElement(type: StudioElementType): List<ElementPropertySpec> {
         if (type == StudioElementType.AUDIO_PROVIDER) return provider
-        if (type == StudioElementType.MIRROR_EFFECT) return (sharedGeneral + mirrorEffect + sharedAdvanced).groupBy { it.name }.values.map { it.last() }
-        if (type == StudioElementType.CUSTOM_SHADER) return (sharedGeneral + customShader + sharedAdvanced).groupBy { it.name }.values.map { it.last() }
-        if (type == StudioElementType.COMPOSITION) return (sharedGeneral + composition + sharedAdvanced).groupBy { it.name }.values.map { it.last() }
+        if (type == StudioElementType.MIRROR_EFFECT) return (sharedGeneral + mirrorEffect + sharedAdvanced + sharedAnimation).groupBy { it.name }.values.map { it.last() }
+        if (type == StudioElementType.CUSTOM_SHADER) return (sharedGeneral + customShader + sharedAdvanced + sharedAnimation).groupBy { it.name }.values.map { it.last() }
+        if (type == StudioElementType.COMPOSITION) return (sharedGeneral + composition + sharedAdvanced + sharedAnimation).groupBy { it.name }.values.map { it.last() }
         if (type == StudioElementType.BLUR_EFFECT) {
-            return (blurGeneral + blurAppearance + blurEffect + sharedAdvanced)
+            return (blurGeneral + blurAppearance + blurEffect + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.PARTICLES) {
-            return (particlesGeneral + particlesAppearance + particles + sharedAdvanced)
+            return (particlesGeneral + particlesAppearance + particles + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.TEXT) {
-            return (textGeneral + textAppearance + textTypography + sharedAdvanced)
+            return (textGeneral + textAppearance + textTypography + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.BACKGROUND) {
-            return (backgroundGeneral + backgroundAppearance + backgroundSpecific + sharedAdvanced)
+            return (backgroundGeneral + backgroundAppearance + backgroundSpecific + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.IMAGE) {
-            return (imageGeneral + imageAppearance + imageSpecific + sharedAdvanced)
+            return (imageGeneral + imageAppearance + imageSpecific + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.RGB_SPLIT) {
-            return (rgbGeneral + rgbAppearance + rgbSplit + sharedAdvanced)
+            return (rgbGeneral + rgbAppearance + rgbSplit + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.MOTION_BLUR_EFFECT) {
-            return (motionBlurGeneral + motionBlurAppearance + motionBlur + sharedAdvanced)
+            return (motionBlurGeneral + motionBlurAppearance + motionBlur + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.BARS_SEGMENTS) {
-            return (barsGeneral + barsAppearance + bars + sharedAdvanced)
+            return (barsGeneral + barsAppearance + bars + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.SHAPE) {
-            return (shapeGeneral + shapeAppearance + shapeSpecific + sharedAdvanced)
+            return (shapeGeneral + shapeAppearance + shapeSpecific + sharedAdvanced + sharedAnimation)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         val specific = when (type) {
@@ -1077,7 +1095,7 @@ object ElementPropertyCatalog {
             StudioElementType.CUSTOM_SHADER -> customShader
             StudioElementType.COMPOSITION -> composition
         }
-        return (sharedGeneral + specific + sharedAdvanced).groupBy { it.name }.values.map { sameName -> sameName.last() }
+        return (sharedGeneral + specific + sharedAdvanced + sharedAnimation).groupBy { it.name }.values.map { sameName -> sameName.last() }
     }
 
     fun create(type: StudioElementType, id: String, tag: String = type.displayName): ElementDocument {

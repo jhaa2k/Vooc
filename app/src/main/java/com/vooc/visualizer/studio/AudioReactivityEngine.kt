@@ -3,6 +3,7 @@ package com.vooc.visualizer.studio
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.sqrt
+import kotlin.math.roundToInt
 
 /** Audio measurements shared by the live preview and offline export renderers. */
 data class AudioReactivitySources(
@@ -222,8 +223,8 @@ fun audioReactivityTransform(properties: Map<String, ElementValue>, value: Float
 fun audioReactivityColor(color: Int, multiplier: Float): Int {
     val factor = multiplier.takeIf { it.isFinite() }?.coerceIn(0f, 4f) ?: 1f
     val alpha = color ushr 24 and 0xFF
-    val red = ((color ushr 16 and 0xFF) * factor).toInt().coerceIn(0, 255)
-    val green = ((color ushr 8 and 0xFF) * factor).toInt().coerceIn(0, 255)
-    val blue = ((color and 0xFF) * factor).toInt().coerceIn(0, 255)
+    val red = ((color ushr 16 and 0xFF) * factor).roundToInt().coerceIn(0, 255)
+    val green = ((color ushr 8 and 0xFF) * factor).roundToInt().coerceIn(0, 255)
+    val blue = ((color and 0xFF) * factor).roundToInt().coerceIn(0, 255)
     return (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 }

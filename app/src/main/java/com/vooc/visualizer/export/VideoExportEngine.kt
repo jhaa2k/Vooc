@@ -1248,6 +1248,7 @@ object VideoExportEngine {
                                 paint.alpha = (particleAlpha * trailFade).toInt().coerceIn(0, 255)
                                 paint.strokeCap = Paint.Cap.ROUND
                                 canvas.drawLine(x - trailX, y - trailY, x, y, paint)
+                                paint.alpha = particleAlpha
                             }
                             if (customParticle != null) {
                                 canvas.save()
@@ -1256,7 +1257,16 @@ object VideoExportEngine {
                                     RectF(x - particleWidth / 2f, y - particleHeight / 2f, x + particleWidth / 2f, y + particleHeight / 2f), paint)
                                 canvas.restore()
                             } else {
-                                canvas.drawCircle(x, y, particleWidth * 0.5f, paint)
+                                canvas.save()
+                                canvas.rotate(visualAngle, x, y)
+                                when (particleShape) {
+                                    "Square" -> canvas.drawRect(x - particleWidth / 2f, y - particleHeight / 2f, x + particleWidth / 2f, y + particleHeight / 2f, paint)
+                                    "Triangle" -> { val p = android.graphics.Path().apply { moveTo(x, y - particleHeight / 2f); lineTo(x + particleWidth / 2f, y + particleHeight / 2f); lineTo(x - particleWidth / 2f, y + particleHeight / 2f); close() }; canvas.drawPath(p, paint) }
+                                    "Star" -> { val p = android.graphics.Path(); for (v in 0 until 10) { val a = (v * 36f - 90f) * PI.toFloat() / 180f; val radius = if (v % 2 == 0) 0.5f else 0.22f; val px2 = x + cos(a) * particleWidth * radius; val py2 = y + sin(a) * particleHeight * radius; if (v == 0) p.moveTo(px2, py2) else p.lineTo(px2, py2) }; p.close(); canvas.drawPath(p, paint) }
+                                    "Line" -> { paint.style = Paint.Style.STROKE; paint.strokeWidth = particleHeight.coerceAtLeast(1f); canvas.drawLine(x - particleWidth / 2f, y, x + particleWidth / 2f, y, paint); paint.style = Paint.Style.FILL }
+                                    else -> canvas.drawCircle(x, y, particleWidth * 0.5f, paint)
+                                }
+                                canvas.restore()
                             }
                         }
                         if (mirrorX) drawParticleAt(width - px, py)

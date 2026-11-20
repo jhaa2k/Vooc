@@ -1352,7 +1352,7 @@ private fun ElementStudioEditor(
                                     is ElementValue.Integer -> default.value.toFloat()
                                     else -> current
                                 }
-                                LayerSlider(spec.name.uppercase(), current, minimum..maximum, resetValue = reset) { next ->
+                                LayerSlider(spec.name.uppercase(), current, minimum..maximum ) { next ->
                                     val nextValue = if (spec.type == ElementValueType.INTEGER) ElementValue.Integer(next.toLong()) else ElementValue.Number(next.toDouble())
                                     onChange(selected.withValue(spec.name, nextValue))
                                 }
@@ -1524,13 +1524,13 @@ private fun AnalyzerSettingsScreen(
                 val title = "BAND • ${band.label.uppercase()}"
                 expandedCategory = if (expandedCategory == title) "" else title
             }) {
-                LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f, resetValue = defaultBand.lowHz) { value ->
+                LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f ) { value ->
                     val updated = config.bands.bands.map { current ->
                         if (current.label == band.label) current.copy(lowHz = value.coerceAtMost(current.highHz - 1f)) else current
                     }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
-                LayerSlider("HIGH CUT HZ", band.highHz, 250f..20000f, resetValue = defaultBand.highHz) { value ->
+                LayerSlider("HIGH CUT HZ", band.highHz, 250f..20000f ) { value ->
                     val updated = config.bands.bands.map { current ->
                         if (current.label == band.label) current.copy(highHz = value.coerceAtLeast(current.lowHz + 1f)) else current
                     }
@@ -1540,7 +1540,7 @@ private fun AnalyzerSettingsScreen(
                     val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(gain = value) else current }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
-                LayerSlider("SMOOTHING", band.smoothing * 100f, 0f..99f, resetValue = 30f) { value ->
+                LayerSlider("SMOOTHING", band.smoothing * 100f, 0f..99f ) { value ->
                     val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(smoothing = value / 100f) else current }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
@@ -3026,41 +3026,11 @@ private fun EditorSection(title: String, expanded: String, onToggle: () -> Unit,
     }
 }
 
-private fun defaultSliderResetValue(label: String, range: ClosedFloatingPointRange<Float>): Float =
-    when (label.uppercase()) {
-        "BEAT SENSITIVITY" -> 60f
-        "MANUAL BPM (0 = AUTO)" -> 0f
-        "POSITION X", "POSITION Y", "ROTATION" -> 0f
-        "SCALE", "OPACITY", "AUDIO SENSITIVITY" -> 100f
-        "SMOOTHING" -> 45f
-        "RED" -> 198f
-        "GREEN" -> 243f
-        "BLUE" -> 106f
-        "BAR / SAMPLE COUNT" -> 64f
-        "THICKNESS" -> 2f
-        "SPACING" -> 1f
-        "RADIUS" -> 18f
-        "PARTICLE COUNT" -> 48f
-        "BEAT COOLDOWN" -> 150f
-        "BEAT THRESHOLD" -> 1.5f
-        "TEMPORAL SMOOTHING" -> 50f
-        "ATTACK" -> 20f
-        "RELEASE" -> 180f
-        "RING BUFFER" -> 8192f
-        "WAVEFORM SAMPLES" -> 2048f
-        "DB FLOOR" -> -70f
-        "GAIN" -> 1f
-        "ATTACK MS" -> 20f
-        "RELEASE MS" -> 150f
-        else -> range.start
-    }.coerceIn(range)
-
 @Composable
 private fun LayerSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
-    resetValue: Float = defaultSliderResetValue(label, range),
     onChange: (Float) -> Unit
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
@@ -3072,7 +3042,6 @@ private fun LayerSlider(
             label = label,
             value = value,
             valueRange = range,
-            resetValue = resetValue,
             onValueChange = onChange
         )
     }
@@ -3083,22 +3052,15 @@ private fun ThinSlider(
     label: String,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
-    resetValue: Float,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     steps: Int = 0,
-    onDoubleTapReset: (() -> Unit)? = null,
     onValueChangeFinished: (() -> Unit)? = null
 ) {
     val safeValue = value.coerceIn(valueRange)
-    val safeReset = resetValue.coerceIn(valueRange)
     val updateValue by rememberUpdatedState(onValueChange)
-    val resetAction by rememberUpdatedState(onDoubleTapReset ?: { onValueChange(safeReset) })
     Canvas(
         modifier.fillMaxWidth().height(24.dp)
-            .pointerInput(valueRange, safeReset) {
-                detectTapGestures(onDoubleTap = { resetAction() })
-            }
             .pointerInput(valueRange) {
                 fun update(x: Float) {
                     val inset = 6.dp.toPx()
@@ -3162,10 +3124,8 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
             label = "PLAYBACK SEEK",
             value = seek.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
             valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-            resetValue = 0f,
             onValueChange = { seek = it },
             onValueChangeFinished = { player.seekTo(seek.toLong()) },
-            onDoubleTapReset = { seek = 0f; player.seekTo(0L) }
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatTime(position), color = Muted, style = MaterialTheme.typography.labelSmall)
@@ -3180,13 +3140,8 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
                 label = "PLAYBACK SPEED",
                 value = speed,
                 valueRange = 0.5f..2f,
-                resetValue = 1f,
                 steps = 5,
                 onValueChange = { speed = it; player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it, 1f)) },
-                onDoubleTapReset = {
-                    speed = 1f
-                    player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(1f, 1f))
-                }
             )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

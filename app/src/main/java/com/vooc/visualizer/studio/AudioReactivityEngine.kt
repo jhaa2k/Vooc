@@ -123,7 +123,10 @@ fun audioReactivitySources(
     overall: Float,
     beat: Float,
     peak: Float = overall,
-    rms: Float = overall
+    rms: Float = overall,
+    waveform: Float = overall,
+    left: Float = overall,
+    right: Float = overall
 ): AudioReactivitySources {
     val data = samples?.takeIf { it.isNotEmpty() }
     fun average(from: Int, until: Int): Float {
@@ -157,11 +160,11 @@ fun audioReactivitySources(
         beat = beat.coerceIn(0f, 1f),
         peak = peak.coerceIn(0f, 1f),
         rms = rms.coerceIn(0f, 1f),
-        waveform = fallback,
+        waveform = waveform.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: fallback,
         spectrumAverage = if (size == 0) fallback else spectrumSum / size,
         spectrumMaximum = if (size == 0) fallback else spectrumMaximum,
-        left = fallback,
-        right = fallback
+        left = left.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: fallback,
+        right = right.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: fallback
     )
 }
 

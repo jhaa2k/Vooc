@@ -21,6 +21,8 @@ import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.LinearGradient
@@ -814,7 +816,9 @@ object VideoExportEngine {
                         }
                         val overlay = runCatching { android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF")) }.getOrDefault(android.graphics.Color.TRANSPARENT)
                         val imagePaint = Paint(paint).apply {
-                            this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
+                            this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f) * number("Transparency Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
+                            val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
+                            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })
                             colorFilter = if (android.graphics.Color.alpha(overlay) > 0) android.graphics.PorterDuffColorFilter(overlay, android.graphics.PorterDuff.Mode.SRC_ATOP) else null
                         }
                         canvas.save()

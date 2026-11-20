@@ -625,8 +625,8 @@ object VideoExportEngine {
                     }
                     val family = textValue("Font Family", "sans-serif").ifBlank { "sans-serif" }
                     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-                        color = color
-                        alpha = alpha
+                        this.color = color
+                        this.alpha = alpha
                         textSize = (number("Font Size", 48f) * width / 1080f * scale).coerceAtLeast(6f)
                         typeface = Typeface.create(family, fontStyle)
                         textAlign = when (textValue("Alignment", "Center")) {
@@ -677,7 +677,7 @@ object VideoExportEngine {
                     val strokeWidth = number("Stroke Thickness", 0f) * width / 1080f
                     if (strokeEnabled && strokeWidth > 0f) {
                         val strokePaint = Paint(textPaint).apply {
-                            color = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                            this.color = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
                             style = Paint.Style.STROKE
                             strokeJoin = Paint.Join.ROUND
                             this.strokeWidth = strokeWidth

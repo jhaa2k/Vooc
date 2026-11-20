@@ -185,7 +185,7 @@ object VideoExportEngine {
                 }
             }
         }
-        project.document.elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BARS_SEGMENTS }.forEach { element ->
+        project.document.elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BARS_SEGMENTS || it.type == StudioElementType.PARTICLES }.forEach { element ->
             val uriText = ((element.value("Custom Bar Image") as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
                 ?: (element.value("Custom Image") as? ElementValue.Text)?.value.orEmpty())
             if (uriText.isNotBlank()) runCatching {
@@ -630,15 +630,147 @@ object VideoExportEngine {
                     paint.pathEffect = null
                 }
                 StudioElementType.PARTICLES -> {
-                    val count = number("Count Limit", 64f).toInt().coerceIn(1, 300)
+                    val count = number("Count Limit", number("Particle Count", 128f)).toInt().coerceIn(1, 10000)
+                    val lifetime = number("Lifetime", number("Life Span", 3f)).coerceIn(0.01f, 3600f)
+                    val spawnInterval = number("Spawn Time", 0.02f).coerceIn(0f, 10f)
+                    val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * width * 0.25f
+                    val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * height * 0.25f
+                    val spawnArea = textValue("Spawn Area", "Point")
+                    val relativeToCenter = (element.value("Vector Relative To Center") as? ElementValue.Bool)?.value == true
+                    val randomVector = (element.value("Use Random Vector Instead") as? ElementValue.Bool)?.value == true
+                    val baseAngle = Math.toRadians(number("Vector Angle", number("Direction / Angle", -90f)).toDouble()).toFloat()
+                    val gravity = element.value("Gravity") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+                    val forcePosition = element.value("Force Field Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                    val forceMode = textValue("Force Field", "None")
+                    val forceStrength = number("Force Field Strength", 0f)
+                    val sampleCount = providerSamples?.size ?: 0
+                    val bassValue = providerSamples?.take((sampleCount / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel
+                    val trebleValue = providerSamples?.takeLast((sampleCount / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel
+                    val measuredSpeed = when (textValue("Measure Overall Speed (Measure What)", "Nothing")) {
+                        "Beat" -> providerBeat
+                        "Bass" -> bassValue
+                        "Treble" -> trebleValue
+                        "RMS", "Overall Audio Level" -> audioLevel
+                        "Peak" -> audioLevel
+                        else -> 0f
+                    }.coerceIn(0f, 1f)
+                    val baseSpeed = number("Speed", number("Start Velocity", 80f)) +
+                        measuredSpeed * (number("Measure Overall Speed A (X Amount)", 0f) + number("Measure Overall Speed B (Y Amount)", 0f))
+                    val speedRandom = number("Speed Random", number("Velocity Random", 0f)).coerceIn(0f, 1f)
+                    val startSize = number("Start Size", 8f).coerceAtLeast(0f) * width / 1080f
+                    val endSize = number("End Size", 2f).coerceAtLeast(0f) * width / 1080f
+                    val endRandom = number("End Size Random", number("Particle Size Random", 0f)).coerceIn(0f, 1f)
+                    val fadeTime = number("Fade In And Out Time", 0.25f).coerceIn(0f, lifetime * 0.5f)
+                    val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f) * width / 1080f
+                    val particleScale = number("Particle Scale", 100f).coerceAtLeast(0f) / 100f * scale
+                    val aspect = number("Size Aspect Ratio", 1f).coerceIn(0.01f, 20f)
+                    val perspectiveDepth = number("Perspective Depth", 0f).coerceAtLeast(0f)
+                    val perspectiveFov = number("Perspective Fov", 60f).coerceIn(1f, 179f)
+                    val nearFadeDistance = number("Near Camera Fade Out Distance", 0f).coerceAtLeast(0f)
+                    val sineFrequency = number("Side Sine Wave Freq", 0f)
+                    val sineFrequencyRandom = number("Side Sine Wave Freq Random", 0f).coerceIn(0f, 1f)
+                    val sineMagnitude = number("Side Sine Wave Mag", 0f) * width / 1080f
+                    val sineMagnitudeRandom = number("Side Sine Wave Mag Random", 0f).coerceIn(0f, 1f)
+                    val colorFrom = runCatching { android.graphics.Color.parseColor(textValue("Color From", textValue("Color", "#FFFFFFFF"))) }.getOrDefault(color)
                     val colorTo = runCatching { android.graphics.Color.parseColor(textValue("Color To", textValue("Color", "#FFFFFFFF"))) }.getOrDefault(color)
+                    val customParticle = imageCache[textValue("Custom Image")]
+                    val mirrorX = (element.value("Mirror X") as? ElementValue.Bool)?.value == true
+                    val mirrorY = (element.value("Mirror Y") as? ElementValue.Bool)?.value == true
+                    val velocityAngle = (element.value("Velocity Angle") as? ElementValue.Bool)?.value == true
                     repeat(count) { index ->
-                        paint.color = if (index % 2 == 0) color else colorTo
-                        paint.alpha = alpha
-                        val angle = index * 2f * PI.toFloat() / count + seconds * 0.35f
-                        val radius = min(width, height) * (0.06f + (index % 11) * 0.018f) * scale
-                        canvas.drawCircle(cx + cos(angle) * radius, cy + sin(angle) * radius, max(1f, number("Start Size", 8f) * width / 1080f * 0.5f), paint)
+                        val seed = index + 1f
+                        val randomA = abs(sin(seed * 12.9898f) * 43758.5453f) % 1f
+                        val randomB = abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
+                        val randomC = abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
+                        val age = ((seconds + index * spawnInterval) % lifetime).coerceIn(0f, lifetime)
+                        val lifeT = (age / lifetime).coerceIn(0f, 1f)
+                        val spawnX = when (spawnArea) {
+                            "Rectangle" -> cx + (randomA * 2f - 1f) * spawnWidth
+                            "Circle" -> cx + cos(randomA * 2f * PI.toFloat()) * spawnWidth * randomB
+                            "Line" -> cx + (randomA * 2f - 1f) * spawnWidth
+                            "Edge" -> cx + (if (randomA < 0.5f) -spawnWidth else spawnWidth)
+                            else -> cx
+                        }
+                        val spawnY = when (spawnArea) {
+                            "Rectangle" -> cy + (randomB * 2f - 1f) * spawnHeight
+                            "Circle" -> cy + sin(randomA * 2f * PI.toFloat()) * spawnHeight * randomB
+                            "Line" -> cy
+                            "Edge" -> cy + (randomB * 2f - 1f) * spawnHeight
+                            else -> cy
+                        }
+                        val radialAngle = kotlin.math.atan2(spawnY - cy, spawnX - cx)
+                        val angle = when {
+                            randomVector -> randomA * 2f * PI.toFloat()
+                            relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f
+                            else -> baseAngle
+                        }
+                        val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom)
+                        var vx = cos(angle) * velocity
+                        var vy = sin(angle) * velocity
+                        val fieldX = forcePosition.x.toFloat() * width
+                        val fieldY = forcePosition.y.toFloat() * height
+                        val dx = fieldX - spawnX
+                        val dy = fieldY - spawnY
+                        val distance = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+                        when (forceMode) {
+                            "Attract", "Radial" -> { vx += dx / distance * forceStrength * age; vy += dy / distance * forceStrength * age }
+                            "Repel" -> { vx -= dx / distance * forceStrength * age; vy -= dy / distance * forceStrength * age }
+                            "Directional" -> { vx += cos(baseAngle) * forceStrength * age; vy += sin(baseAngle) * forceStrength * age }
+                        }
+                        val frequency = sineFrequency * (1f + randomB * sineFrequencyRandom)
+                        val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
+                            sineMagnitude * (1f + randomA * sineMagnitudeRandom)
+                        val px = spawnX + vx * age * 0.01f + gravity.x.toFloat() * age * age * 0.005f + wave
+                        val py = spawnY + vy * age * 0.01f + gravity.y.toFloat() * age * age * 0.005f
+                        val depth = randomB * perspectiveDepth
+                        val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)
+                        val depthScale = (1f + number("End Size ZFactor", 0f) * depth / 1000f).coerceAtLeast(0.05f)
+                        val endVariation = 1f + (randomC * 2f - 1f) * endRandom
+                        val fadeInScale = if (fadeTime > 0f) (age / fadeTime).coerceIn(0f, 1f) else 1f
+                        val sizeT = (startSize + (endSize * endVariation - startSize) * lifeT) *
+                            (1f + (fadeInScale - 1f) * number("Fade In Size", 1f).coerceIn(0f, 10f))
+                        val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
+                        val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
+                        val particleAlpha = (alpha * fadeInScale * fadeOut * nearFade).coerceIn(0, 255)
+                        val colorT = lifeT.coerceIn(0f, 1f)
+                        val particleColor = android.graphics.Color.argb(
+                            (particleAlpha * (android.graphics.Color.alpha(colorFrom) / 255f)).toInt(),
+                            (android.graphics.Color.red(colorFrom) + (android.graphics.Color.red(colorTo) - android.graphics.Color.red(colorFrom)) * colorT).toInt(),
+                            (android.graphics.Color.green(colorFrom) + (android.graphics.Color.green(colorTo) - android.graphics.Color.green(colorFrom)) * colorT).toInt(),
+                            (android.graphics.Color.blue(colorFrom) + (android.graphics.Color.blue(colorTo) - android.graphics.Color.blue(colorFrom)) * colorT).toInt()
+                        )
+                        val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).coerceAtLeast(0.5f)
+                        val particleHeight = (sizeT * particleScale * perspective * depthScale).coerceAtLeast(0.5f)
+                        val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Rotation Speed", 0f) * age
+                        val trailX = vx * trailLength * 0.001f
+                        val trailY = vy * trailLength * 0.001f
+                        fun drawParticleAt(x: Float, y: Float) {
+                            paint.color = particleColor
+                            paint.alpha = particleAlpha
+                            paint.style = Paint.Style.FILL
+                            if (trailLength > 0f) {
+                                paint.strokeWidth = (particleHeight * 0.35f).coerceAtLeast(0.5f)
+                                paint.strokeCap = Paint.Cap.ROUND
+                                canvas.drawLine(x - trailX, y - trailY, x, y, paint)
+                            }
+                            if (customParticle != null) {
+                                canvas.save()
+                                canvas.rotate(visualAngle, x, y)
+                                canvas.drawBitmap(customParticle, null,
+                                    RectF(x - particleWidth / 2f, y - particleHeight / 2f, x + particleWidth / 2f, y + particleHeight / 2f), paint)
+                                canvas.restore()
+                            } else {
+                                canvas.drawCircle(x, y, particleWidth * 0.5f, paint)
+                            }
+                        }
+                        if (mirrorX) drawParticleAt(width - px, py)
+                        if (mirrorY) drawParticleAt(px, height - py)
+                        if (mirrorX && mirrorY) drawParticleAt(width - px, height - py)
+                        drawParticleAt(px, py)
                     }
+                    paint.color = color
+                    paint.alpha = alpha
+                    paint.style = Paint.Style.FILL
                 }
                 StudioElementType.IMAGE -> {
                     val uriText = textValue("Custom Image")

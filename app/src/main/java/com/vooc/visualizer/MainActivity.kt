@@ -2,6 +2,7 @@ package com.vooc.visualizer
 
 import com.vooc.visualizer.studio.replacePreservingOrder
 import com.vooc.visualizer.studio.buildNormalizedImageShapePath
+import com.vooc.visualizer.studio.BackgroundImageProcessor
 
 import android.net.Uri
 import android.Manifest
@@ -1730,7 +1731,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     ) {
         value = withContext(Dispatchers.IO) {
             elements.mapNotNull { element ->
-                val uriText = listOf("Import Image", "Custom Bar Image", "Texture / Image", "Custom Image", "Image Source / File", "Target Image")
+                val uriText = listOf("Image File / Source", "Import Image", "Custom Bar Image", "Texture / Image", "Custom Image", "Image Source / File", "Target Image")
                     .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
                 if (uriText.isBlank()) null else {
                     val bitmap = runCatching {
@@ -1744,6 +1745,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)
                                 StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
                                 StudioElementType.MOTION_BLUR_EFFECT, StudioElementType.RGB_SPLIT -> processImageForPreview(decoded, element, maskBitmap)
+                                StudioElementType.BACKGROUND -> BackgroundImageProcessor.process(decoded, element)
                                 else -> decoded
                             }
                             val image = processed.asImageBitmap()
@@ -1765,20 +1767,130 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
         clipRect {
         val cx = size.width / 2f
         val cy = size.height / 2f
-        // Paint canonical solid backgrounds before every visual layer so they never cover bars or artwork.
+        // Render dedicated backgrounds before all visual elements.
         elements.filter { it.visible && it.type == StudioElementType.BACKGROUND }.forEach { background ->
             val properties = background.properties
-            val sourceType = (properties["Source Type"] as? ElementValue.Text)?.value ?: "Solid Color"
-            if (sourceType == "Solid Color") {
-                val colorValue = (properties["Color"] as? ElementValue.Text)?.value ?: "#FF000000"
-                val alphaValue = when (val alpha = properties["Opacity / Alpha"]) {
-                    is ElementValue.Number -> alpha.value.toFloat()
-                    is ElementValue.Integer -> alpha.value.toFloat()
-                    else -> 1f
-                }.coerceIn(0f, 1f)
-                val backgroundColor = runCatching { Color(android.graphics.Color.parseColor(colorValue)) }
-                    .getOrDefault(Color.Black)
-                drawRect(backgroundColor.copy(alpha = alphaValue))
+            fun bgNumber(name: String, fallback: Float): Float = when (val value = properties[name]) {
+                is ElementValue.Number -> value.value.toFloat()
+                is ElementValue.Integer -> value.value.toFloat()
+                else -> fallback
+            }
+            fun bgText(name: String, fallback: String = ""): String =
+                (properties[name] as? ElementValue.Text)?.value ?: fallback
+            fun bgBool(name: String): Boolean = (properties[name] as? ElementValue.Bool)?.value == true
+            val sourceType = bgText("Source Type", "Solid Color")
+            val opacity = (bgNumber("Opacity", 100f) / 100f *
+                bgNumber("Opacity / Alpha", 1f)).coerceIn(0f, 1f)
+            val blend = when (bgText("Blend Mode Content", "Alpha")) {
+                "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
+                "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                "Multiply", "Subtractive" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
+                "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
+                "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Difference
+                "Copy" -> androidx.compose.ui.graphics.BlendMode.Src
+                else -> androidx.compose.ui.graphics.BlendMode.SrcOver
+            }
+            when (sourceType) {
+                "Solid Color" -> {
+                    val color = runCatching {
+                        Color(android.graphics.Color.parseColor(bgText("Color", "#FF000000")))
+                    }.getOrDefault(Color.Black).copy(alpha = opacity)
+                    drawRect(color, blendMode = blend)
+                }
+                "Gradient" -> {
+                    val start = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient Start", "#FF000000"))) }.getOrDefault(Color.Black).copy(alpha = opacity)
+                    val end = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient End", "#FFFFFFFF"))) }.getOrDefault(Color.White).copy(alpha = opacity)
+                    val angle = Math.toRadians(bgNumber("Background Gradient Angle", 0f).toDouble())
+                    val radius = (size.maxDimension * 0.5f).coerceAtLeast(1f)
+                    val dx = kotlin.math.cos(angle).toFloat() * radius
+                    val dy = kotlin.math.sin(angle).toFloat() * radius
+                    val brush = if (bgText("Background Gradient Type", "Linear") == "Radial") {
+                        androidx.compose.ui.graphics.Brush.radialGradient(
+                            colors = listOf(start, end), center = Offset(cx, cy), radius = radius
+                        )
+                    } else {
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(start, end),
+                            start = Offset(cx - dx, cy - dy),
+                            end = Offset(cx + dx, cy + dy)
+                        )
+                    }
+                    drawRect(brush, blendMode = blend)
+                }
+                "Image" -> {
+                    val image = elementImages[background.id]
+                    if (image != null) {
+                        val imageRatio = image.width.toFloat() / image.height.coerceAtLeast(1)
+                        val frameRatio = size.width / size.height.coerceAtLeast(1f)
+                        val fit = bgText("Fit Mode (Scale Type)", "Fill (Cover)")
+                        val destWidth: Float
+                        val destHeight: Float
+                        when {
+                            fit == "Stretch" -> { destWidth = size.width; destHeight = size.height }
+                            fit == "Fit (Contain)" -> {
+                                destWidth = if (imageRatio > frameRatio) size.width else size.height * imageRatio
+                                destHeight = if (imageRatio > frameRatio) size.width / imageRatio else size.height
+                            }
+                            else -> {
+                                destWidth = if (imageRatio > frameRatio) size.height * imageRatio else size.width
+                                destHeight = if (imageRatio > frameRatio) size.height else size.width / imageRatio
+                            }
+                        }
+                        val alignment = bgText("Background Fit Alignment", "Center")
+                        val left = when (alignment) {
+                            "Left" -> 0f
+                            "Right" -> size.width - destWidth
+                            else -> (size.width - destWidth) * 0.5f
+                        } + bgNumber("Background Image Offset X", 0f) * size.width / 1080f
+                        val top = when (alignment) {
+                            "Top" -> 0f
+                            "Bottom" -> size.height - destHeight
+                            else -> (size.height - destHeight) * 0.5f
+                        } + bgNumber("Background Image Offset Y", 0f) * size.height / 1080f
+                        val dst = androidx.compose.ui.geometry.Rect(left, top, left + destWidth, top + destHeight)
+                        if (bgBool("Background Tile")) {
+                            drawIntoCanvas { target ->
+                                val tileScale = bgNumber("Background Tile Scale", 1f).coerceIn(0.01f, 100f)
+                                val shader = android.graphics.BitmapShader(
+                                    image.asAndroidBitmap(),
+                                    android.graphics.Shader.TileMode.REPEAT,
+                                    android.graphics.Shader.TileMode.REPEAT
+                                )
+                                val matrix = android.graphics.Matrix().apply {
+                                    setScale(tileScale, tileScale)
+                                    postTranslate(left, top)
+                                }
+                                shader.setLocalMatrix(matrix)
+                                val tilePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
+                                    this.shader = shader
+                                    alpha = (opacity * 255f).toInt().coerceIn(0, 255)
+                                    xfermode = android.graphics.PorterDuffXfermode(when (blend) {
+                                        androidx.compose.ui.graphics.BlendMode.Plus -> android.graphics.PorterDuff.Mode.ADD
+                                        androidx.compose.ui.graphics.BlendMode.Screen -> android.graphics.PorterDuff.Mode.SCREEN
+                                        androidx.compose.ui.graphics.BlendMode.Multiply -> android.graphics.PorterDuff.Mode.MULTIPLY
+                                        androidx.compose.ui.graphics.BlendMode.Darken -> android.graphics.PorterDuff.Mode.DARKEN
+                                        androidx.compose.ui.graphics.BlendMode.Lighten -> android.graphics.PorterDuff.Mode.LIGHTEN
+                                        androidx.compose.ui.graphics.BlendMode.Src -> android.graphics.PorterDuff.Mode.SRC
+                                        else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                                    })
+                                }
+                                target.nativeCanvas.drawRect(0f, 0f, size.width, size.height, tilePaint)
+                            }
+                        } else {
+                            drawImage(
+                                image,
+                                dstOffset = androidx.compose.ui.unit.IntOffset(dst.left.toInt(), dst.top.toInt()),
+                                dstSize = androidx.compose.ui.unit.IntSize(dst.width.toInt().coerceAtLeast(1), dst.height.toInt().coerceAtLeast(1)),
+                                alpha = opacity,
+                                blendMode = blend
+                            )
+                        }
+                        val overlay = runCatching { Color(android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))) }.getOrDefault(Color.Transparent)
+                        if (overlay.alpha > 0f) drawRect(overlay.copy(alpha = overlay.alpha * opacity), blendMode = blend)
+                    }
+                }
+                else -> Unit // Video backgrounds need a video-frame source pipeline.
             }
         }
         layers.forEach { layer ->

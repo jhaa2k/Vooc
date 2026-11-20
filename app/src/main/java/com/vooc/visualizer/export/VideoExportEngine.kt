@@ -357,16 +357,19 @@ object VideoExportEngine {
                     val maskFactor = when (maskMode) {
                         "Luminance Mask" -> luminance
                         "Inverted Mask" -> 1f - maskAlpha
+                        "Normal Mask" -> (luminance * maskAlpha).coerceIn(0f, 1f)
                         else -> maskAlpha
                     }
-                    alpha *= maskFactor
+                    val maskStrength = number("Mask Strength", 1f).coerceIn(0f, 1f)
+                    alpha *= 1f - (1f - maskFactor) * maskStrength
                 }
                 if (keyEnabled) {
                     val dr = android.graphics.Color.red(pixel) - keyR
                     val dg = android.graphics.Color.green(pixel) - keyG
                     val db = android.graphics.Color.blue(pixel) - keyB
                     val distance = kotlin.math.sqrt(dr * dr + dg * dg + db * db) / 441.673f
-                    alpha *= 1f - (1f - (distance / 0.16f).coerceIn(0f, 1f)) * transparency
+                    val tolerance = number("Color Key Tolerance", 0.16f).coerceIn(0.001f, 1f)
+                    alpha *= 1f - (1f - (distance / tolerance).coerceIn(0f, 1f)) * transparency
                 }
                 if (edge > 0f) {
                     val edgeFactor = min(min(x + 1f, w - x.toFloat()), min(y + 1f, h - y.toFloat())) / edge

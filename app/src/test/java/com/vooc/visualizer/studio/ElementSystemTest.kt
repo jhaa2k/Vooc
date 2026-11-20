@@ -9,13 +9,14 @@ import org.junit.Test
 class ElementSystemTest {
     @Test
     fun everyCatalogHasUniqueNamesValidDefaultsAndConsistentBounds() {
+        val invalidDefaults = mutableListOf<String>()
         StudioElementType.entries.forEach { type ->
             val specs = ElementPropertyCatalog.forElement(type)
             val duplicateNames = specs.groupBy { it.name }.filterValues { it.size > 1 }.keys
             assertTrue("$type has duplicate property names: $duplicateNames", duplicateNames.isEmpty())
             specs.forEach { spec ->
                 assertTrue("$type/${spec.name} has a blank category", spec.category.isNotBlank())
-                assertNotNull("$type/${spec.name} default fails its own schema", spec.validate(spec.defaultValue))
+                if (spec.validate(spec.defaultValue) == null) invalidDefaults += "$type/${spec.name}: type=${spec.type}, default=${spec.defaultValue}, options=${spec.options}"
                 if (spec.type == ElementValueType.ENUM) {
                     val default = (spec.defaultValue as ElementValue.Text).value
                     assertTrue("$type/${spec.name} default '$default' is not in ${spec.options}", default in spec.options)
@@ -36,6 +37,8 @@ class ElementSystemTest {
                 }
             }
         }
+    }
+        assertTrue("Invalid catalog defaults: " + invalidDefaults.joinToString("; "), invalidDefaults.isEmpty())
     }
     @Test
     fun catalogContainsAllSpecificationElementTypes() {

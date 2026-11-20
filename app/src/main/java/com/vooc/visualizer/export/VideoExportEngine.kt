@@ -1077,8 +1077,23 @@ object VideoExportEngine {
                                 canvas.restore()
                                 paint.alpha = alpha
                             }
-                            if (design == "Custom Image" && customBitmap != null && !outline) {
-                                canvas.drawBitmap(customBitmap, null, rect, paint)
+                            if (design == "Custom Image" && customBitmap != null) {
+                                val bitmapPaint = Paint(paint).apply {
+                                    style = Paint.Style.FILL
+                                    pathEffect = null
+                                    alpha = alpha
+                                    colorFilter = null
+                                    maskFilter = null
+                                }
+                                canvas.drawBitmap(customBitmap, null, rect, bitmapPaint)
+                                if (outline) {
+                                    paint.color = strokeColor
+                                    paint.alpha = alpha
+                                    paint.style = Paint.Style.STROKE
+                                    paint.strokeWidth = strokeWidth
+                                    paint.pathEffect = dash
+                                    canvas.drawPath(path, paint)
+                                }
                             } else if (design == "Circle / Dot") {
                                 paint.style = if (outline) Paint.Style.STROKE else Paint.Style.FILL
                                 canvas.drawCircle(x + barWidth / 2f, (yTop + yBottom) / 2f, max(1f, h / 2f), paint)

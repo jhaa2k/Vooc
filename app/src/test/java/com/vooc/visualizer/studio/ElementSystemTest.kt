@@ -540,7 +540,7 @@ class ElementSystemTest {
         )
         assertEquals(StudioElementType.TEXT, text.type)
         assertEquals(ElementValue.Text("VOOC Studio"), text.value("Text"))
-        assertEquals(ElementValue.Text("content://media/image/8"), image.value("Image Source / File"))
+        assertEquals(ElementValue.Text("content://media/image/8"), image.value("Import Image"))
         assertEquals(ElementValue.Text("content://media/image/9"), background.value("Image File / Source"))
     }
 

@@ -1738,13 +1738,60 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             rotate(rotation, center) {
                 when (element.type) {
                     StudioElementType.TEXT -> drawIntoCanvas { canvas ->
-                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                            color = elementColor.toArgb()
-                            textSize = (number("Font Size", 48f) * scale).coerceAtLeast(6f).sp.toPx()
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            typeface = poppinsTypeface?.let { android.graphics.Typeface.create(it, android.graphics.Typeface.BOLD) } ?: android.graphics.Typeface.DEFAULT_BOLD
+                        val native = canvas.nativeCanvas
+                        val caseMode = textValue("Case", "Original")
+                        val displayText = when (caseMode) {
+                            "Uppercase" -> label.uppercase()
+                            "Lowercase" -> label.lowercase()
+                            "Capitalize" -> label.split(" ").joinToString(" ") { word ->
+                                word.replaceFirstChar { char -> char.uppercase() }
+                            }
+                            else -> label
                         }
-                        canvas.nativeCanvas.drawText(label, center.x, center.y, paint)
+                        val fontStyle = textValue("Font Style", "Bold")
+                        val typefaceStyle = when (fontStyle) {
+                            "Regular" -> android.graphics.Typeface.NORMAL
+                            "Medium", "SemiBold", "Bold" -> android.graphics.Typeface.BOLD
+                            "Italic" -> android.graphics.Typeface.ITALIC
+                            "Bold Italic" -> android.graphics.Typeface.BOLD_ITALIC
+                            else -> android.graphics.Typeface.BOLD
+                        }
+                        val baseTypeface = poppinsTypeface?.let {
+                            android.graphics.Typeface.create(it, typefaceStyle)
+                        } ?: android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, typefaceStyle)
+                        val textSize = (number("Font Size", 48f) * scale).coerceAtLeast(6f).sp.toPx()
+                        val shadowEnabled = props["Shadow Enabled"] == ElementValue.Bool(true)
+                        val shadowColor = runCatching {
+                            android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000"))
+                        }.getOrDefault(android.graphics.Color.BLACK)
+                        val shadowBlur = number("Shadow Blur", 4f).dp.toPx().coerceAtLeast(0f)
+                        val shadowX = number("Shadow Offset X", 2f).dp.toPx()
+                        val shadowY = number("Shadow Offset Y", 2f).dp.toPx()
+                        val strokeEnabled = props["Stroke Enabled"] == ElementValue.Bool(true)
+                        val strokeColor = runCatching {
+                            Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")))
+                        }.getOrDefault(Color.Black).copy(alpha = opacity)
+                        val strokeWidth = number("Stroke Thickness", 0f).dp.toPx().coerceAtLeast(0f)
+                        val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = elementColor.toArgb()
+                            textSize = textSize
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            typeface = baseTypeface
+                            isUnderlineText = props["Underline"] == ElementValue.Bool(true)
+                            if (shadowEnabled) setShadowLayer(shadowBlur, shadowX, shadowY, shadowColor)
+                        }
+                        if (strokeEnabled && strokeWidth > 0f) {
+                            val outlinePaint = android.graphics.Paint(textPaint).apply {
+                                color = strokeColor.toArgb()
+                                style = android.graphics.Paint.Style.STROKE
+                                strokeJoin = android.graphics.Paint.Join.ROUND
+                                strokeWidth = strokeWidth
+                                clearShadowLayer()
+                            }
+                            native.drawText(displayText, center.x, center.y, outlinePaint)
+                        }
+                        native.drawText(displayText, center.x, center.y, textPaint)
+                        textPaint.clearShadowLayer()
                     }
                     StudioElementType.BARS_SEGMENTS -> {
                         val rawSamples: FloatArray = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)

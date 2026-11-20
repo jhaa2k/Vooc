@@ -1683,7 +1683,7 @@ object VideoExportEngine {
                             else -> android.graphics.PorterDuff.Mode.SRC_OVER
                         }
                         val mirrorPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                            this.alpha = alpha
+                            setAlpha(alpha)
                             xfermode = if (mirrorBlend == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(mirrorBlend)
                         }
                         canvas.drawBitmap(

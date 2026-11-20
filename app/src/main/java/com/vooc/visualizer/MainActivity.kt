@@ -2155,7 +2155,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
                         val input = processBarSpectrum(
                             samples = rawSamples,
-                            amplitudeScale = number("Amplitude Scale", 1f),
+                            amplitudeScale = number("Amplitude Scale", 1f) * number("Sensitivity", 1f),
                             gamma = number("Amplitude Gamma", 1f),
                             amplitudeMode = textValue("Amplitude Mode", "Magnitude"),
                             threshold = number("Amplitude Threshold", 0f),
@@ -2179,7 +2179,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             reactionDelayMs = number("Reaction Delay", 0f),
                             accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),
-                            releaseSmoothing = number("Release Smoothing", number("Smoothing / Damping", 0.72f))
+                            releaseSmoothing = number("Release Smoothing", number("Smoothing / Damping", 0.72f)),
+                            peakHoldEnabled = props["Peak Hold Enabled"] != ElementValue.Bool(false),
+                            peakResetThreshold = number("Peak Reset Threshold", 0f),
+                            peakFallDelay = number("Peak Fall Delay", 0f)
                         )
                         val levels = barFrame.levels
                         val peaks = barFrame.peaks

@@ -912,7 +912,30 @@ object ElementPropertyCatalog {
         number("Max Width", "Typography", 1000.0, 1.0, 10000.0),
         bool("Wrap Text", "Typography", true),
         bool("Auto-Scale", "Typography", false),
-        text("Case", "Typography", "Original", listOf("Original", "Uppercase", "Lowercase", "Capitalize"))
+        text("Case", "Typography", "Original", listOf("Original", "Uppercase", "Lowercase", "Capitalize")),
+        text("Font Asset", "Typography", "", listOf("System Font", "Imported Font")),
+        text("Font Fallback", "Typography", "Sans Serif", listOf("Sans Serif", "Serif", "Monospace", "Cursive")),
+        number("Measure Font Size", "Typography", 0.0, -512.0, 512.0),
+        text("Measure Font Size (Measure What)", "Typography", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options),
+        text("Vertical Alignment", "Typography", "Middle", listOf("Top", "Middle", "Bottom")),
+        text("Text Direction", "Typography", "Auto", listOf("Auto", "Left To Right", "Right To Left")),
+        integer("Maximum Lines", "Typography", 0, 0.0, 1000.0),
+        text("Overflow Mode", "Typography", "Visible", listOf("Visible", "Clip", "Ellipsis", "Scale Down")),
+        number("Paragraph Spacing", "Typography", 0.0, -100.0, 500.0),
+        text("Line Height Mode", "Typography", "Multiplier", listOf("Multiplier", "Fixed")),
+        number("Fixed Line Height", "Typography", 0.0, 0.0, 1000.0),
+        bool("Text Background Enabled", "Typography", false),
+        text("Text Background Color", "Typography", "#00000000"),
+        number("Text Background Padding X", "Typography", 0.0, 0.0, 512.0),
+        number("Text Background Padding Y", "Typography", 0.0, 0.0, 512.0),
+        number("Text Background Corner Radius", "Typography", 0.0, 0.0, 512.0),
+        text("Text Gradient Type", "Typography", "Linear", listOf("Linear", "Radial")),
+        number("Text Gradient Angle", "Typography", 0.0, -360.0, 360.0),
+        number("Text Gradient Midpoint", "Typography", 0.5, 0.0, 1.0),
+        text("Stroke Join", "Typography", "Round", listOf("Miter", "Round", "Bevel")),
+        number("Shadow Spread", "Typography", 0.0, 0.0, 100.0),
+        number("Shadow Distance", "Typography", 3.0, 0.0, 500.0),
+        number("Shadow Angle", "Typography", 45.0, -360.0, 360.0) 
     )
 
     private val motionBlurGeneral = listOf(

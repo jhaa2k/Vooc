@@ -920,7 +920,20 @@ object VideoExportEngine {
                                     values[base + 4] = values[base + 4] * (1f - a) + channels[row] * a
                                 }
                             }
-                            val blendAmount = number("Measure Color Blend", 0f).coerceIn(0f, 1f)
+                            val blendMode = textValue("Measure Color Blend (Measure What)", "Nothing")
+                            val blendMotion = motionFor("Measure Color Blend (Measure What)")
+                            val blendResponse = maxOf(
+                                kotlin.math.abs(blendMotion.scale - 1f) / 0.32f,
+                                kotlin.math.abs(blendMotion.rotation) / 8f,
+                                kotlin.math.abs(blendMotion.offsetX) / 0.05f,
+                                kotlin.math.abs(blendMotion.offsetY) / 0.05f
+                            ).coerceIn(0f, 1f)
+                            val measuredBlend = if (blendMode == "Nothing") 0f else {
+                                val minBlend = number("Measure Color Blend Min", 0f).coerceIn(0f, 1f)
+                                val maxBlend = number("Measure Color Blend Max", 1f).coerceIn(0f, 1f)
+                                minBlend + (maxBlend - minBlend) * blendResponse
+                            }
+                            val blendAmount = maxOf(number("Measure Color Blend", 0f).coerceIn(0f, 1f), measuredBlend)
                             if (blendAmount > 0f) {
                                 val target = runCatching { android.graphics.Color.parseColor(textValue("Color To", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                                 val values = colorMatrix.array

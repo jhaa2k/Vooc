@@ -1686,6 +1686,21 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             }.toMap()
         }
     }
+    val elementOriginalImages by produceState(
+        initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
+        key1 = elements.filter { it.type == StudioElementType.BLUR_EFFECT }.map { element -> element.id to element.properties }
+    ) {
+        value = withContext(Dispatchers.IO) {
+            elements.filter { it.type == StudioElementType.BLUR_EFFECT }.mapNotNull { element ->
+                val uriText = (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
+                if (uriText.isBlank()) null else runCatching {
+                    context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
+                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                    }
+                }.getOrNull()?.let { element.id to it }
+            }.toMap()
+        }
+    }
     val elementImages by produceState(
         initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
         key1 = elements.map { element -> element.id to element.properties }
@@ -2679,8 +2694,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val destinationSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
                             drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
                             if (props["Show Unblurred Content"] == ElementValue.Bool(true)) {
-                                val original = bitmap
-                                drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity * 0.35f)
+                                elementOriginalImages[element.id]?.let { original ->
+                                    drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity * 0.35f)
+                                }
                             }
                         }
                     }

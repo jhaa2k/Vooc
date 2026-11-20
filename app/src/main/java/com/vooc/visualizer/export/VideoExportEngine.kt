@@ -7,8 +7,10 @@ import com.vooc.visualizer.analyzer.AudioAnalyzer
 import com.vooc.visualizer.analyzer.AnalyzerConfig
 import com.vooc.visualizer.analyzer.FftSize
 import com.vooc.visualizer.analyzer.AudioProviderProcessor
+import com.vooc.visualizer.analyzer.ChannelSelect
 import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
+import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.studio.ElementPropertyCatalog
 import com.vooc.visualizer.studio.ElementValue
 import com.vooc.visualizer.studio.StudioElementType
@@ -96,6 +98,9 @@ object VideoExportEngine {
         val providerConfig = providerElement.toAudioProviderConfig()
         val providerSamplesByFrame = Array(frameCount) { FloatArray(providerConfig.sampleOutCount) }
         val providerBeatByFrame = FloatArray(frameCount)
+        val leftLevelByFrame = FloatArray(frameCount)
+        val rightLevelByFrame = FloatArray(frameCount)
+        val waveformLevelByFrame = FloatArray(frameCount)
         // Keep the analyzer's measured tempo alongside each offline visual frame.
         val providerBpmByFrame = FloatArray(frameCount) { 120f }
         val providerFrameAssigned = BooleanArray(frameCount)
@@ -106,7 +111,7 @@ object VideoExportEngine {
                 val weights = IntArray(frameCount)
                 val offlineAnalyzer = AudioAnalyzer(
                     stream.sampleRate,
-                    AnalyzerConfig(fftSize = FftSize.fromSize(providerConfig.fftSize))
+                    providerConfig.applyTo(AnalyzerConfig(fftSize = FftSize.fromSize(providerConfig.fftSize)))
                 )
                 val providerProcessor = AudioProviderProcessor()
                 decoder.decode { samples, frames, ptsUs ->
@@ -125,6 +130,11 @@ object VideoExportEngine {
                                 shaped.samples.copyInto(providerSamplesByFrame[frameIndex])
                                 providerBeatByFrame[frameIndex] = shaped.beatValue
                                 providerBpmByFrame[frameIndex] = analysis.beat.bpm.takeIf { it in 40f..240f } ?: 120f
+                                leftLevelByFrame[frameIndex] = analysis.channel(ChannelSelect.LEFT).rms
+                                rightLevelByFrame[frameIndex] = analysis.channel(ChannelSelect.RIGHT).rms
+                                waveformLevelByFrame[frameIndex] = if (analysis.waveform.isEmpty()) analysis.rms else kotlin.math.sqrt(
+                                    analysis.waveform.sumOf { sample -> sample.toDouble() * sample.toDouble() } / analysis.waveform.size
+                                ).toFloat()
                                 providerFrameAssigned[frameIndex] = true
                             }
                         }
@@ -154,15 +164,24 @@ object VideoExportEngine {
                 var lastSamples: FloatArray? = null
                 var lastBeat = 0f
                 var lastBpm = 120f
+                var lastLeft = 0f
+                var lastRight = 0f
+                var lastWaveform = 0f
                 for (i in providerSamplesByFrame.indices) {
                     if (providerFrameAssigned[i]) {
                         lastSamples = providerSamplesByFrame[i]
                         lastBeat = providerBeatByFrame[i]
                         lastBpm = providerBpmByFrame[i]
+                        lastLeft = leftLevelByFrame[i]
+                        lastRight = rightLevelByFrame[i]
+                        lastWaveform = waveformLevelByFrame[i]
                     } else if (lastSamples != null) {
                         lastSamples.copyInto(providerSamplesByFrame[i])
                         providerBeatByFrame[i] = lastBeat
                         providerBpmByFrame[i] = lastBpm
+                        leftLevelByFrame[i] = lastLeft
+                        rightLevelByFrame[i] = lastRight
+                        waveformLevelByFrame[i] = lastWaveform
                     }
                 }
                 val firstAssigned = providerFrameAssigned.indexOfFirst { it }
@@ -171,6 +190,9 @@ object VideoExportEngine {
                         providerSamplesByFrame[firstAssigned].copyInto(providerSamplesByFrame[i])
                         providerBeatByFrame[i] = providerBeatByFrame[firstAssigned]
                         providerBpmByFrame[i] = providerBpmByFrame[firstAssigned]
+                        leftLevelByFrame[i] = leftLevelByFrame[firstAssigned]
+                        rightLevelByFrame[i] = rightLevelByFrame[firstAssigned]
+                        waveformLevelByFrame[i] = waveformLevelByFrame[firstAssigned]
                     }
                 }
             }
@@ -253,7 +275,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f })
+                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -466,7 +488,7 @@ object VideoExportEngine {
         return blurred
     }
 
-    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float, providerBpm: Float) {
+    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
         val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         canvas.save()
         canvas.clipRect(0, 0, width, height)
@@ -581,7 +603,12 @@ object VideoExportEngine {
             val reactivitySources = audioReactivitySources(
                 samples = safeElementSamples,
                 overall = audioLevel,
-                beat = providerBeat
+                beat = providerBeat,
+                peak = audioLevel,
+                rms = audioLevel,
+                waveform = waveformLevel,
+                left = leftLevel,
+                right = rightLevel
             )
             val reactivityValue = audioReactivityRuntimes.getOrPut(element.id) { AudioReactivityRuntime() }
                 .update(props, reactivitySources, 1f / project.fps.coerceIn(15, 60))

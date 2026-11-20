@@ -98,7 +98,7 @@ object VideoExportEngine {
         val audioEnvelope = FloatArray(frameCount)
         val providerElements = project.document.elements.filter {
             it.type == StudioElementType.AUDIO_PROVIDER && it.visible
-        }.ifEmpty { listOf(ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-export-default")) }
+        }.take(32).ifEmpty { listOf(ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-export-default")) }
         val providerConfigs = providerElements.map { it.toAudioProviderConfig() }
         val providerConfig = providerConfigs.first()
         val needsStereoReactivity = providerConfigs.any { it.channelMode != com.vooc.visualizer.analyzer.ProviderChannelMode.MONO_MIX } ||

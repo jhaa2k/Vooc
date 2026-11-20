@@ -3039,56 +3039,81 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")), reactivity.colorMultiplier))
                         }.getOrDefault(Color.Black).copy(alpha = fillAlpha)
                         val gradientAngle = number("Gradient Angle", 0f) * PI.toFloat() / 180f
-                        val gradientRadius = maxOf(w, h, 1f) * 0.5f
+                        val gradientCenterValue = props["Gradient Center"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                        val gradientCenter = Offset(left + w * gradientCenterValue.x.toFloat(), top + h * gradientCenterValue.y.toFloat())
+                        val gradientRadius = (maxOf(w, h, 1f) * number("Gradient Radius", 0.5f)).coerceAtLeast(1f)
                         val gradientBrush = if (gradientEnabled) {
-                            if (textValue("Gradient Type", "Linear") == "Radial") {
-                                androidx.compose.ui.graphics.Brush.radialGradient(
-                                    colors = listOf(gradientStart, gradientEnd),
-                                    center = center,
-                                    radius = gradientRadius
-                                )
-                            } else {
+                            if (textValue("Gradient Type", "Linear") == "Radial") androidx.compose.ui.graphics.Brush.radialGradient(
+                                colors = listOf(gradientStart, gradientEnd), center = gradientCenter, radius = gradientRadius,
+                                tileMode = when (textValue("Gradient Spread", "Pad")) { "Repeat" -> androidx.compose.ui.graphics.TileMode.Repeated; "Reflect" -> androidx.compose.ui.graphics.TileMode.Mirror; else -> androidx.compose.ui.graphics.TileMode.Clamp }
+                            ) else {
                                 val dx = cos(gradientAngle) * gradientRadius
                                 val dy = sin(gradientAngle) * gradientRadius
                                 androidx.compose.ui.graphics.Brush.linearGradient(
-                                    colors = listOf(gradientStart, gradientEnd),
-                                    start = Offset(center.x - dx, center.y - dy),
-                                    end = Offset(center.x + dx, center.y + dy)
+                                    colors = listOf(gradientStart, gradientEnd), start = Offset(gradientCenter.x - dx, gradientCenter.y - dy),
+                                    end = Offset(gradientCenter.x + dx, gradientCenter.y + dy),
+                                    tileMode = when (textValue("Gradient Spread", "Pad")) { "Repeat" -> androidx.compose.ui.graphics.TileMode.Repeated; "Reflect" -> androidx.compose.ui.graphics.TileMode.Mirror; else -> androidx.compose.ui.graphics.TileMode.Clamp }
                                 )
                             }
                         } else androidx.compose.ui.graphics.SolidColor(fillColor)
                         val shapePath = Path().apply {
                             when (shapeType) {
-                                "Circle/Oval" -> addOval(androidx.compose.ui.geometry.Rect(left, top, left + w, top + h))
-                                "Line" -> { moveTo(left, center.y); lineTo(left + w, center.y) }
-                                "Triangle" -> { moveTo(center.x, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
-                                else -> {
-                                    addRoundRect(androidx.compose.ui.geometry.RoundRect(
-                                        left, top, left + w, top + h,
-                                        androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f).dp.toPx())
-                                    ))
+                                "Circle/Oval" -> {
+                                    val oval = androidx.compose.ui.geometry.Rect(left, top, left + w, top + h)
+                                    val sweep = number("Ellipse Sweep Angle", 360f) * number("Trim Paths / Progress", 1f)
+                                    arcTo(oval, number("Ellipse Start Angle", 0f) + number("Trim Offset", 0f) * 360f, sweep, true)
+                                    if (kotlin.math.abs(sweep) >= 359.9f) close()
                                 }
+                                "Line" -> { moveTo(left, center.y); lineTo(left + w * number("Trim Paths / Progress", 1f).coerceIn(0f, 1f), center.y) }
+                                "Triangle" -> { moveTo(center.x, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
+                                "Polygon", "Star" -> {
+                                    val count = if (shapeType == "Star") number("Star Points", 5f).toInt().coerceIn(3, 128) * 2 else number("Polygon Sides", 6f).toInt().coerceIn(3, 128)
+                                    for (point in 0 until count) {
+                                        val angle = (point.toFloat() / count * 360f - 90f) * PI.toFloat() / 180f
+                                        val radius = if (shapeType == "Star" && point % 2 == 1) number("Star Inner Radius", 0.5f).coerceIn(0.01f, 0.99f) else 1f
+                                        val px = center.x + cos(angle) * w * 0.5f * radius
+                                        val py = center.y + sin(angle) * h * 0.5f * radius
+                                        if (point == 0) moveTo(px, py) else lineTo(px, py)
+                                    }
+                                    close()
+                                }
+                                "Custom" -> {
+                                    val points = textValue("Custom Path Data").split(';').mapNotNull { token ->
+                                        val pair = token.trim().split(',', ' ').filter { it.isNotBlank() }
+                                        if (pair.size < 2) null else runCatching { pair[0].toFloat() to pair[1].toFloat() }.getOrNull()
+                                    }.take(512)
+                                    points.forEachIndexed { index, point ->
+                                        val px = left + point.first.coerceIn(0f, 1f) * w
+                                        val py = top + point.second.coerceIn(0f, 1f) * h
+                                        if (index == 0) moveTo(px, py) else lineTo(px, py)
+                                    }
+                                    if (points.size >= 3) close()
+                                }
+                                else -> addRoundRect(androidx.compose.ui.geometry.RoundRect(left, top, left + w, top + h,
+                                    androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f).dp.toPx())))
                             }
+                            fillType = if (textValue("Fill Rule", "Non Zero") == "Even Odd") androidx.compose.ui.graphics.PathFillType.EvenOdd else androidx.compose.ui.graphics.PathFillType.NonZero
                         }
                         if (shapeType == "Line") {
                             val lineWidth = number("Stroke / Border Width", 3f).dp.toPx().coerceAtLeast(1f)
-                            drawPath(shapePath, fillColor, style = Stroke(width = lineWidth))
+                            drawPath(shapePath, fillColor, style = Stroke(width = lineWidth, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
                         } else {
                             drawPath(shapePath, brush = gradientBrush)
                         }
                         val strokeWidth = number("Stroke / Border Width", 0f).dp.toPx()
                         if (strokeWidth > 0f && shapeType != "Line") {
                             val strokeStyle = textValue("Stroke Style", "Solid")
+                            val customDash = textValue("Stroke Dash Pattern").split(',', ' ').mapNotNull { it.trim().toFloatOrNull()?.takeIf { value -> value > 0f } }.toFloatArray()
                             val dash = when (strokeStyle) {
                                 "Dashed" -> floatArrayOf(strokeWidth * 4f, strokeWidth * 2f)
                                 "Dotted" -> floatArrayOf(strokeWidth, strokeWidth * 1.8f)
-                                else -> null
+                                else -> customDash.takeIf { it.size >= 2 }
                             }
                             val pathEffect = dash?.let { androidx.compose.ui.graphics.PathEffect.dashPathEffect(it) }
                             val strokeColor = runCatching {
                                 Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")))
                             }.getOrDefault(Color.White).copy(alpha = opacity)
-                            drawPath(shapePath, strokeColor, style = Stroke(width = strokeWidth, pathEffect = pathEffect))
+                            drawPath(shapePath, strokeColor, style = Stroke(width = strokeWidth, pathEffect = pathEffect, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
                         }
                     }
                     StudioElementType.BACKGROUND -> Unit

@@ -668,8 +668,9 @@ object VideoExportEngine {
                 "Image" -> {
                     val sourceUri = bgText("Image File / Source")
                     val image = imageCache["${sourceUri}#${element.id}"] ?: imageCache[sourceUri]
-                    if (image != null) {
-                        val imageRatio = image.width.toFloat() / image.height.coerceAtLeast(1)
+                    val originalImage = imageCache[sourceUri]
+                    fun drawBackgroundBitmap(bitmap: Bitmap, applyOverlay: Boolean) {
+                        val imageRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
                         val frameRatio = width.toFloat() / height.coerceAtLeast(1)
                         val fit = bgText("Fit Mode (Scale Type)", "Fill (Cover)")
                         val destWidth: Float
@@ -700,8 +701,7 @@ object VideoExportEngine {
                         } + offsetY
                         if (bgBool("Background Tile")) {
                             val tileScale = bgNumber("Background Tile Scale", 1f).coerceIn(0.01f, 100f)
-                            val tileShader = android.graphics.BitmapShader(image,
-                                Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+                            val tileShader = android.graphics.BitmapShader(bitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
                             val tileMatrix = android.graphics.Matrix().apply {
                                 setScale(tileScale, tileScale)
                                 postTranslate(offsetX, offsetY)
@@ -711,19 +711,26 @@ object VideoExportEngine {
                             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
                             backgroundPaint.shader = null
                         } else {
-                            canvas.drawBitmap(image, null, RectF(left, top, left + destWidth, top + destHeight), backgroundPaint)
+                            canvas.drawBitmap(bitmap, null, RectF(left, top, left + destWidth, top + destHeight), backgroundPaint)
                         }
-                        val overlay = runCatching {
-                            android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))
-                        }.getOrDefault(android.graphics.Color.TRANSPARENT)
-                        if (android.graphics.Color.alpha(overlay) > 0) {
-                            val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                color = overlay
-                                alpha = (android.graphics.Color.alpha(overlay) * opacity).toInt().coerceIn(0, 255)
-                                xfermode = if (blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
+                        if (applyOverlay) {
+                            val overlay = runCatching {
+                                android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))
+                            }.getOrDefault(android.graphics.Color.TRANSPARENT)
+                            if (android.graphics.Color.alpha(overlay) > 0) {
+                                val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                    color = overlay
+                                    alpha = (android.graphics.Color.alpha(overlay) * opacity).toInt().coerceIn(0, 255)
+                                    xfermode = if (blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
+                                }
+                                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
                             }
-                            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
                         }
+                    }
+                    if (image != null) {
+                        if (bgBool("Show Unblurred Content Under") && originalImage != null) drawBackgroundBitmap(originalImage, false)
+                        drawBackgroundBitmap(image, true)
+                        if (bgBool("Show Unblurred Content") && originalImage != null) drawBackgroundBitmap(originalImage, false)
                     } else {
                         backgroundPaint.color = runCatching {
                             android.graphics.Color.parseColor(bgText("Color", "#FF000000"))

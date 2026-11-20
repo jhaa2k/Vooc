@@ -409,10 +409,14 @@ object ElementPropertyCatalog {
     )
 
     private val imageSpecific = listOf(
-        text("Image Source / File", "Image", ""),
+        text("Custom Image", "Image", ""),
+        text("Image Source / File", "Compatibility", ""),
         text("Fit Mode (Scale Type)", "Image", "Fit (Contain)", listOf(
             "Fit (Contain)", "Fill (Cover)", "Stretch"
         )),
+        bool("Keep Aspect Ratio And Crop To Fit", "Image", false),
+        bool("Keep Aspect Ratio", "Image", true),
+        text("Shape", "Image", "Rectangle", listOf("Rectangle", "Square", "Circle", "Ellipse", "Triangle", "Custom")),
         number("Crop Left", "Image", 0.0, 0.0, 1.0),
         number("Crop Top", "Image", 0.0, 0.0, 1.0),
         number("Crop Right", "Image", 0.0, 0.0, 1.0),
@@ -425,6 +429,12 @@ object ElementPropertyCatalog {
         text("Color Overlay", "Image", "#00FFFFFF"),
         number("Opacity / Alpha", "Image", 1.0, 0.0, 1.0),
         number("Measure Animation Speed", "Image", 0.0, -20.0, 20.0),
+        text("Measure Animation Speed (Measure What)", "Image", "Nothing", MeasureWhatEngine.options),
+        number("Measure Animation Speed A (Speed)", "Image", 1.0, -100.0, 100.0),
+        number("Measure Animation Speed B (Beat Amount)", "Image", 0.0, -100.0, 100.0),
+        text("Measure Color Blend (Measure What)", "Color", "Nothing", MeasureWhatEngine.options),
+        number("Measure Color Blend Min", "Color", 0.0, 0.0, 1.0),
+        number("Measure Color Blend Max", "Color", 1.0, 0.0, 1.0),
         bool("Blurred Border", "Image", false),
         text("Mask Mode", "Image", "Alpha Mask", listOf("Alpha Mask", "Luminance Mask", "Inverted Mask", "Normal Mask")),
         text("Color To", "Image", "#FFFFFFFF"),
@@ -487,6 +497,8 @@ object ElementPropertyCatalog {
     )
 
     private val rgbSplit = listOf(
+        text("Target Image", "RGB Split", ""),
+        number("Split Amount", "RGB Split", 4.0, 0.0, 256.0),
         number("Red Offset X", "RGB Split", -4.0, -256.0, 256.0),
         number("Red Offset Y", "RGB Split", 0.0, -256.0, 256.0),
         number("Green Offset X", "RGB Split", 0.0, -256.0, 256.0),
@@ -893,6 +905,7 @@ object ElementPropertyCatalog {
     )
 
     private val motionBlur = listOf(
+        text("Target Image", "Appearance", ""),
         number("Blur Amount / Strength", "Motion Blur", 1.0, 0.0, 64.0),
         number("Blur Length", "Motion Blur", 24.0, 0.0, 512.0),
         number("Blur Direction / Angle", "Motion Blur", 0.0, -360.0, 360.0),

@@ -139,6 +139,23 @@ class ElementSystemTest {
     }
 
     @Test
+    fun shapeLayerExposesAdvancedGeometryPathStrokeAndFillControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.SHAPE).associateBy { it.name }
+        val required = setOf(
+            "Polygon Sides", "Star Points", "Star Inner Radius", "Ellipse Start Angle",
+            "Ellipse Sweep Angle", "Custom Path Data", "Fill Rule", "Stroke Cap",
+            "Stroke Join", "Stroke Alignment", "Stroke Miter Limit", "Stroke Dash Pattern",
+            "Stroke Dash Offset", "Trim Start", "Trim End", "Trim Offset", "Gradient Spread",
+            "Gradient Center", "Gradient Radius", "Shape Shadow Enabled", "Shape Shadow Color",
+            "Shape Shadow Blur", "Shape Shadow Offset X", "Shape Shadow Offset Y",
+            "Shape Blur", "Skew X", "Skew Y"
+        )
+        assertTrue("Missing advanced shape controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(listOf("Non Zero", "Even Odd"), specs.getValue("Fill Rule").options)
+        assertEquals(listOf("Inside", "Center", "Outside"), specs.getValue("Stroke Alignment").options)
+    }
+
+    @Test
     fun audioProviderExposesInputSpectrumFrequencyAndAdvancedBeatControls() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).associateBy { it.name }
         val required = setOf(

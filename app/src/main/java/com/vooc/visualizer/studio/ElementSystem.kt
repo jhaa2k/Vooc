@@ -606,6 +606,10 @@ object ElementPropertyCatalog {
         text("Custom Path Points", "Layout", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5"),
         number("Min Height", "Layout", 0.0, 0.0, 10000.0),
         number("Max Height", "Layout", 300.0, 0.0, 10000.0),
+        number("Height Scale", "Bars", 1.0, 0.0, 10.0),
+        number("Min Height Scale", "Bars", 0.0, 0.0, 1.0),
+        number("Max Height Scale", "Bars", 1.0, 0.0, 1.0),
+        number("Color Blend Offset", "Bars", 0.0, -1.0, 1.0),
         text("Bar Design", "Design", "Rounded Rect", listOf(
             "Rectangle", "Rounded Rect", "Capsule / Pill", "Line", "Circle / Dot",
             "Triangle", "Diamond", "Hexagon", "Pentagon", "Octagon", "Trapezoid", "Parallelogram", "Star", "Chevron", "Arrow", "Cross", "Wave", "Lightning", "Custom Image"
@@ -659,7 +663,20 @@ object ElementPropertyCatalog {
         number("Peak Hold Time", "Modifiers", 0.35, 0.0, 1.0),
         number("Reaction Delay", "Behavior", 0.0, 0.0, 5000.0),
         number("Accumulated Delay", "Behavior", 0.0, 0.0, 5000.0),
-        number("Softness", "Behavior", 0.0, 0.0, 1.0)
+        number("Reaction Accumulated Delay", "Behavior", 0.0, 0.0, 5000.0),
+        number("Softness", "Behavior", 0.0, 0.0, 1.0),
+        text("Segment 1 Color From", "Segment 1", "#FF56D8FF"),
+        text("Segment 1 Color To", "Segment 1", "#FF9B5CFF"),
+        bool("Segment 1 Fixed Height", "Segment 1", false),
+        number("Segment 1 Bar Height Multiplier", "Segment 1", 1.0, 0.0, 10.0),
+        bool("Segment 1 Mirror", "Segment 1", false),
+        bool("Segment 1 Flip Every Other", "Segment 1", false),
+        text("Segment 2 Color From", "Segment 2", "#FF9B5CFF"),
+        text("Segment 2 Color To", "Segment 2", "#FFFFFFFF"),
+        bool("Segment 2 Fixed Height", "Segment 2", false),
+        number("Segment 2 Bar Height Multiplier", "Segment 2", 1.0, 0.0, 10.0),
+        bool("Segment 2 Mirror", "Segment 2", false),
+        bool("Segment 2 Flip Every Other", "Segment 2", false)
     )
 
     private val particlesGeneral = listOf(

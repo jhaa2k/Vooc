@@ -75,6 +75,22 @@ class ElementSystemTest {
     }
 
     @Test
+    fun everyVisualLayerExposesTheSharedAnimationControlSet() {
+        val required = setOf(
+            "Animation Enabled", "Animation Start Delay", "Animation Duration",
+            "Animation Playback Mode", "Animation Time Mode", "Animation Time Offset",
+            "Animation Speed", "Animation Easing", "Animation Interpolation",
+            "Animation Loop Count", "Animation Start On Beat", "Animation Beat Offset",
+            "Animation Reset On Track Change", "Animation Hold First Frame",
+            "Animation Hold Last Frame"
+        )
+        StudioElementType.entries.filter { it != StudioElementType.AUDIO_PROVIDER }.forEach { type ->
+            val names = ElementPropertyCatalog.forElement(type).map { it.name }.toSet()
+            assertTrue("$type missing animation controls: ${required - names}", names.containsAll(required))
+        }
+    }
+
+    @Test
     fun propertyValuesAreTypeCheckedAndClamped() {
         val element = ElementPropertyCatalog.create(StudioElementType.BARS_SEGMENTS, "bars-1")
         val bounded = element.withValue("Bar Count", ElementValue.Number(5000.0))

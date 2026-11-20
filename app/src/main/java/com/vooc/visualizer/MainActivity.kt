@@ -1868,9 +1868,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val maxHeight = (number("Max Height", size.height * 0.35f) * scaleY).coerceIn(1f, size.height * 0.95f)
                         val minHeight = number("Min Height", 0f).coerceIn(0f, maxHeight)
                         val design = textValue("Bar Design", "Rounded Rect")
+                        val orientation = textValue("Orientation", "Vertical")
                         val alignment = textValue("Alignment", "Bottom")
                         val mirrorMode = textValue("Mirror Mode", if (props["Mirror"] == ElementValue.Bool(true)) "Horizontal" else "Off")
-                        val horizontalMirror = mirrorMode == "Horizontal" || mirrorMode == "Both" || props["Mirror"] == ElementValue.Bool(true)
+                        val horizontalMirror = orientation == "Mirror" || mirrorMode == "Horizontal" || mirrorMode == "Both" || props["Mirror"] == ElementValue.Bool(true)
                         val verticalMirror = mirrorMode == "Vertical" || mirrorMode == "Both"
                         val centerSymmetry = props["Center Symmetry"] == ElementValue.Bool(true)
                         val outline = props["Outline / Stroke"] == ElementValue.Bool(true)
@@ -2003,6 +2004,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         val segmentsPerBar = number("Segments Per Bar", 1f).toInt().coerceIn(1, 64)
                         val segmentGap = (gap * 0.55f).coerceAtMost(6.dp.toPx())
+                        rotate(if (orientation == "Horizontal") 90f else 0f, center) {
                         repeat(count) { index ->
                             val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                             var level = levels[sourceIndex].coerceIn(0f, 1f)
@@ -2041,6 +2043,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 }
                                 if (peakEnabled) drawBarShape(x, top, barWidth, 1f, colorForBar, peaks[sourceIndex], index)
                             }
+                        }
                         }
                     }
                     StudioElementType.PARTICLES -> {

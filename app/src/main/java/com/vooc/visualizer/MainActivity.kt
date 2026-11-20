@@ -2693,7 +2693,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val randomC = kotlin.math.abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
                             val particleLifetime = (lifetime * (1f + (randomC * 2f - 1f) * lifetimeRandom)).coerceAtLeast(0.01f)
                             val age = ((playbackSeconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
-                            val lifeT = (age / lifetime).coerceIn(0f, 1f)
+                            val lifeT = (age / particleLifetime).coerceIn(0f, 1f)
                             val emitterAngle = emitterArcStart + randomA * emitterArcSweep
                             val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
                             val localX: Float

@@ -2654,8 +2654,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         addRect(androidx.compose.ui.geometry.Rect(imageDestination.center.x - side / 2f, imageDestination.center.y - side / 2f, imageDestination.center.x + side / 2f, imageDestination.center.y + side / 2f))
                                     }
                                     "Triangle" -> { moveTo(imageDestination.center.x, imageDestination.top); lineTo(imageDestination.right, imageDestination.bottom); lineTo(imageDestination.left, imageDestination.bottom); close() }
-                                    "Rounded Rectangle", "Rounded Rect" -> addRoundRect(androidx.compose.ui.geometry.RoundRect(destination, androidx.compose.ui.geometry.CornerRadius((number("Corner Radius", 0f) * size.width / 1080f).coerceAtLeast(0f))))
-                                    else -> addRect(destination)
+                                    "Rounded Rectangle", "Rounded Rect" -> addRoundRect(androidx.compose.ui.geometry.RoundRect(imageDestination, androidx.compose.ui.geometry.CornerRadius((number("Corner Radius", 0f) * size.width / 1080f).coerceAtLeast(0f))))
+                                    else -> addRect(imageDestination)
                                 }
                             }
                             val overlay = runCatching { Color(android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF"))) }.getOrDefault(Color.Transparent)

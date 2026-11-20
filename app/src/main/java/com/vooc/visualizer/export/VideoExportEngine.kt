@@ -1033,6 +1033,19 @@ object VideoExportEngine {
                                 }
                             }
                             colorFilter = ColorMatrixColorFilter(colorMatrix)
+                            val layerBlend = when (textValue("Blend Mode", "Alpha")) {
+                                "Add" -> android.graphics.PorterDuff.Mode.ADD
+                                "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                                "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                                "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                                "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                                "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                                "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                                else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                            }
+                            if (layerBlend != android.graphics.PorterDuff.Mode.SRC_OVER) {
+                                xfermode = android.graphics.PorterDuffXfermode(layerBlend)
+                            }
                         }
                         canvas.save()
                         canvas.clipPath(clip)

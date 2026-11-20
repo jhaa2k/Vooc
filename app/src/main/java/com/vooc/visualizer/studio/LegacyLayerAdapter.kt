@@ -41,7 +41,6 @@ object LegacyLayerAdapter {
                 text("Frequency Scale", if (layer.spectrumScale == "LINEAR") "Linear" else "Logarithmic")
                 text("Bar Color A", colorHex(layer.color))
                 text("Bar Color B", colorHex(layer.gradientColor))
-                text("Tag", "${layer.kind.title} • ${layer.name}")
                 when (layer.kind) {
                     LayerKind.BARSH -> values["Mirror"] = ElementValue.Bool(true)
                     LayerKind.CIRCLE, LayerKind.MULTIRING, LayerKind.CONCENTRIC,

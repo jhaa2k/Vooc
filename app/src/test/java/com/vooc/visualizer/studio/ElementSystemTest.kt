@@ -10,12 +10,24 @@ class ElementSystemTest {
     @Test
     fun catalogContainsAllSpecificationElementTypes() {
         assertEquals(
-            setOf("Audio Provider", "Image", "Rgb Split", "Blur Effect", "Bars/Segments", "Particles", "Text", "Motion Blur Effect"),
+            setOf("Audio Provider", "Image", "Background", "Rgb Split", "Blur Effect", "Bars/Segments", "Particles", "Text", "Motion Blur Effect", "Shape"),
             StudioElementType.entries.map { it.displayName }.toSet()
         )
         StudioElementType.entries.forEach { type ->
             assertTrue("$type should expose a property schema", ElementPropertyCatalog.forElement(type).isNotEmpty())
         }
+    }
+
+    @Test
+    fun addLayerCatalogContainsNoDuplicateCommonElementTypes() {
+        val names = LayerAddMenuCatalog.spectrumStyles.map { it.title } +
+            LayerAddMenuCatalog.elementTypes.map { it.displayName }
+        assertEquals(names.size, names.toSet().size)
+        listOf("Image", "Text", "Shape", "Background", "Particles").forEach { name ->
+            assertEquals("Expected exactly one $name entry", 1, names.count { it == name })
+        }
+        assertTrue(LayerAddMenuCatalog.elementTypes.contains(StudioElementType.BARS_SEGMENTS))
+        assertFalse(LayerAddMenuCatalog.elementTypes.contains(StudioElementType.AUDIO_PROVIDER))
     }
 
     @Test

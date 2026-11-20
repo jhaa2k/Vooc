@@ -928,8 +928,10 @@ object VideoExportEngine {
                         val sourceIndex = if (mirrorX) minOf(index, count - 1 - index) else index
                         var level = levels[sourceIndex].coerceIn(0f, 1f)
                         if ((element.value("Flip Input") as? ElementValue.Bool)?.value == true) level = 1f - level
+                        val layoutRandom = kotlin.math.abs(kotlin.math.sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
+                        val heightRandom = number("Bar Height Random", 0f).coerceIn(0f, 1f)
                         val activeMaxHeight = if (radialLayout) radialMaxHeight else maxHeight
-                        val barHeight = (minHeight + level * activeMaxHeight).coerceIn(0f, height * 0.95f)
+                        val barHeight = ((minHeight + level * activeMaxHeight) * (1f + (layoutRandom * 2f - 1f) * heightRandom)).coerceIn(0f, height * 0.95f)
                         val pathT = if (count <= 1) 0f else index.toFloat() / (count - 1)
                         val currentPathPoint = if (customPathMode) pathPoint(pathT) else 0f to 0f
                         val beforePoint = if (customPathMode) pathPoint((pathT - 0.01f).coerceAtLeast(0f)) else currentPathPoint

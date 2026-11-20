@@ -416,7 +416,7 @@ object ElementPropertyCatalog {
         )),
         bool("Keep Aspect Ratio And Crop To Fit", "Image", false),
         bool("Keep Aspect Ratio", "Image", true),
-        text("Shape", "Image", "Rectangle", listOf("Rectangle", "Square", "Circle", "Ellipse", "Triangle", "Custom")),
+        text("Shape", "Image", "Rectangle", listOf("Rectangle", "Rounded Rectangle", "Square", "Circle", "Ellipse", "Triangle", "Custom")),
         number("Crop Left", "Image", 0.0, 0.0, 1.0),
         number("Crop Top", "Image", 0.0, 0.0, 1.0),
         number("Crop Right", "Image", 0.0, 0.0, 1.0),

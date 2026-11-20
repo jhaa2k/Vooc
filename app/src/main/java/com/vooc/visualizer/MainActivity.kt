@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -2740,20 +2741,70 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         blendMode = layerBlend
                                     )
                                 }
-                                drawImage(bitmap,
-                                    srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
-                                    srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
-                                    dstOffset = androidx.compose.ui.unit.IntOffset(imageDestination.left.toInt(), imageDestination.top.toInt()),
-                                    dstSize = androidx.compose.ui.unit.IntSize(imageDestination.width.toInt().coerceAtLeast(1), imageDestination.height.toInt().coerceAtLeast(1)),
-                                    alpha = imageAlpha,
-                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix),
-                                    blendMode = contentBlend,
-                                    filterQuality = when (textValue("Image Sampling", "Linear")) {
-                                        "Nearest" -> androidx.compose.ui.graphics.FilterQuality.None
-                                        "Cubic" -> androidx.compose.ui.graphics.FilterQuality.High
-                                        else -> androidx.compose.ui.graphics.FilterQuality.Medium
+                                val tileX = textValue("Image Tile Mode X", "Clamp")
+                                val tileY = textValue("Image Tile Mode Y", "Clamp")
+                                val tileScaleX = number("Image Tile Scale X", 1f).coerceIn(0.1f, 4f)
+                                val tileScaleY = number("Image Tile Scale Y", 1f).coerceIn(0.1f, 4f)
+                                if (tileX == "Clamp" && tileY == "Clamp" && tileScaleX == 1f && tileScaleY == 1f) {
+                                    drawImage(bitmap,
+                                        srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
+                                        srcSize = androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight),
+                                        dstOffset = androidx.compose.ui.unit.IntOffset(imageDestination.left.toInt(), imageDestination.top.toInt()),
+                                        dstSize = androidx.compose.ui.unit.IntSize(imageDestination.width.toInt().coerceAtLeast(1), imageDestination.height.toInt().coerceAtLeast(1)),
+                                        alpha = imageAlpha,
+                                        colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix),
+                                        blendMode = contentBlend,
+                                        filterQuality = when (textValue("Image Sampling", "Linear")) {
+                                            "Nearest" -> androidx.compose.ui.graphics.FilterQuality.None
+                                            "Cubic" -> androidx.compose.ui.graphics.FilterQuality.High
+                                            else -> androidx.compose.ui.graphics.FilterQuality.Medium
+                                        }
+                                    )
+                                } else {
+                                    drawIntoCanvas { composeCanvas ->
+                                        val nativePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                            alpha = (imageAlpha * 255f).toInt().coerceIn(0, 255)
+                                            isFilterBitmap = textValue("Image Sampling", "Linear") != "Nearest"
+                                            colorFilter = android.graphics.ColorMatrixColorFilter(android.graphics.ColorMatrix(imageColorMatrix.values))
+                                            xfermode = android.graphics.PorterDuffXfermode(when (contentBlend) {
+                                                androidx.compose.ui.graphics.BlendMode.Plus -> android.graphics.PorterDuff.Mode.ADD
+                                                androidx.compose.ui.graphics.BlendMode.Screen -> android.graphics.PorterDuff.Mode.SCREEN
+                                                androidx.compose.ui.graphics.BlendMode.Multiply -> android.graphics.PorterDuff.Mode.MULTIPLY
+                                                androidx.compose.ui.graphics.BlendMode.Darken -> android.graphics.PorterDuff.Mode.DARKEN
+                                                androidx.compose.ui.graphics.BlendMode.Lighten -> android.graphics.PorterDuff.Mode.LIGHTEN
+                                                androidx.compose.ui.graphics.BlendMode.Difference -> android.graphics.PorterDuff.Mode.XOR
+                                                androidx.compose.ui.graphics.BlendMode.Src -> android.graphics.PorterDuff.Mode.SRC
+                                                else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                                            })
+                                        }
+                                        val shader = android.graphics.BitmapShader(bitmap.asAndroidBitmap(),
+                                            when (tileX) {
+                                                "Repeat" -> android.graphics.Shader.TileMode.REPEAT
+                                                "Mirror" -> android.graphics.Shader.TileMode.MIRROR
+                                                else -> android.graphics.Shader.TileMode.CLAMP
+                                            },
+                                            when (tileY) {
+                                                "Repeat" -> android.graphics.Shader.TileMode.REPEAT
+                                                "Mirror" -> android.graphics.Shader.TileMode.MIRROR
+                                                else -> android.graphics.Shader.TileMode.CLAMP
+                                            })
+                                        val tileMatrix = android.graphics.Matrix().apply {
+                                            setRectToRect(
+                                                android.graphics.RectF(sourceLeft.toFloat(), sourceTop.toFloat(), (sourceLeft + sourceWidth).toFloat(), (sourceTop + sourceHeight).toFloat()),
+                                                android.graphics.RectF(imageDestination.left, imageDestination.top,
+                                                    imageDestination.left + imageDestination.width * tileScaleX,
+                                                    imageDestination.top + imageDestination.height * tileScaleY),
+                                                android.graphics.Matrix.ScaleToFit.FILL
+                                            )
+                                        }
+                                        shader.setLocalMatrix(tileMatrix)
+                                        nativePaint.shader = shader
+                                        composeCanvas.nativeCanvas.drawRect(
+                                            android.graphics.RectF(imageDestination.left, imageDestination.top, imageDestination.right, imageDestination.bottom),
+                                            nativePaint
+                                        )
                                     }
-                                )
+                                }
                                 if (showUnblurredOver && originalBitmap != null) {
                                     drawImage(originalBitmap,
                                         srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),

@@ -1850,7 +1850,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             peakFallSpeed = number("Peak Fall Speed", 0.8f),
                             logarithmicInput = providerFrame == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                             reactionDelayMs = number("Reaction Delay", 0f),
-                            accumulatedDelayMs = number("Accumulated Delay", 0f),
+                            accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),
                             releaseSmoothing = number("Release Smoothing", number("Smoothing / Damping", 0.72f))
                         )
@@ -1865,8 +1865,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val slot = totalWidth / count
                         val requestedWidth = number("Bar Width", 8f).dp.toPx()
                         val barWidth = requestedWidth.coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
-                        val maxHeight = (number("Max Height", size.height * 0.35f) * scaleY).coerceIn(1f, size.height * 0.95f)
-                        val minHeight = number("Min Height", 0f).coerceIn(0f, maxHeight)
+                        val heightScale = number("Height Scale", 1f).coerceIn(0f, 10f)
+                        val maxHeightScale = number("Max Height Scale", 1f).coerceIn(0f, 1f)
+                        val maxHeight = (number("Max Height", size.height * 0.35f) * scaleY * heightScale * maxHeightScale).coerceIn(1f, size.height * 0.95f)
+                        val minHeightScale = number("Min Height Scale", 0f).coerceIn(0f, 1f)
+                        val minHeight = maxOf(number("Min Height", 0f), maxHeight * minHeightScale).coerceIn(0f, maxHeight)
                         val design = textValue("Bar Design", "Rounded Rect")
                         val orientation = textValue("Orientation", "Vertical")
                         val alignment = textValue("Alignment", "Bottom")
@@ -2092,13 +2095,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val top = if (centerSymmetry) baseline - drawHeight else if (alignment == "Center") baseline - barHeight / 2f
                                 else if (alignment == "Top") baseline else baseline - barHeight
                             val height = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(size.height * 0.95f) else drawHeight
+                            val blendPosition = (index.toFloat() / (count - 1).coerceAtLeast(1) +
+                                number("Color Blend Offset", 0f)).coerceIn(0f, 1f)
                             val colorForBar = when (colorMode) {
                                 "Alternating" -> if (index % 2 == 0) colorA else colorB
                                 "Per Bar" -> runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor)
                                 "Gradient", "By Amplitude" -> Color(
-                                    colorA.red + (colorB.red - colorA.red) * level,
-                                    colorA.green + (colorB.green - colorA.green) * level,
-                                    colorA.blue + (colorB.blue - colorA.blue) * level,
+                                    colorA.red + (colorB.red - colorA.red) * blendPosition,
+                                    colorA.green + (colorB.green - colorA.green) * blendPosition,
+                                    colorA.blue + (colorB.blue - colorA.blue) * blendPosition,
                                     opacity
                                 )
                                 else -> elementColor
@@ -2106,11 +2111,29 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             rotate(barRotation + customAngle, Offset(x + barWidth / 2f, baseline)) {
                                 val segmentHeight = ((height - segmentGap * (segmentsPerBar - 1)) / segmentsPerBar).coerceAtLeast(0.5f)
                                 repeat(segmentsPerBar) { segment ->
-                                    val segmentTop = top + segment * (segmentHeight + segmentGap)
-                                    drawBarShape(x, segmentTop, barWidth, segmentHeight, colorForBar, 0f, index)
-                                    if (verticalMirror || centerSymmetry) {
-                                        val mirrorTop = baseline + segment * (segmentHeight + segmentGap)
-                                        drawBarShape(x, mirrorTop, barWidth, segmentHeight, colorForBar, 0f, index)
+                                    val segmentNumber = segment + 1
+                                    val segmentPrefix = if (segmentNumber <= 2) "Segment $segmentNumber " else ""
+                                    val fixedHeight = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Fixed Height"] == ElementValue.Bool(true)
+                                    val segmentMultiplier = if (segmentPrefix.isNotEmpty()) number("$segmentPrefix" + "Bar Height Multiplier", 1f).coerceIn(0f, 10f) else 1f
+                                    val renderedSegmentHeight = (if (fixedHeight) maxHeight / segmentsPerBar else segmentHeight)
+                                        .times(segmentMultiplier).coerceAtLeast(0.5f)
+                                    val from = if (segmentPrefix.isNotEmpty()) runCatching { Color(android.graphics.Color.parseColor(textValue("$segmentPrefix" + "Color From", "#FF56D8FF"))) }.getOrDefault(colorForBar) else colorForBar
+                                    val to = if (segmentPrefix.isNotEmpty()) runCatching { Color(android.graphics.Color.parseColor(textValue("$segmentPrefix" + "Color To", "#FF9B5CFF"))) }.getOrDefault(colorForBar) else colorForBar
+                                    val segmentFill = if (segmentPrefix.isNotEmpty()) Color(
+                                        from.red + (to.red - from.red) * level,
+                                        from.green + (to.green - from.green) * level,
+                                        from.blue + (to.blue - from.blue) * level,
+                                        opacity
+                                    ) else colorForBar
+                                    val segmentTop = top + segment * (renderedSegmentHeight + segmentGap)
+                                    val flipAlternate = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Flip Every Other"] == ElementValue.Bool(true) && index % 2 == 1
+                                    val mirrorSegment = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Mirror"] == ElementValue.Bool(true)
+                                    rotate(if (flipAlternate) 180f else 0f, Offset(x + barWidth / 2f, baseline)) {
+                                        drawBarShape(x, segmentTop, barWidth, renderedSegmentHeight, segmentFill, 0f, index)
+                                        if (verticalMirror || centerSymmetry || mirrorSegment) {
+                                            val mirrorTop = baseline + segment * (renderedSegmentHeight + segmentGap)
+                                            drawBarShape(x, mirrorTop, barWidth, renderedSegmentHeight, segmentFill, 0f, index)
+                                        }
                                     }
                                 }
                                 val peakStyle = textValue("Peak Indicator Style", "Line")

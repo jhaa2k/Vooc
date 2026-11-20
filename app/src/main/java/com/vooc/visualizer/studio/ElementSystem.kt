@@ -555,6 +555,8 @@ object ElementPropertyCatalog {
         text("Image Sampling", "Image", "Linear", listOf("Nearest", "Linear", "Cubic")),
         text("Image Tile Mode X", "Image", "Clamp", listOf("Clamp", "Repeat", "Mirror")),
         text("Image Tile Mode Y", "Image", "Clamp", listOf("Clamp", "Repeat", "Mirror")),
+        number("Image Tile Scale X", "Image", 1.0, 0.1, 4.0),
+        number("Image Tile Scale Y", "Image", 1.0, 0.1, 4.0),
         number("Image Brightness", "Color", 1.0, 0.0, 4.0),
         number("Image Contrast", "Color", 1.0, 0.0, 4.0),
         number("Image Hue", "Color", 0.0, -360.0, 360.0),

@@ -136,7 +136,7 @@ private val Lime = Color(0xFFC6F36A)
 private val Ink = Color(0xFF0C0E0B)
 private val Panel = Color(0xFF171A14)
 private val Muted = Color(0xFF92998A)
-private fun processImageForPreview(source: android.graphics.Bitmap, element: ElementDocument): android.graphics.Bitmap {
+private fun processImageForPreview(source: android.graphics.Bitmap, element: ElementDocument, maskSource: android.graphics.Bitmap? = null): android.graphics.Bitmap {
     fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
         is ElementValue.Number -> value.value.toFloat()
         is ElementValue.Integer -> value.value.toFloat()
@@ -148,12 +148,15 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
     val blurDivider = number("Blur Divider", 2f).coerceIn(1f, 32f)
     val edgeBlur = number("Edge Blur", 0f).coerceIn(0f, 128f)
     val keyEnabled = enabled("Color Key Enabled")
-    if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled) return source
+    if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled && maskSource == null) return source
     val output = source.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
     val w = output.width
     val h = output.height
     val pixels = IntArray(w * h)
     output.getPixels(pixels, 0, w, 0, 0, w, h)
+    val mask = maskSource?.let { if (it.width == w && it.height == h) it else android.graphics.Bitmap.createScaledBitmap(it, w, h, true) }
+    val maskPixels = mask?.let { IntArray(w * h).also { values -> it.getPixels(values, 0, w, 0, 0, w, h) } }
+    val maskMode = (element.value("Mask Mode") as? ElementValue.Text)?.value ?: "Alpha Mask"
     val keyColor = if (enabled("Auto Detect Color Key")) {
         val samples = intArrayOf(pixels[0], pixels[w - 1], pixels[(h - 1) * w], pixels[h * w - 1])
         android.graphics.Color.rgb(
@@ -172,6 +175,17 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
             val index = y * w + x
             val pixel = pixels[index]
             var alpha = android.graphics.Color.alpha(pixel).toFloat()
+            if (maskPixels != null) {
+                val maskPixel = maskPixels[index]
+                val maskAlpha = android.graphics.Color.alpha(maskPixel).toFloat() / 255f
+                val luminance = (0.2126f * android.graphics.Color.red(maskPixel) + 0.7152f * android.graphics.Color.green(maskPixel) + 0.0722f * android.graphics.Color.blue(maskPixel)) / 255f
+                val maskFactor = when (maskMode) {
+                    "Luminance Mask" -> luminance
+                    "Inverted Mask" -> 1f - maskAlpha
+                    else -> maskAlpha
+                }
+                alpha *= maskFactor
+            }
             if (keyEnabled) {
                 val dr = android.graphics.Color.red(pixel) - keyR
                 val dg = android.graphics.Color.green(pixel) - keyG
@@ -187,6 +201,7 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
         }
     }
     output.setPixels(pixels, 0, w, 0, 0, w, h)
+    if (mask != null && mask !== maskSource) mask.recycle()
     if (blurRadius <= 0f) return output
     val scale = (1f / (1f + blurRadius / blurDivider)).coerceIn(0.08f, 1f)
     val smallW = (w * scale).toInt().coerceAtLeast(1)
@@ -1513,9 +1528,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     val bitmap = runCatching {
                         context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                             val decoded = BitmapFactory.decodeStream(stream) ?: return@use null
-                            val processed = if (element.type == StudioElementType.IMAGE) processImageForPreview(decoded, element) else decoded
+                            val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                            val maskBitmap = if (element.type == StudioElementType.IMAGE && maskUri.isNotBlank()) {
+                                context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                            } else null
+                            val processed = if (element.type == StudioElementType.IMAGE) processImageForPreview(decoded, element, maskBitmap) else decoded
                             val image = processed.asImageBitmap()
                             if (processed !== decoded) decoded.recycle()
+                            maskBitmap?.recycle()
                             image
                         }
                     }.getOrNull()

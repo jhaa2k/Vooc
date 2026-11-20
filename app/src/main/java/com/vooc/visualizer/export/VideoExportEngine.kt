@@ -1308,7 +1308,7 @@ object VideoExportEngine {
                         if (borderWidth > 0f) {
                             val borderColor = runCatching { android.graphics.Color.parseColor(textValue("Image Border Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT)
                             val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                color = borderColor
+                                setColor(borderColor)
                                 style = Paint.Style.STROKE
                                 strokeWidth = borderWidth
                             }

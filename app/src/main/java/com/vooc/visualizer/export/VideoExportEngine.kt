@@ -807,11 +807,11 @@ object VideoExportEngine {
                     val mirrorY = mirrorMode == "Vertical" || mirrorMode == "Both" || (element.value("Center Symmetry") as? ElementValue.Bool)?.value == true
                     val outline = (element.value("Outline / Stroke") as? ElementValue.Bool)?.value == true
                     val strokeWidth = (number("Stroke Width", 1.5f) * width / 1080f).coerceAtLeast(0.5f)
-                    val strokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(color)
-                    val colorA = runCatching { android.graphics.Color.parseColor(textValue("Bar Color A", "#FF56D8FF")) }.getOrDefault(color)
-                    val colorB = runCatching { android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF")) }.getOrDefault(color)
-                    val capColor = runCatching { android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF")) }.getOrDefault(strokeColor)
-                    val peakColor = runCatching { android.graphics.Color.parseColor(textValue("Peak Color", "#FFFFFFFF")) }.getOrDefault(strokeColor)
+                    val strokeColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(color)
+                    val colorA = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Bar Color A", "#FF56D8FF")), reactivity.colorMultiplier) }.getOrDefault(color)
+                    val colorB = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF")), reactivity.colorMultiplier) }.getOrDefault(color)
+                    val capColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(strokeColor)
+                    val peakColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Peak Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(strokeColor)
                     val colorMode = if ((element.value("Gradient Fill") as? ElementValue.Bool)?.value == true) "Gradient" else textValue("Color Mode", "Alternating")
                     val capMode = textValue("Top/Bottom Cap", "None")
                     val capPlacement = textValue("Cap Placement", "Top")
@@ -996,8 +996,8 @@ object VideoExportEngine {
                     val sineFrequencyRandom = number("Side Sine Wave Freq Random", 0f).coerceIn(0f, 1f)
                     val sineMagnitude = number("Side Sine Wave Mag", 0f) * width / 1080f
                     val sineMagnitudeRandom = number("Side Sine Wave Mag Random", 0f).coerceIn(0f, 1f)
-                    val colorFrom = runCatching { android.graphics.Color.parseColor(textValue("Color From", textValue("Color", "#FFFFFFFF"))) }.getOrDefault(color)
-                    val colorTo = runCatching { android.graphics.Color.parseColor(textValue("Color To", textValue("Color", "#FFFFFFFF"))) }.getOrDefault(color)
+                    val colorFrom = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Color From", textValue("Color", "#FFFFFFFF"))), reactivity.colorMultiplier) }.getOrDefault(color)
+                    val colorTo = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Color To", textValue("Color", "#FFFFFFFF"))), reactivity.colorMultiplier) }.getOrDefault(color)
                     val customParticle = imageCache[textValue("Custom Image")]
                     val mirrorX = (element.value("Mirror X") as? ElementValue.Bool)?.value == true
                     val mirrorY = (element.value("Mirror Y") as? ElementValue.Bool)?.value == true

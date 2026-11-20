@@ -1097,6 +1097,16 @@ object VideoExportEngine {
                             }
                         }
                         val overlay = runCatching { android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF")) }.getOrDefault(android.graphics.Color.TRANSPARENT)
+                        val layerBlend = when (textValue("Blend Mode", "Alpha")) {
+                            "Add" -> android.graphics.PorterDuff.Mode.ADD
+                            "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                            "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                            "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                            "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                            "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                            "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                        }
                         val imagePaint = Paint(paint).apply {
                             this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
@@ -1150,16 +1160,6 @@ object VideoExportEngine {
                                 }
                             }
                             colorFilter = ColorMatrixColorFilter(colorMatrix)
-                            val layerBlend = when (textValue("Blend Mode", "Alpha")) {
-                                "Add" -> android.graphics.PorterDuff.Mode.ADD
-                                "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
-                                "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
-                                "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
-                                "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
-                                "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
-                                "Copy" -> android.graphics.PorterDuff.Mode.SRC
-                                else -> android.graphics.PorterDuff.Mode.SRC_OVER
-                            }
                             val contentBlend = when (textValue("Blend Mode Content", "Alpha")) {
                                 "Add" -> android.graphics.PorterDuff.Mode.ADD
                                 "Screen" -> android.graphics.PorterDuff.Mode.SCREEN

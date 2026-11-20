@@ -2434,7 +2434,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         v[base + 4] = v[base + 4] * (1f - a) + (if (row == 0) overlay.red else if (row == 1) overlay.green else overlay.blue) * a
                                     }
                                 }
-                                val blendAmount = number("Measure Color Blend", 0f).coerceIn(0f, 1f)
+                                val blendMode = textValue("Measure Color Blend (Measure What)", "Nothing")
+                                val blendMotion = motionFor("Measure Color Blend (Measure What)")
+                                val blendResponse = maxOf(
+                                    kotlin.math.abs(blendMotion.scale - 1f) / 0.32f,
+                                    kotlin.math.abs(blendMotion.rotation) / 8f,
+                                    kotlin.math.abs(blendMotion.offsetX) / 0.05f,
+                                    kotlin.math.abs(blendMotion.offsetY) / 0.05f
+                                ).coerceIn(0f, 1f)
+                                val measuredBlend = if (blendMode == "Nothing") 0f else {
+                                    val minBlend = number("Measure Color Blend Min", 0f).coerceIn(0f, 1f)
+                                    val maxBlend = number("Measure Color Blend Max", 1f).coerceIn(0f, 1f)
+                                    minBlend + (maxBlend - minBlend) * blendResponse
+                                }
+                                val blendAmount = maxOf(number("Measure Color Blend", 0f).coerceIn(0f, 1f), measuredBlend)
                                 if (blendAmount > 0f) {
                                     val target = runCatching { Color(android.graphics.Color.parseColor(textValue("Color To", "#FFFFFFFF"))) }.getOrDefault(Color.White)
                                     val v = values

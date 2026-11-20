@@ -301,7 +301,9 @@ class ElementSystemTest {
         val mirror = ElementPropertyCatalog.forElement(StudioElementType.MIRROR_EFFECT).map { it.name }.toSet()
         val shader = ElementPropertyCatalog.forElement(StudioElementType.CUSTOM_SHADER).map { it.name }.toSet()
         val composition = ElementPropertyCatalog.forElement(StudioElementType.COMPOSITION).map { it.name }.toSet()
+        assertEquals(listOf("Solid Color", "Gradient", "Image", "Video"), ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).first { it.name == "Source Type" }.options)
         assertTrue(background.containsAll(setOf(
+            "Source Type", "Image File / Source", "Fit Mode (Scale Type)", "Edge Blur (Image Fill)",
             "Background Fit Alignment", "Background Tile", "Background Tile Scale",
             "Background Image Offset X", "Background Image Offset Y", "Background Blur Quality",
             "Background Brightness", "Background Contrast", "Background Saturation",

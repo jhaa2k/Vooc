@@ -2610,7 +2610,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val fadeInSize = number("Fade In Size", 1f).coerceIn(0f, 10f)
                             val sizeT = ((startSize + (endSize * endVariation - startSize) * lifeT) *
                                 (1f + (fadeInScale - 1f) * fadeInSize)).coerceAtLeast(0f)
-                            val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
+                            val fadeOut = if (fadeTime > 0f) ((particleLifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
                             val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
                             val alpha = (opacity * fadeInScale * fadeOut * nearFade * (1f - randomA * opacityRandom)).coerceIn(0f, 1f)
                             val colorT = (lifeT + (randomC - 0.5f) * colorRandom).coerceIn(0f, 1f)
@@ -2628,7 +2628,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val trailY = vy * trailLength * 0.001f
                             fun drawParticleAt(x: Float, y: Float) {
                                 if (trailLength > 0f) {
-                                    drawLine(particleColor.copy(alpha = alpha * 0.5f), Offset(x - trailX, y - trailY), Offset(x, y),
+                                    drawLine(particleColor.copy(alpha = alpha * trailFade), Offset(x - trailX, y - trailY), Offset(x, y),
                                         (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f), cap = androidx.compose.ui.graphics.StrokeCap.Round, blendMode = particleBlendMode)
                                 }
                                 if (customParticle != null) {

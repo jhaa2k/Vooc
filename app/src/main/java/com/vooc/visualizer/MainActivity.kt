@@ -793,12 +793,12 @@ private fun VoocStudio(
                 }
             }
             "EXPORT" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, providerFrame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, providerFrame, providerFrames, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 ExportScreen(project, onProjectChange = { project = it; onSave(it) }, Modifier.weight(0.60f))
             }
             "TEMPLATES" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, providerFrame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, providerFrame, providerFrames, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 TemplateLibraryScreen(
                     project = project,
@@ -817,7 +817,7 @@ private fun VoocStudio(
                 )
             }
             "SETTINGS" -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, providerFrame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, providerFrame, providerFrames, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 AnalyzerSettingsScreen(analyzerConfig, onConfigChange = { next ->
                     analyzerConfig = next
@@ -825,7 +825,7 @@ private fun VoocStudio(
                 }, Modifier.weight(0.60f))
             }
             else -> Column(Modifier.fillMaxSize().padding(padding)) {
-                PreviewPane(project, frame, providerFrame, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
+                PreviewPane(project, frame, providerFrame, providerFrames, playing, position, Modifier.fillMaxWidth().weight(0.40f).padding(horizontal = 10.dp, vertical = 6.dp))
                 HorizontalDivider(color = Color(0xFF343A2B), thickness = 1.dp)
                 LazyColumn(
                     modifier = Modifier.weight(0.60f).fillMaxWidth(),
@@ -1258,7 +1258,7 @@ private fun evaluateAnimatedLayer(project: StudioProject, layer: VisualLayer, ti
 }
 
 @Composable
-private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, playing: Boolean, timeMs: Long, modifier: Modifier = Modifier) {
+private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, providerFrames: List<AudioProviderFrame>, playing: Boolean, timeMs: Long, modifier: Modifier = Modifier) {
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(bottom = 5.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(project.name.uppercase(), color = Color.White, style = MaterialTheme.typography.labelLarge,
@@ -1266,7 +1266,7 @@ private fun PreviewPane(project: StudioProject, frame: AnalysisFrame?, providerF
             Text("${project.width} × ${project.height}  •  ${project.fps} FPS", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
         VisualizerPreview(modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF343A2B)),
-            layers = project.layers.filter { it.enabled }.map { evaluateAnimatedLayer(project, it, timeMs) }, elements = project.document.elements, frame = frame, providerFrame = providerFrame, playing = playing)
+            layers = project.layers.filter { it.enabled }.map { evaluateAnimatedLayer(project, it, timeMs) }, elements = project.document.elements, frame = frame, providerFrame = providerFrame, providerFrames = providerFrames, playing = playing)
     }
 }
 
@@ -1622,7 +1622,7 @@ private fun updateLayer(project: StudioProject, id: Long, transform: (VisualLaye
     project.copy(layers = project.layers.map { if (it.id == id) transform(it) else it })
 
 @Composable
-private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, elements: List<ElementDocument>, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, playing: Boolean) {
+private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, elements: List<ElementDocument>, frame: AnalysisFrame?, providerFrame: AudioProviderFrame?, providerFrames: List<AudioProviderFrame>, playing: Boolean) {
     // AnalysisFrame.timeSec is anchored to Media3's current playback position.
     // Using it for motion keeps preview animation synchronized through pause, seek and track changes.
     val playbackSeconds = (frame?.timeSec ?: 0.0).toFloat().coerceAtLeast(0f)

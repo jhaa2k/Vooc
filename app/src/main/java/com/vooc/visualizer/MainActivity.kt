@@ -2036,6 +2036,24 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                         } else {
                             rotate(if (orientation == "Horizontal" || textValue("Shape Path", "Horizontal Line") == "Vertical Line") 90f else 0f, center) {
+                                val customPathMode = textValue("Shape Path", "Horizontal Line") == "Custom Path"
+                                val customPoints = if (customPathMode) textValue("Custom Path Points", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5")
+                                    .split(";").mapNotNull { token ->
+                                        val parts = token.trim().split(",")
+                                        if (parts.size != 2) null else runCatching {
+                                            parts[0].trim().toFloat().coerceIn(0f, 1f) to parts[1].trim().toFloat().coerceIn(0f, 1f)
+                                        }.getOrNull()
+                                    }.take(128) else emptyList()
+                                fun pathPoint(t: Float): Pair<Float, Float> {
+                                    if (customPoints.size < 2) return (center.x - totalWidth / 2f + t * totalWidth) to (center.y + size.height * 0.25f)
+                                    val scaled = t.coerceIn(0f, 1f) * (customPoints.size - 1)
+                                    val segmentIndex = scaled.toInt().coerceAtMost(customPoints.size - 2)
+                                    val fraction = scaled - segmentIndex
+                                    val a = customPoints[segmentIndex]
+                                    val b = customPoints[segmentIndex + 1]
+                                    return (center.x - totalWidth / 2f + (a.first + (b.first - a.first) * fraction) * totalWidth) to
+                                        (center.y - size.height * 0.4f + (a.second + (b.second - a.second) * fraction) * size.height * 0.8f)
+                                }
                                 repeat(count) { index ->
                             val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                             var level = levels[sourceIndex].coerceIn(0f, 1f)

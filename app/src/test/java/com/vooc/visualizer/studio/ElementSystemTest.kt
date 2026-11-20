@@ -111,6 +111,56 @@ class ElementSystemTest {
     }
 
     @Test
+    fun everyMeasureWhatOptionHasAWorkingDeterministicMotionResponse() {
+        val input = mapOf(
+            "runtimeSeconds" to 1.23f,
+            "trackPositionSeconds" to 1.37f,
+            "playing" to true,
+            "beatPulse" to 0.8f,
+            "bass" to 0.55f,
+            "treble" to 0.75f,
+            "bpm" to 120f,
+            "seed" to 123L,
+            "playingSeconds" to 1.23f
+        )
+        assertEquals(22, MeasureWhatEngine.options.size)
+        MeasureWhatEngine.options.filter { it != "Nothing" }.forEach { mode ->
+            val first = MeasureWhatEngine.evaluate(
+                mode, input.getValue("runtimeSeconds"), input.getValue("trackPositionSeconds"),
+                input.getValue("playing"), input.getValue("beatPulse"), input.getValue("bass"),
+                input.getValue("treble"), input.getValue("bpm"), input.getValue("seed"),
+                input.getValue("playingSeconds")
+            )
+            val second = MeasureWhatEngine.evaluate(
+                mode, input.getValue("runtimeSeconds"), input.getValue("trackPositionSeconds"),
+                input.getValue("playing"), input.getValue("beatPulse"), input.getValue("bass"),
+                input.getValue("treble"), input.getValue("bpm"), input.getValue("seed"),
+                input.getValue("playingSeconds")
+            )
+            assertEquals("$mode should be deterministic", first, second)
+            assertTrue("$mode should produce a response", first != MeasureMotion())
+            assertTrue("$mode should return finite offsets", first.offsetX.isFinite() && first.offsetY.isFinite())
+            assertTrue("$mode should return finite transform values", first.scale.isFinite() && first.rotation.isFinite())
+        }
+    }
+
+    @Test
+    fun audioProviderPropertiesSurviveJsonRoundTrip() {
+        val provider = ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider")
+            .withValue("Analysis Mode", ElementValue.Text("Beat"))
+            .withValue("Channel Mode", ElementValue.Text("Stereo Average"))
+            .withValue("Window Function", ElementValue.Text("Blackman"))
+            .withValue("Fft Size", ElementValue.Text("4096"))
+            .withValue("Beat Sensitivity", ElementValue.Number(2.5))
+        val restored = elementDocumentFromJson(provider.toJson())
+        assertNotNull(restored)
+        assertEquals(provider.properties, restored!!.properties)
+        assertEquals(ElementValue.Text("Beat"), restored.value("Analysis Mode"))
+        assertEquals(ElementValue.Text("4096"), restored.value("Fft Size"))
+        assertEquals(ElementValue.Number(2.5), restored.value("Beat Sensitivity"))
+    }
+
+    @Test
     fun measurementMappingHandlesRangesCurvesAndInvalidInput() {
         val mapping = MeasurementMapping(
             inputMin = 0f, inputMax = 1f, outputMin = 10f, outputMax = 20f,

@@ -970,6 +970,10 @@ object VideoExportEngine {
                         val clip = android.graphics.Path().apply {
                             when (shape) {
                                 "Circle", "Ellipse", "Circle/Oval" -> addOval(dst, android.graphics.Path.Direction.CW)
+                                "Square" -> {
+                                    val side = minOf(dst.width(), dst.height())
+                                    addRect(RectF(dst.centerX() - side / 2f, dst.centerY() - side / 2f, dst.centerX() + side / 2f, dst.centerY() + side / 2f), android.graphics.Path.Direction.CW)
+                                }
                                 "Triangle" -> { moveTo(dst.centerX(), dst.top); lineTo(dst.right, dst.bottom); lineTo(dst.left, dst.bottom); close() }
                                 "Rounded Rectangle", "Rounded Rect" -> addRoundRect(dst, (number("Corner Radius", 0f) * width / 1080f).coerceAtLeast(0f), (number("Corner Radius", 0f) * width / 1080f).coerceAtLeast(0f), android.graphics.Path.Direction.CW)
                                 else -> addRect(dst, android.graphics.Path.Direction.CW)

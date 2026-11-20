@@ -192,7 +192,13 @@ object VideoExportEngine {
                 .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
             if (uriText.isNotBlank()) runCatching {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
-                    BitmapFactory.decodeStream(stream)?.let { imageCache[uriText] = it }
+                    BitmapFactory.decodeStream(stream)?.let { source ->
+                        if (element.type == StudioElementType.IMAGE) {
+                            val processed = processImageForExport(source, element)
+                            imageCache["${uriText}#${element.id}"] = processed
+                            if (processed !== source) source.recycle()
+                        } else imageCache[uriText] = source
+                    }
                 }
             }
         }
@@ -298,6 +304,68 @@ object VideoExportEngine {
             muxer.writeSampleData(track, buffer, sampleInfo)
             if (!extractor.advance()) return true
         }
+    }
+
+    private fun processImageForExport(source: Bitmap, element: com.vooc.visualizer.studio.ElementDocument): Bitmap {
+        fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
+            is ElementValue.Number -> value.value.toFloat()
+            is ElementValue.Integer -> value.value.toFloat()
+            else -> fallback
+        }
+        fun text(name: String, fallback: String = ""): String = (element.value(name) as? ElementValue.Text)?.value ?: fallback
+        fun enabled(name: String): Boolean = (element.value(name) as? ElementValue.Bool)?.value == true
+        val blurRadius = if (enabled("Blur Enabled")) number("Blur Radius", 0f).coerceIn(0f, 128f) else 0f
+        val blurDivider = number("Blur Divider", 2f).coerceIn(1f, 32f)
+        val edgeBlur = number("Edge Blur", 0f).coerceIn(0f, 128f)
+        val keyEnabled = enabled("Color Key Enabled")
+        if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled) return source
+        val output = source.copy(Bitmap.Config.ARGB_8888, true)
+        val w = output.width
+        val h = output.height
+        val pixels = IntArray(w * h)
+        output.getPixels(pixels, 0, w, 0, 0, w, h)
+        val keyColor = if (enabled("Auto Detect Color Key")) {
+            val samples = intArrayOf(pixels[0], pixels[w - 1], pixels[(h - 1) * w], pixels[h * w - 1])
+            android.graphics.Color.rgb(
+                samples.map { android.graphics.Color.red(it) }.average().toInt(),
+                samples.map { android.graphics.Color.green(it) }.average().toInt(),
+                samples.map { android.graphics.Color.blue(it) }.average().toInt()
+            )
+        } else runCatching { android.graphics.Color.parseColor(text("Color Key", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
+        val transparency = number("Transparency Strength", 1f).coerceIn(0f, 1f)
+        val keyR = android.graphics.Color.red(keyColor).toFloat()
+        val keyG = android.graphics.Color.green(keyColor).toFloat()
+        val keyB = android.graphics.Color.blue(keyColor).toFloat()
+        val edge = edgeBlur * min(w, h) / 1080f
+        if (keyEnabled || edge > 0f) {
+            for (y in 0 until h) for (x in 0 until w) {
+                val index = y * w + x
+                val pixel = pixels[index]
+                var alpha = android.graphics.Color.alpha(pixel).toFloat()
+                if (keyEnabled) {
+                    val dr = android.graphics.Color.red(pixel) - keyR
+                    val dg = android.graphics.Color.green(pixel) - keyG
+                    val db = android.graphics.Color.blue(pixel) - keyB
+                    val distance = kotlin.math.sqrt(dr * dr + dg * dg + db * db) / 441.673f
+                    alpha *= 1f - (1f - (distance / 0.16f).coerceIn(0f, 1f)) * transparency
+                }
+                if (edge > 0f) {
+                    val edgeFactor = min(min(x + 1f, w - x.toFloat()), min(y + 1f, h - y.toFloat())) / edge
+                    alpha *= edgeFactor.coerceIn(0f, 1f)
+                }
+                pixels[index] = (pixel and 0x00FFFFFF) or (alpha.toInt().coerceIn(0, 255) shl 24)
+            }
+        }
+        output.setPixels(pixels, 0, w, 0, 0, w, h)
+        if (blurRadius <= 0f) return output
+        val scale = (1f / (1f + blurRadius / blurDivider)).coerceIn(0.08f, 1f)
+        val smallW = (w * scale).toInt().coerceAtLeast(1)
+        val smallH = (h * scale).toInt().coerceAtLeast(1)
+        val reduced = Bitmap.createScaledBitmap(output, smallW, smallH, true)
+        val blurred = Bitmap.createScaledBitmap(reduced, w, h, true)
+        if (reduced !== output) reduced.recycle()
+        output.recycle()
+        return blurred
     }
 
     private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float, providerBpm: Float) {
@@ -777,7 +845,7 @@ object VideoExportEngine {
                 }
                 StudioElementType.IMAGE -> {
                     val uriText = textValue("Custom Image", textValue("Image Source / File"))
-                    val image = imageCache[uriText]
+                    val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
                     if (image != null) {
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = height * 0.45f * scale

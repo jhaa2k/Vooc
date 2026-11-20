@@ -1,5 +1,6 @@
 package com.vooc.visualizer.export
 
+import com.vooc.visualizer.studio.buildNormalizedImageShapePath
 import android.content.ContentResolver
 import android.content.Context
 import com.vooc.visualizer.analyzer.decode.PcmDecoder
@@ -1187,7 +1188,8 @@ object VideoExportEngine {
                         val flipX = (element.value("Image Flip Horizontal") as? ElementValue.Bool)?.value == true
                         val flipY = (element.value("Image Flip Vertical") as? ElementValue.Bool)?.value == true
                         val shape = textValue("Shape", "Rectangle").takeIf { it != "Rectangle" } ?: textValue("Mask / Shape", "Rectangle")
-                        val clip = android.graphics.Path().apply {
+                        val customShape = buildNormalizedImageShapePath(textValue("Image Custom Shape Path", ""), dst)
+                        val clip = customShape ?: android.graphics.Path().apply {
                             when (shape) {
                                 "Circle", "Ellipse", "Circle/Oval" -> addOval(dst, android.graphics.Path.Direction.CW)
                                 "Square" -> {

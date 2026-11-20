@@ -663,7 +663,21 @@ object VideoExportEngine {
             val cx = width * (0.5f + (position.x.toFloat() + reactivity.xOffset) / 200f + posMotion.offsetX)
             val cy = height * (0.5f + (position.y.toFloat() + reactivity.yOffset) / 200f + posMotion.offsetY)
             val scale = (number("Scale", 100f) / 100f * scaleMotion.scale * reactivity.scaleMultiplier).coerceIn(0f, 10f)
-            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation + reactivity.rotationOffset
+            val imageAnimationMode = textValue("Measure Animation Speed (Measure What)", "Nothing")
+            val imageAnimationMotion = if (element.type == StudioElementType.IMAGE) motionFor("Measure Animation Speed (Measure What)") else null
+            val imageAnimationResponse = imageAnimationMotion?.let { motion ->
+                if (imageAnimationMode == "Nothing") 0f else maxOf(
+                    kotlin.math.abs(motion.scale - 1f) / 0.32f,
+                    kotlin.math.abs(motion.rotation) / 8f,
+                    kotlin.math.abs(motion.offsetX) / 0.05f,
+                    kotlin.math.abs(motion.offsetY) / 0.05f
+                ).coerceIn(0f, 1f)
+            } ?: 0f
+            val imageAnimationRate = number("Measure Animation Speed", 0f) *
+                (number("Measure Animation Speed A (Speed)", 1f) +
+                    imageAnimationResponse * number("Measure Animation Speed B (Beat Amount)", 0f))
+            val imageAnimationRotation = if (element.type == StudioElementType.IMAGE) seconds * imageAnimationRate * 360f else 0f
+            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation + reactivity.rotationOffset + imageAnimationRotation
             val opacityMode = textValue("Measure Opacity (Measure What)", "Nothing")
             val opacityMotion = motionFor("Measure Opacity (Measure What)")
             val measuredOpacity = if (opacityMode == "Nothing") 1f else maxOf(

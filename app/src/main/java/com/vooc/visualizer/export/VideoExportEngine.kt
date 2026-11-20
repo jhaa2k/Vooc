@@ -866,10 +866,11 @@ object VideoExportEngine {
                         "Side" -> channelSamples[ChannelSelect.SIDE]
                         else -> channelSamples[ChannelSelect.MIX]
                     }
-                    val baseSource = if (selectedChannel == "Mixed" && !customFrequencyRange) {
+                    val useProviderSmoothing = (element.value("Use Audio Provider Smoothing") as? ElementValue.Bool)?.value != false
+                    val baseSource = if (selectedChannel == "Mixed" && !customFrequencyRange && useProviderSmoothing) {
                         providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
                     } else selectedSpectrum?.takeIf { it.isNotEmpty() }
-                        ?: providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+                        ?: floatArrayOf(audioLevel)
                     val source = if (customFrequencyRange && selectedSpectrum != null) {
                         SpectrumMapper.cropFrequencyRange(baseSource, analysisSampleRate, frequencyStartHz, frequencyEndHz)
                     } else baseSource

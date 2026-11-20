@@ -637,6 +637,7 @@ object VideoExportEngine {
                         textAlign = when (textValue("Alignment", "Center")) {
                             "Left" -> Paint.Align.LEFT
                             "Right" -> Paint.Align.RIGHT
+                            "Justified" -> Paint.Align.LEFT
                             else -> Paint.Align.CENTER
                         }
                         letterSpacing = number("Letter Spacing", 0f) / 100f
@@ -666,7 +667,24 @@ object VideoExportEngine {
                     val textX = when (textValue("Alignment", "Center")) {
                         "Left" -> cx - maxTextWidth * 0.5f
                         "Right" -> cx + maxTextWidth * 0.5f
+                        "Justified" -> cx - maxTextWidth * 0.5f
                         else -> cx
+                    }
+                    fun drawTextLine(targetPaint: Paint, line: String, baseline: Float, index: Int) {
+                        if (textValue("Alignment", "Center") == "Justified" && index < textLines.lastIndex) {
+                            val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                            if (words.size > 1) {
+                                val naturalWidth = words.sumOf { targetPaint.measureText(it).toDouble() }.toFloat()
+                                val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)
+                                var x = textX
+                                words.forEach { word ->
+                                    canvas.drawText(word, x, baseline, targetPaint)
+                                    x += targetPaint.measureText(word) + gap
+                                }
+                                return
+                            }
+                        }
+                        canvas.drawText(line, textX, baseline, targetPaint)
                     }
                     val shadowEnabled = (element.value("Shadow Enabled") as? ElementValue.Bool)?.value == true
                     if (shadowEnabled) {
@@ -688,7 +706,7 @@ object VideoExportEngine {
                             this.strokeWidth = strokeWidth
                             clearShadowLayer()
                         }
-                        textLines.forEachIndexed { index, line -> canvas.drawText(line, textX, firstBaseline + index * lineHeight, strokePaint) }
+                        textLines.forEachIndexed { index, line -> drawTextLine(strokePaint, line, firstBaseline + index * lineHeight, index) }
                     }
                     val gradientStart = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient Start", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                     val gradientEnd = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient End", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
@@ -696,7 +714,7 @@ object VideoExportEngine {
                         val widest = textLines.maxOfOrNull { textPaint.measureText(it) } ?: textPaint.textSize
                         textPaint.shader = LinearGradient(cx - widest / 2f, cy, cx + widest / 2f, cy, gradientStart, gradientEnd, Shader.TileMode.CLAMP)
                     }
-                    textLines.forEachIndexed { index, line -> canvas.drawText(line, textX, firstBaseline + index * lineHeight, textPaint) }
+                    textLines.forEachIndexed { index, line -> drawTextLine(textPaint, line, firstBaseline + index * lineHeight, index) }
                     textPaint.clearShadowLayer()
                     textPaint.shader = null
                     textPaint.style = Paint.Style.FILL

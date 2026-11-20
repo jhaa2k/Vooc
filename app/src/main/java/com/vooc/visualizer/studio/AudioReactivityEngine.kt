@@ -35,11 +35,33 @@ fun processBarSpectrum(
         val biased = (position + safeBias * position * (1f - position) * 2f).coerceIn(0f, 1f)
         val mapped = biased.toDouble().pow(safeCurve.toDouble()).toFloat()
         val mappedIndex = ((mapped * (count - 1)).roundToInt() + bandOffset).let { ((it % count) + count) % count }
-        var value = (samples[mappedIndex].takeIf { it.isFinite() } ?: 0f).coerceAtLeast(0f) * safeScale
-        value = when (amplitudeMode) {
-            "Power" -> value * value
-            "Decibel" -> ((20f * ln(value.coerceAtLeast(0.000001f)) / ln(10f) + 72f) / 72f).coerceIn(0f, 1f)
-            else -> value
+        val centerValue = (samples[mappedIndex].takeIf { it.isFinite() } ?: 0f).coerceAtLeast(0f) * safeScale
+        var value = when (amplitudeMode) {
+            "Power" -> centerValue * centerValue
+            "RMS" -> {
+                val from = (mappedIndex - 1).coerceAtLeast(0)
+                val until = (mappedIndex + 1).coerceAtMost(count - 1)
+                var squareSum = 0f
+                var sampleCount = 0
+                for (neighbor in from..until) {
+                    val sample = (samples[neighbor].takeIf { it.isFinite() } ?: 0f).coerceAtLeast(0f) * safeScale
+                    squareSum += sample * sample
+                    sampleCount++
+                }
+                sqrt(squareSum / sampleCount.coerceAtLeast(1))
+            }
+            "Peak" -> {
+                val from = (mappedIndex - 1).coerceAtLeast(0)
+                val until = (mappedIndex + 1).coerceAtMost(count - 1)
+                var peak = 0f
+                for (neighbor in from..until) {
+                    val sample = (samples[neighbor].takeIf { it.isFinite() } ?: 0f).coerceAtLeast(0f) * safeScale
+                    peak = maxOf(peak, sample)
+                }
+                peak
+            }
+            "Decibel" -> ((20f * ln(centerValue.coerceAtLeast(0.000001f)) / ln(10f) + 72f) / 72f).coerceIn(0f, 1f)
+            else -> centerValue
         }
         value = (value / (1f + value)).coerceAtLeast(0f)
         value = if (value < safeThreshold) 0f else value

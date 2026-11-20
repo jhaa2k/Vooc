@@ -2334,7 +2334,18 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val overlay = runCatching { Color(android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF"))) }.getOrDefault(Color.Transparent)
                             val imageAlpha = (opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f) * number("Transparency Strength", 1f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
-                            val imageColorMatrix = ColorMatrix().apply { setToSaturation(saturation) }
+                            val imageColorMatrix = ColorMatrix().apply {
+                                setToSaturation(saturation)
+                                if (overlay.alpha > 0f) {
+                                    val a = overlay.alpha
+                                    val v = values
+                                    for (row in 0..2) {
+                                        val base = row * 5
+                                        for (column in 0..3) v[base + column] *= (1f - a)
+                                        v[base + 4] = v[base + 4] * (1f - a) + (if (row == 0) overlay.red else if (row == 1) overlay.green else overlay.blue) * a
+                                    }
+                                }
+                            }
                             clipPath(clip) {
                                 drawImage(bitmap,
                                     srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),

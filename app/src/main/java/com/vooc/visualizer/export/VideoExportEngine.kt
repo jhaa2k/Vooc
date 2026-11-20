@@ -867,6 +867,9 @@ object VideoExportEngine {
                     val capMode = textValue("Top/Bottom Cap", "None")
                     val capPlacement = textValue("Cap Placement", "Top")
                     val capSize = (number("Cap Size", 4f) * width / 1080f).coerceAtLeast(1f)
+                    val capThickness = (number("Cap Thickness", 3f) * width / 1080f).coerceAtLeast(0.5f)
+                    val colorBlendOffset = number("Color Blend Offset", 0f).coerceIn(-1f, 1f)
+                    val perBarColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(color)
                     val barOffset = number("Bar Offset", 0f) * width / 1080f
                     val customBitmap = imageCache[textValue("Custom Bar Image", "")]
                     val corner = when (design) {
@@ -908,7 +911,7 @@ object VideoExportEngine {
                             (cy - height * 0.4f + (a.second + (b.second - a.second) * fraction) * height * 0.8f)
                     }
                     canvas.save()
-                    if (orientation == "Horizontal") canvas.rotate(90f, cx, cy)
+                    if (orientation == "Horizontal" || textValue("Shape Path", "Horizontal Line") == "Vertical Line") canvas.rotate(90f, cx, cy)
                     repeat(count) { index ->
                         val sourceIndex = if (mirrorX) minOf(index, count - 1 - index) else index
                         var level = levels[sourceIndex].coerceIn(0f, 1f)
@@ -931,11 +934,14 @@ object VideoExportEngine {
                         val h = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(height * 0.95f) else drawHeight
                         val top = if (radialLayout) baseline - h else if (mirrorY) baseline - h else if (alignment == "Center") baseline - barHeight / 2f else if (alignment == "Top") baseline else baseline - h
                         val bottom = top + h
-                        val gradientT = if (textValue("Gradient Direction", "Vertical") == "Horizontal") index.toFloat() / (count - 1).coerceAtLeast(1) else level
+                        val gradientT = if (textValue("Gradient Direction", "Vertical") == "Horizontal")
+                            (index.toFloat() / (count - 1).coerceAtLeast(1) + colorBlendOffset).coerceIn(0f, 1f)
+                        else (level + colorBlendOffset).coerceIn(0f, 1f)
                         val fill = when (colorMode) {
                             "Alternating" -> if (index % 2 == 0) colorA else colorB
                             "Gradient" -> lerpColor(colorA, colorB, gradientT)
-                            "By Amplitude" -> lerpColor(colorA, colorB, level)
+                            "By Amplitude" -> lerpColor(colorA, colorB, (level + colorBlendOffset).coerceIn(0f, 1f))
+                            "Per Bar" -> perBarColor
                             else -> color
                         }
                         fun drawShape(yTop: Float, yBottom: Float, shapeFill: Int = fill) {
@@ -945,6 +951,19 @@ object VideoExportEngine {
                                     "Triangle" -> { moveTo(x + barWidth / 2f, yTop); lineTo(x + barWidth, yBottom); lineTo(x, yBottom); close() }
                                     "Diamond" -> { moveTo(x + barWidth / 2f, yTop); lineTo(x + barWidth, (yTop + yBottom) / 2f); lineTo(x + barWidth / 2f, yBottom); lineTo(x, (yTop + yBottom) / 2f); close() }
                                     "Hexagon" -> { moveTo(x + barWidth * 0.22f, yTop); lineTo(x + barWidth * 0.78f, yTop); lineTo(x + barWidth, (yTop + yBottom) / 2f); lineTo(x + barWidth * 0.78f, yBottom); lineTo(x + barWidth * 0.22f, yBottom); lineTo(x, (yTop + yBottom) / 2f); close() }
+                                    "Pentagon", "Octagon" -> {
+                                        val sides = if (design == "Pentagon") 5 else 8
+                                        for (point in 0 until sides) {
+                                            val angle = (point * 360f / sides - 90f) * PI.toFloat() / 180f
+                                            val px = x + barWidth * (0.5f + cos(angle) * 0.5f)
+                                            val py = yTop + h * (0.5f + sin(angle) * 0.5f)
+                                            if (point == 0) moveTo(px, py) else lineTo(px, py)
+                                        }
+                                        close()
+                                    }
+                                    "Trapezoid" -> { moveTo(x + barWidth * 0.2f, yTop); lineTo(x + barWidth * 0.8f, yTop); lineTo(x + barWidth, yBottom); lineTo(x, yBottom); close() }
+                                    "Parallelogram" -> { moveTo(x + barWidth * 0.25f, yTop); lineTo(x + barWidth, yTop); lineTo(x + barWidth * 0.75f, yBottom); lineTo(x, yBottom); close() }
+                                    "Lightning" -> { moveTo(x + barWidth * 0.58f, yTop); lineTo(x + barWidth * 0.18f, yTop + h * 0.56f); lineTo(x + barWidth * 0.46f, yTop + h * 0.56f); lineTo(x + barWidth * 0.34f, yBottom); lineTo(x + barWidth * 0.84f, yTop + h * 0.38f); lineTo(x + barWidth * 0.56f, yTop + h * 0.38f); close() }
                                     "Star" -> { for (point in 0 until 10) { val angle = (point * 36f - 90f) * PI.toFloat() / 180f; val radius = if (point % 2 == 0) 0.5f else 0.22f; val px = x + barWidth * (0.5f + cos(angle) * radius); val py = yTop + (yBottom - yTop) * (0.5f + sin(angle) * radius); if (point == 0) moveTo(px, py) else lineTo(px, py) }; close() }
                                     "Chevron" -> { moveTo(x, yTop + h * 0.28f); lineTo(x + barWidth * 0.5f, yTop); lineTo(x + barWidth, yTop + h * 0.28f); lineTo(x + barWidth, yTop + h * 0.72f); lineTo(x + barWidth * 0.5f, yBottom); lineTo(x, yTop + h * 0.72f); close() }
                                     "Arrow" -> { moveTo(x + barWidth * 0.35f, yTop); lineTo(x + barWidth, yTop + h * 0.5f); lineTo(x + barWidth * 0.35f, yBottom); lineTo(x + barWidth * 0.35f, yTop + h * 0.68f); lineTo(x, yTop + h * 0.68f); lineTo(x, yTop + h * 0.32f); lineTo(x + barWidth * 0.35f, yTop + h * 0.32f); close() }
@@ -997,9 +1016,9 @@ object VideoExportEngine {
                                 fun cap(y: Float) {
                                     when (capMode) {
                                         "Circle" -> canvas.drawCircle(cxBar, y, capSize, paint)
-                                        "Square" -> canvas.drawRect(cxBar - capSize, y - capSize, cxBar + capSize, y + capSize, paint)
+                                        "Square" -> canvas.drawRect(cxBar - capThickness / 2f, y - capSize, cxBar + capThickness / 2f, y + capSize, paint)
                                         "Diamond" -> {
-                                            val cp = android.graphics.Path().apply { moveTo(cxBar, y - capSize); lineTo(cxBar + capSize, y); lineTo(cxBar, y + capSize); lineTo(cxBar - capSize, y); close() }
+                                            val cp = android.graphics.Path().apply { moveTo(cxBar, y - capSize); lineTo(cxBar + capThickness / 2f, y); lineTo(cxBar, y + capSize); lineTo(cxBar - capThickness / 2f, y); close() }
                                             canvas.drawPath(cp, paint)
                                         }
                                     }

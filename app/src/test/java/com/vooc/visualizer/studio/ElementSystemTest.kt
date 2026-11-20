@@ -139,6 +139,30 @@ class ElementSystemTest {
     }
 
     @Test
+    fun audioProviderExposesInputSpectrumFrequencyAndAdvancedBeatControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).associateBy { it.name }
+        val required = setOf(
+            "Audio Input Source", "Input Channel", "Input Gain", "Input Offset",
+            "Input Auto Normalize", "Input Noise Gate", "Input Noise Gate Smoothing",
+            "Input DC Removal", "Stereo Width", "Stereo Balance",
+            "Spectrum Output Mode", "Spectrum Scale", "Spectrum Floor", "Spectrum Ceiling",
+            "Spectrum Compression", "Spectrum Noise Reduction", "Spectrum Averaging Frames",
+            "Spectrum Peak Normalize", "Spectrum Logarithmic Smoothing",
+            "Frequency Mapping Bias", "Frequency Mapping Curve", "Frequency Mapping Bands",
+            "Frequency Mapping Overlap", "Beat Detection Mode", "Beat Frequency Range",
+            "Beat Minimum Interval", "Beat Adaptive Sensitivity", "Beat Onset Strength",
+            "Beat Decay", "Beat Quantize", "Beat Quantize Strength", "Beat Ignore Low Energy",
+            "Beat Low Energy Threshold", "Audio Output Signal", "Audio Output Smoothing",
+            "Audio Output Clamp", "Audio Output Hold Peak", "Audio Output Peak Hold Time",
+            "Analysis Update Rate", "Analysis Buffer Size", "Analysis Multithreaded"
+        )
+        assertTrue("Missing advanced audio provider controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(listOf("Playback Capture", "Imported Track", "Microphone", "Test Signal"), specs.getValue("Audio Input Source").options)
+        assertEquals(listOf("Linear", "Logarithmic", "Mel", "Bark"), specs.getValue("Spectrum Scale").options)
+        assertEquals(listOf("Adaptive", "Fixed Threshold", "Spectral Flux", "Energy"), specs.getValue("Beat Detection Mode").options)
+    }
+
+    @Test
     fun blurAndRgbSplitExposeTheirCompleteEffectControlGroups() {
         val blur = ElementPropertyCatalog.forElement(StudioElementType.BLUR_EFFECT).map { it.name }.toSet()
         val rgb = ElementPropertyCatalog.forElement(StudioElementType.RGB_SPLIT).map { it.name }.toSet()

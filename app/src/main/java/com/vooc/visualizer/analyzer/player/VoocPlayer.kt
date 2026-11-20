@@ -1,6 +1,7 @@
 package com.vooc.visualizer.analyzer.player
 
 import android.content.Context
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -48,7 +49,14 @@ class AnalyzerTapAudioProcessor(private val analyzer: AudioAnalyzer) : BaseAudio
 }
 
 object VoocPlayer {
-    /** Builds an ExoPlayer whose audio output is mirrored into [analyzer]; seeks/track changes re-anchor it. */
+    /**
+     * Builds an ExoPlayer whose audio output is mirrored into [analyzer]; seeks/track changes re-anchor it.
+     *
+     * Android integration:
+     *  - audio focus is requested and honoured (calls, other media apps, navigation prompts pause/duck playback),
+     *  - playback pauses when headphones are unplugged or a Bluetooth route disconnects,
+     *  - a partial wake lock keeps decoding alive while the screen is off during playback.
+     */
     @androidx.annotation.OptIn(UnstableApi::class)
     fun create(context: Context, analyzer: AudioAnalyzer): ExoPlayer {
         val tap = AnalyzerTapAudioProcessor(analyzer)
@@ -63,7 +71,15 @@ object VoocPlayer {
                 .setAudioProcessors(arrayOf<AudioProcessor>(tap))
                 .build()
         }
-        val player = ExoPlayer.Builder(context, renderers).build()
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+        val player = ExoPlayer.Builder(context, renderers)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
         player.addListener(object : Player.Listener {
             override fun onPositionDiscontinuity(
                 oldPosition: Player.PositionInfo,

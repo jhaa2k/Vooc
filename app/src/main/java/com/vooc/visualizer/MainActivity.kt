@@ -1802,7 +1802,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     val start = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient Start", "#FF000000"))) }.getOrDefault(Color.Black).copy(alpha = opacity)
                     val end = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient End", "#FFFFFFFF"))) }.getOrDefault(Color.White).copy(alpha = opacity)
                     val angle = Math.toRadians(bgNumber("Background Gradient Angle", 0f).toDouble())
-                    val radius = (size.maxDimension * 0.5f).coerceAtLeast(1f)
+                    val radius = (kotlin.math.sqrt(size.width * size.width + size.height * size.height) * 0.5f).coerceAtLeast(1f)
                     val dx = kotlin.math.cos(angle).toFloat() * radius
                     val dy = kotlin.math.sin(angle).toFloat() * radius
                     val brush = if (bgText("Background Gradient Type", "Linear") == "Radial") {

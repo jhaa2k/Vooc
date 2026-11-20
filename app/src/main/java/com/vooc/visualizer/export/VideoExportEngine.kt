@@ -207,6 +207,15 @@ object VideoExportEngine {
                             imageCache["${uriText}#${element.id}"] = blurred
                             imageCache[uriText] = source
                             if (blurred !== source) source.recycle()
+                        } else if (element.type == StudioElementType.MOTION_BLUR_EFFECT) {
+                            val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                            val maskBitmap = if (maskUri.isNotBlank()) {
+                                resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                            } else null
+                            val processed = processImageForExport(source, element, maskBitmap)
+                            imageCache["${uriText}#${element.id}"] = processed
+                            imageCache[uriText] = source
+                            maskBitmap?.recycle()
                         } else imageCache[uriText] = source
                     }
                 }
@@ -366,7 +375,7 @@ object VideoExportEngine {
         val keyG = android.graphics.Color.green(keyColor).toFloat()
         val keyB = android.graphics.Color.blue(keyColor).toFloat()
         val edge = edgeBlur * min(w, h) / 1080f
-        if (keyEnabled || edge > 0f) {
+        if (keyEnabled || edge > 0f || maskPixels != null) {
             for (y in 0 until h) for (x in 0 until w) {
                 val index = y * w + x
                 val pixel = pixels[index]

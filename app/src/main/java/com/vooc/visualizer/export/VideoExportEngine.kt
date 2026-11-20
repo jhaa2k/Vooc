@@ -779,8 +779,8 @@ object VideoExportEngine {
                     if (image != null) {
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = height * 0.45f * scale
-                        val fitMode = if (textValue("Keep Aspect Ratio And Crop To Fit", "false") == "true") "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
-                        val keepRatio = textValue("Keep Aspect Ratio", "true") != "false"
+                        val fitMode = if ((element.value("Keep Aspect Ratio And Crop To Fit") as? ElementValue.Bool)?.value == true) "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
+                        val keepRatio = (element.value("Keep Aspect Ratio") as? ElementValue.Bool)?.value != false
                         val leftCrop = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * image.width).toInt()
                         val topCrop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * image.height).toInt()
                         val rightCrop = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * image.width).toInt()
@@ -884,7 +884,7 @@ object VideoExportEngine {
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
                                 cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), p)
                         }
-                        if (textValue("Show Unblurred Content", "false") == "true") {
+                        if ((element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true) {
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f), paint)
                         }
                     }

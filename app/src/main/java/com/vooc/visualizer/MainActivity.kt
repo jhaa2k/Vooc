@@ -2350,8 +2350,30 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 rotate(angle, center) {
                                     val segmentHeight = ((barHeight - segmentGap * (segmentsPerBar - 1)) / segmentsPerBar).coerceAtLeast(0.5f)
                                     repeat(segmentsPerBar) { segment ->
-                                        val segmentTop = radialTop + segment * (segmentHeight + segmentGap)
-                                        drawBarShape(center.x - barWidth / 2f, segmentTop, barWidth, segmentHeight, radialColor, 0f, index)
+                                        val segmentNumber = segment + 1
+                                        val segmentPrefix = if (segmentNumber <= 2) "Segment $segmentNumber " else ""
+                                        val fixedHeight = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Fixed Height"] == ElementValue.Bool(true)
+                                        val segmentMultiplier = if (segmentPrefix.isNotEmpty()) number("$segmentPrefix" + "Bar Height Multiplier", 1f).coerceIn(0f, 10f) else 1f
+                                        val renderedSegmentHeight = (if (fixedHeight) radialMax / segmentsPerBar else segmentHeight)
+                                            .times(segmentMultiplier).coerceAtLeast(0.5f)
+                                        val from = if (segmentPrefix.isNotEmpty()) runCatching { Color(android.graphics.Color.parseColor(textValue("$segmentPrefix" + "Color From", "#FF56D8FF"))) }.getOrDefault(radialColor) else radialColor
+                                        val to = if (segmentPrefix.isNotEmpty()) runCatching { Color(android.graphics.Color.parseColor(textValue("$segmentPrefix" + "Color To", "#FF9B5CFF"))) }.getOrDefault(radialColor) else radialColor
+                                        val segmentFill = if (segmentPrefix.isNotEmpty()) Color(
+                                            from.red + (to.red - from.red) * level,
+                                            from.green + (to.green - from.green) * level,
+                                            from.blue + (to.blue - from.blue) * level,
+                                            opacity
+                                        ) else radialColor
+                                        val segmentTop = radialTop + segment * (renderedSegmentHeight + segmentGap)
+                                        val flipAlternate = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Flip Every Other"] == ElementValue.Bool(true) && index % 2 == 1
+                                        val mirrorSegment = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Mirror"] == ElementValue.Bool(true)
+                                        rotate(if (flipAlternate) 180f else 0f, center) {
+                                            drawBarShape(center.x - barWidth / 2f, segmentTop, barWidth, renderedSegmentHeight, segmentFill, 0f, index)
+                                            if (verticalMirror || centerSymmetry || mirrorSegment) {
+                                                val mirrorTop = center.y - innerRadius + segment * (renderedSegmentHeight + segmentGap)
+                                                drawBarShape(center.x - barWidth / 2f, mirrorTop, barWidth, renderedSegmentHeight, segmentFill, 0f, index)
+                                            }
+                                        }
                                     }
                                     val peakStyle = textValue("Peak Indicator Style", "Line")
                                     if (peakEnabled && peakStyle != "None") {

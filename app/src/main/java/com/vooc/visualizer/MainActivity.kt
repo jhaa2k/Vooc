@@ -280,9 +280,9 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
                 red = ((red - pivot) * contrast + pivot) * brightness * (1f + warm * 0.10f)
                 green = ((green - pivot) * contrast + pivot) * brightness * (1f + warm * 0.025f)
                 blue = ((blue - pivot) * contrast + pivot) * brightness * (1f - warm * 0.10f)
-                red = kotlin.math.pow(red.coerceAtLeast(0f), 1f / gamma).coerceIn(0f, 1f)
-                green = kotlin.math.pow(green.coerceAtLeast(0f), 1f / gamma).coerceIn(0f, 1f)
-                blue = kotlin.math.pow(blue.coerceAtLeast(0f), 1f / gamma).coerceIn(0f, 1f)
+                red = Math.pow(red.coerceAtLeast(0f).toDouble(), 1.0 / gamma.toDouble()).toFloat().coerceIn(0f, 1f)
+                green = Math.pow(green.coerceAtLeast(0f).toDouble(), 1.0 / gamma.toDouble()).toFloat().coerceIn(0f, 1f)
+                blue = Math.pow(blue.coerceAtLeast(0f).toDouble(), 1.0 / gamma.toDouble()).toFloat().coerceIn(0f, 1f)
                 val hsv = FloatArray(3)
                 android.graphics.Color.RGBToHSV((red * 255f).toInt(), (green * 255f).toInt(), (blue * 255f).toInt(), hsv)
                 hsv[0] = (hsv[0] + hueShift + 360f) % 360f

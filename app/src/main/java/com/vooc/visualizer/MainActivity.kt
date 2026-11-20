@@ -2361,7 +2361,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
                                 val heightRandom = number("Bar Height Random", 0f).coerceIn(0f, 1f)
                                 val barHeight = ((minHeight + level * radialMax) * (1f + (layoutRandom * 2f - 1f) * heightRandom)).coerceIn(0f, radialMax)
-                                val angle = index * (360f / count) + number("Bar Rotation", 0f)
+                                val angle = index * (360f / count)
                                 val radialColorBlendOffset = number("Color Blend Offset", 0f).coerceIn(-1f, 1f)
                                 val radialColorBlendPosition = (if (colorMode == "Gradient" && textValue("Gradient Direction", "Vertical") == "Horizontal")
                                     index.toFloat() / (count - 1).coerceAtLeast(1) + radialColorBlendOffset
@@ -2398,7 +2398,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         val segmentTop = radialTop + segment * (renderedSegmentHeight + segmentGap)
                                         val flipAlternate = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Flip Every Other"] == ElementValue.Bool(true) && index % 2 == 1
                                         val mirrorSegment = segmentPrefix.isNotEmpty() && props["$segmentPrefix" + "Mirror"] == ElementValue.Bool(true)
-                                        rotate(if (flipAlternate) 180f else 0f, Offset(center.x, center.y - innerRadius)) {
+                                        rotate(number("Bar Rotation", 0f) + if (flipAlternate) 180f else 0f, Offset(center.x, center.y - innerRadius)) {
                                             drawBarShape(center.x - barWidth / 2f, segmentTop, barWidth, renderedSegmentHeight, segmentFill, 0f, index)
                                             if (verticalMirror || centerSymmetry || mirrorSegment) {
                                                 val mirrorTop = center.y - innerRadius + segment * (renderedSegmentHeight + segmentGap)

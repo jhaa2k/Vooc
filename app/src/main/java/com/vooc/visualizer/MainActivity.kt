@@ -1671,7 +1671,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     ) {
         value = withContext(Dispatchers.IO) {
             elements.mapNotNull { element ->
-                val uriText = listOf("Import Image", "Custom Bar Image", "Custom Image", "Image Source / File", "Target Image")
+                val uriText = listOf("Import Image", "Custom Bar Image", "Texture / Image", "Custom Image", "Image Source / File", "Target Image")
                     .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
                 if (uriText.isBlank()) null else {
                     val bitmap = runCatching {

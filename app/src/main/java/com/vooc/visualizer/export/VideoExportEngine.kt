@@ -1440,8 +1440,15 @@ object VideoExportEngine {
                             if (customParticle != null) {
                                 canvas.save()
                                 canvas.rotate(visualAngle, x, y)
+                                val texturePaint = Paint(paint).apply {
+                                    colorFilter = android.graphics.PorterDuffColorFilter(
+                                        particleColor,
+                                        android.graphics.PorterDuff.Mode.SRC_IN
+                                    )
+                                    this.alpha = particleAlpha
+                                }
                                 canvas.drawBitmap(customParticle, null,
-                                    RectF(x - particleWidth / 2f, y - particleHeight / 2f, x + particleWidth / 2f, y + particleHeight / 2f), paint)
+                                    RectF(x - particleWidth / 2f, y - particleHeight / 2f, x + particleWidth / 2f, y + particleHeight / 2f), texturePaint)
                                 canvas.restore()
                             } else {
                                 canvas.save()

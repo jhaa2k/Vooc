@@ -916,12 +916,12 @@ object VideoExportEngine {
                         val activeMaxHeight = if (radialLayout) radialMaxHeight else maxHeight
                         val barHeight = (minHeight + level * activeMaxHeight).coerceIn(0f, height * 0.95f)
                         val pathT = if (count <= 1) 0f else index.toFloat() / (count - 1)
-                        val pathPoint = if (customPathMode) pathPoint(pathT) else 0f to 0f
-                        val beforePoint = if (customPathMode) pathPoint((pathT - 0.01f).coerceAtLeast(0f)) else pathPoint
-                        val afterPoint = if (customPathMode) pathPoint((pathT + 0.01f).coerceAtMost(1f)) else pathPoint
+                        val currentPathPoint = if (customPathMode) pathPoint(pathT) else 0f to 0f
+                        val beforePoint = if (customPathMode) pathPoint((pathT - 0.01f).coerceAtLeast(0f)) else currentPathPoint
+                        val afterPoint = if (customPathMode) pathPoint((pathT + 0.01f).coerceAtMost(1f)) else currentPathPoint
                         val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
-                        val x = if (radialLayout || !customPathMode) (if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset) else pathPoint.first - barWidth / 2f + barOffset
-                        val baseline = if (radialLayout) cy - radialInnerRadius else if (customPathMode) pathPoint.second else when (alignment) {
+                        val x = if (radialLayout || !customPathMode) (if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset) else currentPathPoint.first - barWidth / 2f + barOffset
+                        val baseline = if (radialLayout) cy - radialInnerRadius else if (customPathMode) currentPathPoint.second else when (alignment) {
                             "Top" -> cy - height * 0.38f
                             "Center" -> cy
                             "Stretch" -> cy + height * 0.44f

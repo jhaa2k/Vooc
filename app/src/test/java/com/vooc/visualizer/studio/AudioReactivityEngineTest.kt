@@ -45,4 +45,43 @@ class AudioReactivityEngineTest {
         val released = envelope.update(0f, 1f / 60f, 0.1f, 0.5f)
         assertTrue(released > 0f && released < attacked)
     }
+    @Test fun spectrumSourcesAreNormalizedAndSplitIntoBands() {
+        val sources = audioReactivitySources(
+            samples = floatArrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1f),
+            overall = 0.4f,
+            beat = 0.75f
+        )
+        assertEquals(0.4f, sources.overall, 0.0001f)
+        assertEquals(0.75f, sources.beat, 0.0001f)
+        assertEquals(0.15f, sources.bass, 0.0001f)
+        assertEquals(0.95f, sources.treble, 0.0001f)
+    }
+
+    @Test fun runtimeHonorsAttackAndReleaseAndResetsWhenDisabled() {
+        val runtime = AudioReactivityRuntime()
+        val properties = mapOf(
+            "Audio Reactivity Enabled" to ElementValue.Bool(true),
+            "Audio Reactivity Source" to ElementValue.Text("Beat"),
+            "Audio Reactivity Attack" to ElementValue.Number(0.1),
+            "Audio Reactivity Release" to ElementValue.Number(0.5)
+        )
+        val sources = AudioReactivitySources(beat = 1f)
+        val first = runtime.update(properties, sources, 1f / 60f)!!
+        assertTrue(first > 0f && first < 1f)
+        val disabled = runtime.update(emptyMap(), sources, 1f / 60f)
+        assertNull(disabled)
+        assertEquals(1f, runtime.update(properties, sources, 1f / 60f)!!, 0.0001f)
+    }
+
+    @Test fun applyToRoutesMappedSignalToSelectedTransform() {
+        val properties = mapOf("Audio Reactivity Apply To" to ElementValue.Text("Rotation"))
+        val rotation = audioReactivityTransform(properties, 12f)
+        assertEquals(12f, rotation.rotationOffset, 0.0001f)
+        assertEquals(1f, rotation.scaleMultiplier, 0.0001f)
+        val scale = audioReactivityTransform(
+            mapOf("Audio Reactivity Apply To" to ElementValue.Text("Scale")), 0.5f
+        )
+        assertEquals(1.5f, scale.scaleMultiplier, 0.0001f)
+    }
+
 }

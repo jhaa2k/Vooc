@@ -3033,8 +3033,8 @@ private fun LayerSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
-    onChange: (Float) -> Unit,
-    defaultValue: Float = defaultSliderValue(label, value)
+    defaultValue: Float = defaultSliderValue(label, value),
+    onChange: (Float) -> Unit
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

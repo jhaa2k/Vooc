@@ -2333,6 +2333,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val innerRadius = (size.minDimension * 0.16f + barOffset).coerceIn(0f, size.minDimension * 0.42f)
                             val radialMax = minOf(maxHeight, size.minDimension * 0.42f)
                             repeat(count) { index ->
+                                val layoutRandom = kotlin.math.abs(sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
+                                val widthRandom = number("Bar Width Random", 0f).coerceIn(0f, 1f)
+                                val barWidth = (requestedWidth * (1f + (layoutRandom * 2f - 1f) * widthRandom)).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
                                 val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                                 var level = levels[sourceIndex].coerceIn(0f, 1f)
                                 if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
@@ -2418,6 +2421,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val layoutRandom = kotlin.math.abs(sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
                             val heightRandom = number("Bar Height Random", 0f).coerceIn(0f, 1f)
                             val barHeight = ((minHeight + level * maxHeight) * (1f + (layoutRandom * 2f - 1f) * heightRandom)).coerceIn(0f, size.height * 0.95f)
+                            val widthRandom = number("Bar Width Random", 0f).coerceIn(0f, 1f)
+                            val spacingRandom = number("Bar Spacing Random", 0f).coerceIn(0f, 1f)
+                            val barWidth = (requestedWidth * (1f + (layoutRandom * 2f - 1f) * widthRandom)).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
+                            val spacingJitter = (layoutRandom * 2f - 1f) * slot * 0.45f * spacingRandom
                             val drawHeight = if (centerSymmetry) barHeight / 2f else barHeight
                             val customPathMode = textValue("Shape Path", "Horizontal Line") == "Custom Path"
                             val customPoints = if (customPathMode) textValue("Custom Path Points", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5")
@@ -2441,7 +2448,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val beforePoint = if (customPathMode) pathPoint((index.toFloat() / count - 0.01f).coerceAtLeast(0f)) else point
                             val afterPoint = if (customPathMode) pathPoint((index.toFloat() / (count - 1).coerceAtLeast(1) + 0.01f).coerceAtMost(1f)) else point
                             val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
-                            val x = if (customPathMode) point.first - barWidth / 2f + barOffset else center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
+                            val x = if (customPathMode) point.first - barWidth / 2f + barOffset else center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + spacingJitter + barOffset
                             val baseline = if (customPathMode) point.second else when (alignment) {
                                 "Top" -> center.y - size.height * 0.38f
                                 "Center" -> center.y

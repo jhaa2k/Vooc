@@ -2744,20 +2744,22 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 "Fade Out" -> 1f - lifeT
                                 else -> (1f - kotlin.math.abs(lifeT * 2f - 1f)).coerceIn(0f, 1f)
                             }
-                            val alpha = (opacity * fadeInScale * fadeOut * nearFade *
-                                (1f - randomA * opacityRandom) * alphaOverLife).coerceIn(0f, 1f)
                             val randomizedColorT = (lifeT + (randomC - 0.5f) * colorRandom).coerceIn(0f, 1f)
                             val colorT = when (colorOverLifeMode) {
                                 "Constant", "Fade To Transparent" -> 0f
                                 else -> randomizedColorT
                             }
                             val colorFadeAlpha = if (colorOverLifeMode == "Fade To Transparent") 1f - lifeT else 1f
+                            val colorAlpha = (colorOverLifeStart.alpha +
+                                (colorOverLifeEnd.alpha - colorOverLifeStart.alpha) * colorT).coerceIn(0f, 1f)
+                            val alpha = (opacity * fadeInScale * fadeOut * nearFade *
+                                (1f - randomA * opacityRandom) * alphaOverLife * colorFadeAlpha * colorAlpha)
+                                .coerceIn(0f, 1f)
                             val particleColor = Color(
                                 colorOverLifeStart.red + (colorOverLifeEnd.red - colorOverLifeStart.red) * colorT,
                                 colorOverLifeStart.green + (colorOverLifeEnd.green - colorOverLifeStart.green) * colorT,
                                 colorOverLifeStart.blue + (colorOverLifeEnd.blue - colorOverLifeStart.blue) * colorT,
-                                (colorOverLifeStart.alpha + (colorOverLifeEnd.alpha - colorOverLifeStart.alpha) * colorT) *
-                                    alpha * colorFadeAlpha
+                                alpha
                             )
                             val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).dp.toPx().coerceAtLeast(0.5f)
                             val particleHeight = (sizeT * particleScale * perspective * depthScale).dp.toPx().coerceAtLeast(0.5f)
@@ -2774,7 +2776,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     rotate(visualAngle, Offset(x, y)) {
                                         drawImage(customParticle,
                                             dstOffset = androidx.compose.ui.unit.IntOffset((x - particleWidth / 2f).toInt(), (y - particleHeight / 2f).toInt()),
-                                            dstSize = androidx.compose.ui.unit.IntSize(particleWidth.toInt().coerceAtLeast(1), particleHeight.toInt().coerceAtLeast(1)), blendMode = particleBlendMode)
+                                            dstSize = androidx.compose.ui.unit.IntSize(particleWidth.toInt().coerceAtLeast(1), particleHeight.toInt().coerceAtLeast(1)),
+                                            alpha = alpha, blendMode = particleBlendMode)
                                     }
                                 } else {
                                     rotate(visualAngle, Offset(x, y)) {

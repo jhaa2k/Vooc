@@ -648,15 +648,7 @@ private fun VoocStudio(
                             }
                             DropdownMenu(expanded = showLayerMenu, onDismissRequest = { showLayerMenu = false },
                                 modifier = Modifier.background(Panel)) {
-                                // Keep legacy spectrum styles available, but create common visual elements
-                                // only through the unified StudioElementType catalog. This prevents duplicate
-                                // Text / Image / Shape / Background / Particles entries in Add Layer.
-                                LayerKind.entries.filter { kind ->
-                                    kind !in setOf(
-                                        LayerKind.BARS, LayerKind.PARTICLES, LayerKind.SHAPE,
-                                        LayerKind.TEXT, LayerKind.IMAGE, LayerKind.BACKGROUND
-                                    )
-                                }.forEach { kind ->
+                                LayerAddMenuCatalog.spectrumStyles.forEach { kind ->
                                     DropdownMenuItem(text = { Text(kind.title.uppercase()) }, onClick = {
                                         val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
                                         val layer = VisualLayer(id, kind)
@@ -666,7 +658,7 @@ private fun VoocStudio(
                                         showLayerMenu = false
                                     })
                                 }
-                                StudioElementType.entries.filter { it != StudioElementType.AUDIO_PROVIDER }.forEach { type ->
+                                LayerAddMenuCatalog.elementTypes.forEach { type ->
                                     DropdownMenuItem(text = { Text(type.displayName.uppercase()) }, onClick = {
                                         val id = "${type.name.lowercase()}-${System.currentTimeMillis()}"
                                         val created = ElementPropertyCatalog.create(type, id)

@@ -2721,7 +2721,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val angle = (number("Angle / Direction", 0f) + playbackSeconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
                             val focus = props["Center / Focus Point"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                             val falloff = number("Falloff / Radial Split", 0f).coerceAtLeast(0f)
-                            val contentColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF"))) }.getOrDefault(Color.White)
+                            val contentColor = runCatching {
+                                Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")), reactivity.colorMultiplier))
+                            }.getOrDefault(Color.White)
                             val colors = listOf("Split Color 0", "Split Color 1", "Split Color 2").mapIndexed { index, key ->
                                 val channel = runCatching { Color(android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index]))) }.getOrDefault(listOf(Color.Red, Color.Green, Color.Blue)[index])
                                 Color(channel.red * contentColor.red, channel.green * contentColor.green, channel.blue * contentColor.blue, channel.alpha * contentColor.alpha)
@@ -2806,7 +2808,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 drawImage(original, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity)
                             }
                             val contentColor = runCatching {
-                                Color(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")))
+                                Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")), reactivity.colorMultiplier))
                             }.getOrDefault(Color.White)
                             val contentBlend = when (textValue("Blend Mode Content", "Alpha")) {
                                 "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
@@ -2851,14 +2853,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val shapeType = textValue("Shape Type", "Rectangle")
                         val fillAlpha = (opacity * number("Opacity / Alpha", 1f)).coerceIn(0f, 1f)
                         val fillColor = runCatching {
-                            Color(android.graphics.Color.parseColor(textValue("Fill / Color", colorText)))
+                            Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Fill / Color", colorText)), reactivity.colorMultiplier))
                         }.getOrDefault(elementColor).copy(alpha = fillAlpha)
                         val gradientEnabled = props["Gradient Fill"] == ElementValue.Bool(true)
                         val gradientStart = runCatching {
-                            Color(android.graphics.Color.parseColor(textValue("Gradient Start Color", textValue("Fill / Color", colorText))))
+                            Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Gradient Start Color", textValue("Fill / Color", colorText))), reactivity.colorMultiplier))
                         }.getOrDefault(fillColor).copy(alpha = fillAlpha)
                         val gradientEnd = runCatching {
-                            Color(android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")))
+                            Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")), reactivity.colorMultiplier))
                         }.getOrDefault(Color.Black).copy(alpha = fillAlpha)
                         val gradientAngle = number("Gradient Angle", 0f) * PI.toFloat() / 180f
                         val gradientRadius = maxOf(w, h, 1f) * 0.5f

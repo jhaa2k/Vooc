@@ -2570,8 +2570,6 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 Offset(number("Green Offset X", 0f), number("Green Offset Y", 0f)),
                                 Offset(number("Blue Offset X", 4f), number("Blue Offset Y", 0f))
                             )
-                            val frameWidth = size.width * 0.45f * scale
-                            val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
                             val destination = Offset(center.x - frameWidth / 2f, center.y - frameHeight / 2f)
                             val contentBlend = when (textValue("Blend Mode Content", "Alpha")) {
                                 "Add" -> androidx.compose.ui.graphics.BlendMode.Plus

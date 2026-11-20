@@ -2741,7 +2741,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
                                     alpha = imageAlpha,
                                     colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix),
-                                    blendMode = contentBlend
+                                    blendMode = contentBlend,
+                                    filterQuality = when (textValue("Image Sampling", "Linear")) {
+                                        "Nearest" -> androidx.compose.ui.graphics.FilterQuality.None
+                                        "Cubic" -> androidx.compose.ui.graphics.FilterQuality.High
+                                        else -> androidx.compose.ui.graphics.FilterQuality.Medium
+                                    }
                                 )
                                 if (showUnblurredOver && originalBitmap != null) {
                                     drawImage(originalBitmap,

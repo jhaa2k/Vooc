@@ -224,7 +224,7 @@ object VideoExportEngine {
             }
         }
         project.document.elements.filter { it.type in setOf(StudioElementType.IMAGE, StudioElementType.BARS_SEGMENTS, StudioElementType.PARTICLES, StudioElementType.RGB_SPLIT, StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT) }.forEach { element ->
-            val uriText = listOf("Custom Bar Image", "Custom Image", "Image Source / File", "Target Image")
+            val uriText = (if (element.type == StudioElementType.IMAGE) listOf("Import Image", "Custom Image", "Image Source / File") else listOf("Custom Bar Image", "Custom Image", "Image Source / File", "Target Image"))
                 .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
             if (uriText.isNotBlank()) runCatching {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
@@ -1126,7 +1126,7 @@ object VideoExportEngine {
                     paint.style = Paint.Style.FILL
                 }
                 StudioElementType.IMAGE -> {
-                    val uriText = listOf("Custom Image", "Image Source / File", "Target Image")
+                    val uriText = listOf("Import Image", "Custom Image", "Image Source / File", "Target Image")
                         .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
                     val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
                     if (image != null) {

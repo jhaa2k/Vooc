@@ -1116,7 +1116,7 @@ object ElementPropertyCatalog {
         text("Motion Source", "Motion Blur", "Transform Movement", listOf(
             "Transform Movement", "Measured Movement", "Target Motion"
         )),
-        text("Relative Motion Mode", "Motion Blur", "Composition", listOf(
+        text("Relative Motion Mode", "Motion Blur", "Relative", listOf(
             "Relative", "Absolute", "Target Relative"
         )),
         number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0),

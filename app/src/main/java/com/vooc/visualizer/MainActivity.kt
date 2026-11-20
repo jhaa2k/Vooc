@@ -1822,8 +1822,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 }
                 "Image" -> {
                     val image = elementImages[background.id]
-                    if (image != null) {
-                        val imageRatio = image.width.toFloat() / image.height.coerceAtLeast(1)
+                    val originalImage = elementOriginalImages[background.id]
+                    fun drawBackgroundBitmap(bitmap: androidx.compose.ui.graphics.ImageBitmap, applyOverlay: Boolean) {
+                        val imageRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
                         val frameRatio = size.width / size.height.coerceAtLeast(1f)
                         val fit = bgText("Fit Mode (Scale Type)", "Fill (Cover)")
                         val destWidth: Float
@@ -1855,7 +1856,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             drawIntoCanvas { target ->
                                 val tileScale = bgNumber("Background Tile Scale", 1f).coerceIn(0.01f, 100f)
                                 val shader = android.graphics.BitmapShader(
-                                    image.asAndroidBitmap(),
+                                    bitmap.asAndroidBitmap(),
                                     android.graphics.Shader.TileMode.REPEAT,
                                     android.graphics.Shader.TileMode.REPEAT
                                 )
@@ -1881,15 +1882,22 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                         } else {
                             drawImage(
-                                image,
+                                bitmap,
                                 dstOffset = androidx.compose.ui.unit.IntOffset(dst.left.toInt(), dst.top.toInt()),
                                 dstSize = androidx.compose.ui.unit.IntSize(dst.width.toInt().coerceAtLeast(1), dst.height.toInt().coerceAtLeast(1)),
                                 alpha = opacity,
                                 blendMode = blend
                             )
                         }
-                        val overlay = runCatching { Color(android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))) }.getOrDefault(Color.Transparent)
-                        if (overlay.alpha > 0f) drawRect(overlay.copy(alpha = overlay.alpha * opacity), blendMode = blend)
+                        if (applyOverlay) {
+                            val overlay = runCatching { Color(android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))) }.getOrDefault(Color.Transparent)
+                            if (overlay.alpha > 0f) drawRect(overlay.copy(alpha = overlay.alpha * opacity), blendMode = blend)
+                        }
+                    }
+                    if (image != null) {
+                        if (bgBool("Show Unblurred Content Under") && originalImage != null) drawBackgroundBitmap(originalImage, false)
+                        drawBackgroundBitmap(image, true)
+                        if (bgBool("Show Unblurred Content") && originalImage != null) drawBackgroundBitmap(originalImage, false)
                     }
                 }
                 else -> Unit // Video backgrounds need a video-frame source pipeline.

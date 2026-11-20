@@ -913,7 +913,7 @@ object ElementPropertyCatalog {
         bool("Wrap Text", "Typography", true),
         bool("Auto-Scale", "Typography", false),
         text("Case", "Typography", "Original", listOf("Original", "Uppercase", "Lowercase", "Capitalize")),
-        text("Font Asset", "Typography", "", listOf("System Font", "Imported Font")),
+        text("Font Asset", "Typography", "System Font", listOf("System Font", "Imported Font")),
         text("Font Fallback", "Typography", "Sans Serif", listOf("Sans Serif", "Serif", "Monospace", "Cursive")),
         number("Measure Font Size", "Typography", 0.0, -512.0, 512.0),
         text("Measure Font Size (Measure What)", "Typography", "Nothing", listOf("Nothing", "None") + MeasureWhatEngine.options),

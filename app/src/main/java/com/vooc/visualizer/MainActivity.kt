@@ -2339,7 +2339,6 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                                 var level = levels[sourceIndex].coerceIn(0f, 1f)
                                 if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
-                                val layoutRandom = kotlin.math.abs(sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
                                 val heightRandom = number("Bar Height Random", 0f).coerceIn(0f, 1f)
                                 val barHeight = ((minHeight + level * radialMax) * (1f + (layoutRandom * 2f - 1f) * heightRandom)).coerceIn(0f, radialMax)
                                 val angle = index * (360f / count) + number("Bar Rotation", 0f)
@@ -2449,13 +2448,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val afterPoint = if (customPathMode) pathPoint((index.toFloat() / (count - 1).coerceAtLeast(1) + 0.01f).coerceAtMost(1f)) else point
                             val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
                             val x = if (customPathMode) point.first - barWidth / 2f + barOffset else center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + spacingJitter + barOffset
-                            val baseline = if (customPathMode) point.second else when (alignment) {
+                            val alternateDirection = props["Alternate Bar Direction"] == ElementValue.Bool(true) &&
+                                !customPathMode && !centerSymmetry
+                            val alternateFromTop = alternateDirection && index % 2 == 1
+                            val baseline = if (customPathMode) point.second else if (alternateDirection) {
+                                if (alternateFromTop) center.y - size.height * 0.38f else center.y + size.height * 0.38f
+                            } else when (alignment) {
                                 "Top" -> center.y - size.height * 0.38f
                                 "Center" -> center.y
                                 "Stretch" -> center.y + size.height * 0.44f
                                 else -> center.y + size.height * 0.38f
                             }
-                            val top = if (centerSymmetry) baseline - drawHeight else if (alignment == "Center") baseline - barHeight / 2f
+                            val top = if (centerSymmetry) baseline - drawHeight else if (alternateFromTop) baseline
+                                else if (alternateDirection) baseline - barHeight
+                                else if (alignment == "Center") baseline - barHeight / 2f
                                 else if (alignment == "Top") baseline else baseline - barHeight
                             val height = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(size.height * 0.95f) else drawHeight
                             val blendPosition = (index.toFloat() / (count - 1).coerceAtLeast(1) +

@@ -1719,7 +1719,8 @@ object VideoExportEngine {
                             this.color = if (shapeType == "Line") fill else shapeStrokeColor
                             this.alpha = (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
                             this.style = Paint.Style.STROKE
-                            this.strokeWidth = strokeWidth.coerceAtLeast(if (shapeType == "Line") 1f else 0f)
+                            val strokeAlignment = textValue("Stroke Alignment", "Center")
+                            this.strokeWidth = (if (strokeAlignment == "Center") strokeWidth else strokeWidth * 2f).coerceAtLeast(if (shapeType == "Line") 1f else 0f)
                             strokeCap = when (textValue("Stroke Cap", "Round")) { "Butt" -> Paint.Cap.BUTT; "Square" -> Paint.Cap.SQUARE; else -> Paint.Cap.ROUND }
                             strokeJoin = when (textValue("Stroke Join", "Round")) { "Miter" -> Paint.Join.MITER; "Bevel" -> Paint.Join.BEVEL; else -> Paint.Join.ROUND }
                             strokeMiter = number("Stroke Miter Limit", 4f).coerceAtLeast(1f)
@@ -1727,7 +1728,13 @@ object VideoExportEngine {
                             val intervals = when (textValue("Stroke Style", "Solid")) { "Dashed" -> floatArrayOf(this.strokeWidth * 4f, this.strokeWidth * 2f); "Dotted" -> floatArrayOf(this.strokeWidth, this.strokeWidth * 1.8f); else -> pattern.takeIf { it.size >= 2 } }
                             if (intervals != null) pathEffect = android.graphics.DashPathEffect(intervals, number("Stroke Dash Offset", 0f) * width / 1080f)
                         }
+                        canvas.save()
+                        when (textValue("Stroke Alignment", "Center")) {
+                            "Inside" -> canvas.clipPath(shapePath)
+                            "Outside" -> canvas.clipPath(shapePath, android.graphics.Region.Op.DIFFERENCE)
+                        }
                         canvas.drawPath(shapePath, shapeStrokePaint)
+                        canvas.restore()
                     }
                     paint.color = color
                     paint.alpha = alpha

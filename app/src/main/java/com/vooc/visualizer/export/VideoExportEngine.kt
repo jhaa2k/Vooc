@@ -788,7 +788,7 @@ object VideoExportEngine {
                         val src = android.graphics.Rect(leftCrop, topCrop,
                             (image.width - rightCrop).coerceAtLeast(leftCrop + 1),
                             (image.height - bottomCrop).coerceAtLeast(topCrop + 1))
-                        val ratio = src.width() / src.height().coerceAtLeast(1f)
+                        val ratio = src.width().toFloat() / src.height().coerceAtLeast(1).toFloat()
                         val frameRatio = frameWidth / frameHeight.coerceAtLeast(1f)
                         val dst = when {
                             fitMode == "Stretch" || !keepRatio -> RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)

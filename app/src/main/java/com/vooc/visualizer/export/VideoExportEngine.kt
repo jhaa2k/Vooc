@@ -1055,8 +1055,8 @@ object VideoExportEngine {
                             else -> android.graphics.PorterDuff.Mode.SRC_OVER
                         }
                         val original = imageCache[targetUri]
-                        val showUnder = enabled("Show Unblurred Content Under")
-                        val showOver = enabled("Show Unblurred Content")
+                        val showUnder = (element.value("Show Unblurred Content Under") as? ElementValue.Bool)?.value == true
+                        val showOver = (element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true
                         val imageRect = RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
                         if (showUnder && original != null) canvas.drawBitmap(original, null, imageRect, paint)
                         channelColors.forEachIndexed { index, tint ->

@@ -96,6 +96,11 @@ object VideoExportEngine {
             it.type == StudioElementType.AUDIO_PROVIDER && it.visible
         } ?: ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-export-default")
         val providerConfig = providerElement.toAudioProviderConfig()
+        val needsStereoReactivity = project.document.elements.any { element ->
+            val source = (element.value("Audio Reactivity Source") as? ElementValue.Text)?.value
+            (element.value("Audio Reactivity Enabled") as? ElementValue.Bool)?.value == true &&
+                (source == "Left Channel" || source == "Right Channel")
+        }
         val providerSamplesByFrame = Array(frameCount) { FloatArray(providerConfig.sampleOutCount) }
         val providerBeatByFrame = FloatArray(frameCount)
         val leftLevelByFrame = FloatArray(frameCount)
@@ -111,7 +116,9 @@ object VideoExportEngine {
                 val weights = IntArray(frameCount)
                 val offlineAnalyzer = AudioAnalyzer(
                     stream.sampleRate,
-                    providerConfig.applyTo(AnalyzerConfig(fftSize = FftSize.fromSize(providerConfig.fftSize)))
+                    providerConfig.applyTo(AnalyzerConfig(fftSize = FftSize.fromSize(providerConfig.fftSize))).let { config ->
+                        if (needsStereoReactivity) config.copy(channelMode = com.vooc.visualizer.analyzer.ChannelMode.STEREO_SPLIT) else config
+                    }
                 )
                 val providerProcessor = AudioProviderProcessor()
                 decoder.decode { samples, frames, ptsUs ->

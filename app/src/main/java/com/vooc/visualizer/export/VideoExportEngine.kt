@@ -892,6 +892,21 @@ object VideoExportEngine {
                         (android.graphics.Color.green(a) + (android.graphics.Color.green(b) - android.graphics.Color.green(a)) * t).toInt(),
                         (android.graphics.Color.blue(a) + (android.graphics.Color.blue(b) - android.graphics.Color.blue(a)) * t).toInt()
                     )
+                    val customPathMode = textValue("Shape Path", "Horizontal Line") == "Custom Path"
+                    val customPoints = if (customPathMode) textValue("Custom Path Points", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5").split(";").mapNotNull { token ->
+                        val parts = token.trim().split(",")
+                        if (parts.size != 2) null else runCatching { parts[0].trim().toFloat().coerceIn(0f, 1f) to parts[1].trim().toFloat().coerceIn(0f, 1f) }.getOrNull()
+                    }.take(128) else emptyList()
+                    fun pathPoint(t: Float): Pair<Float, Float> {
+                        if (customPoints.size < 2) return (cx - totalWidth / 2f + t * totalWidth) to (cy + height * 0.25f)
+                        val scaled = t.coerceIn(0f, 1f) * (customPoints.size - 1)
+                        val segmentIndex = scaled.toInt().coerceAtMost(customPoints.size - 2)
+                        val fraction = scaled - segmentIndex
+                        val a = customPoints[segmentIndex]
+                        val b = customPoints[segmentIndex + 1]
+                        return (cx - totalWidth / 2f + (a.first + (b.first - a.first) * fraction) * totalWidth) to
+                            (cy - height * 0.4f + (a.second + (b.second - a.second) * fraction) * height * 0.8f)
+                    }
                     canvas.save()
                     if (orientation == "Horizontal") canvas.rotate(90f, cx, cy)
                     repeat(count) { index ->
@@ -900,8 +915,13 @@ object VideoExportEngine {
                         if ((element.value("Flip Input") as? ElementValue.Bool)?.value == true) level = 1f - level
                         val activeMaxHeight = if (radialLayout) radialMaxHeight else maxHeight
                         val barHeight = (minHeight + level * activeMaxHeight).coerceIn(0f, height * 0.95f)
-                        val x = if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
-                        val baseline = if (radialLayout) cy - radialInnerRadius else when (alignment) {
+                        val pathT = if (count <= 1) 0f else index.toFloat() / (count - 1)
+                        val pathPoint = if (customPathMode) pathPoint(pathT) else 0f to 0f
+                        val beforePoint = if (customPathMode) pathPoint((pathT - 0.01f).coerceAtLeast(0f)) else pathPoint
+                        val afterPoint = if (customPathMode) pathPoint((pathT + 0.01f).coerceAtMost(1f)) else pathPoint
+                        val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
+                        val x = if (radialLayout || !customPathMode) (if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset) else pathPoint.first - barWidth / 2f + barOffset
+                        val baseline = if (radialLayout) cy - radialInnerRadius else if (customPathMode) pathPoint.second else when (alignment) {
                             "Top" -> cy - height * 0.38f
                             "Center" -> cy
                             "Stretch" -> cy + height * 0.44f
@@ -1012,7 +1032,7 @@ object VideoExportEngine {
                         }
                         canvas.save()
                         if (radialLayout) canvas.rotate(index * (360f / count), cx, cy)
-                        canvas.rotate(number("Bar Rotation", 0f), x + barWidth / 2f, baseline)
+                        canvas.rotate(number("Bar Rotation", 0f) + customAngle, x + barWidth / 2f, baseline)
                         val segmentHeight = ((h - segmentGap * (segmentsPerBar - 1)) / segmentsPerBar).coerceAtLeast(0.5f)
                         repeat(segmentsPerBar) { segment ->
                             val segmentNumber = segment + 1

@@ -1263,7 +1263,9 @@ object VideoExportEngine {
                             (focus.x.toFloat() - 0.5f) * (focus.x.toFloat() - 0.5f) +
                                 (focus.y.toFloat() - 0.5f) * (focus.y.toFloat() - 0.5f)
                         )
-                        val contentColor = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                        val contentColor = runCatching {
+                            audioReactivityColor(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")), reactivity.colorMultiplier)
+                        }.getOrDefault(android.graphics.Color.WHITE)
                         val channelColors = listOf("Split Color 0", "Split Color 1", "Split Color 2").mapIndexed { index, key ->
                             val channel = runCatching { android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index])) }.getOrDefault(listOf(android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE)[index])
                             android.graphics.Color.argb(
@@ -1395,8 +1397,9 @@ object VideoExportEngine {
                 StudioElementType.SHAPE -> {
                     val shapeWidth = number("Width", 300f) * scale * width / 1080f
                     val shapeHeight = number("Height", 300f) * scale * width / 1080f
-                    val fill = runCatching { android.graphics.Color.parseColor(textValue("Fill / Color", textValue("Color", "#FFFFFFFF"))) }
-                        .getOrDefault(color)
+                    val fill = runCatching {
+                        audioReactivityColor(android.graphics.Color.parseColor(textValue("Fill / Color", textValue("Color", "#FFFFFFFF"))), reactivity.colorMultiplier)
+                    }.getOrDefault(color)
                     paint.color = fill
                     paint.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
                     val rect = RectF(cx - shapeWidth / 2f, cy - shapeHeight / 2f, cx + shapeWidth / 2f, cy + shapeHeight / 2f)

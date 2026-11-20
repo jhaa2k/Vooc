@@ -830,7 +830,6 @@ object VideoExportEngine {
                                 }
                             }
                             colorFilter = ColorMatrixColorFilter(colorMatrix)
-                            colorFilter = if (android.graphics.Color.alpha(overlay) > 0) android.graphics.PorterDuffColorFilter(overlay, android.graphics.PorterDuff.Mode.SRC_ATOP) else null
                         }
                         canvas.save()
                         canvas.clipPath(clip)

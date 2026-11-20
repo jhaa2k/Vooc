@@ -35,6 +35,29 @@ class MeasureWhatEngineTest {
     }
 
     @Test
+    fun trackPositionMotionUsesMeasuredBpm() {
+        val oneBeatPerSecond = MeasureWhatEngine.evaluate(
+            "TrackPosition", 0.25f, 0.25f, true, 0f, 0f, 0f, 60f, 1L
+        )
+        val twoBeatsPerSecond = MeasureWhatEngine.evaluate(
+            "TrackPosition", 0.25f, 0.25f, true, 0f, 0f, 0f, 120f, 1L
+        )
+        assertTrue(oneBeatPerSecond.offsetX > 0.03f)
+        assertTrue(kotlin.math.abs(twoBeatsPerSecond.offsetX) < 0.001f)
+    }
+
+    @Test
+    fun invalidBpmFallsBackToStableDefault() {
+        val invalid = MeasureWhatEngine.evaluate(
+            "TrackPosition", 0.25f, 0.25f, true, 0f, 0f, 0f, 0f, 1L
+        )
+        val fallback = MeasureWhatEngine.evaluate(
+            "TrackPosition", 0.25f, 0.25f, true, 0f, 0f, 0f, 120f, 1L
+        )
+        assertEquals(fallback, invalid)
+    }
+
+    @Test
     fun everyModeReturnsFiniteSafeTransforms() {
         MeasureWhatEngine.options.forEach { mode ->
             val result = MeasureWhatEngine.evaluate(mode, 10f, 3f, true, 0.8f, 0.6f, 0.7f, 128f, 99L)

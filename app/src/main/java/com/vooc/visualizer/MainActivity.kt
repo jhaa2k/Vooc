@@ -1959,25 +1959,85 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                     }
                     StudioElementType.SHAPE -> {
-                        val w = number("Width", 300f).dp.toPx() * scale
-                        val h = number("Height", 300f).dp.toPx() * scale
-                        val shapeColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Fill / Color", colorText))) }
-                            .getOrDefault(elementColor).copy(alpha = opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f))
+                        val w = (number("Width", 300f).dp.toPx() * scale).coerceAtLeast(0f)
+                        val h = (number("Height", 300f).dp.toPx() * scale).coerceAtLeast(0f)
                         val left = center.x - w / 2f
                         val top = center.y - h / 2f
-                        when (textValue("Shape Type", "Rectangle")) {
-                            "Circle/Oval" -> drawOval(shapeColor, Offset(left, top), androidx.compose.ui.geometry.Size(w, h))
-                            "Line" -> drawLine(shapeColor, Offset(left, center.y), Offset(left + w, center.y),
-                                number("Stroke / Border Width", 3f).dp.toPx().coerceAtLeast(1f))
-                            "Triangle" -> {
-                                val p = Path().apply { moveTo(center.x, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
-                                drawPath(p, shapeColor)
+                        val shapeType = textValue("Shape Type", "Rectangle")
+                        val fillAlpha = (opacity * number("Opacity / Alpha", 1f)).coerceIn(0f, 1f)
+                        val fillColor = runCatching {
+                            Color(android.graphics.Color.parseColor(textValue("Fill / Color", colorText)))
+                        }.getOrDefault(elementColor).copy(alpha = fillAlpha)
+                        val gradientEnabled = props["Gradient Fill"] == ElementValue.Bool(true)
+                        val gradientStart = runCatching {
+                            Color(android.graphics.Color.parseColor(textValue("Gradient Start Color", textValue("Fill / Color", colorText))))
+                        }.getOrDefault(fillColor).copy(alpha = fillAlpha)
+                        val gradientEnd = runCatching {
+                            Color(android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")))
+                        }.getOrDefault(Color.Black).copy(alpha = fillAlpha)
+                        val gradientAngle = number("Gradient Angle", 0f) * PI.toFloat() / 180f
+                        val gradientRadius = maxOf(w, h, 1f) * 0.5f
+                        val gradientBrush = if (gradientEnabled) {
+                            if (textValue("Gradient Type", "Linear") == "Radial") {
+                                androidx.compose.ui.graphics.Brush.radialGradient(
+                                    colors = listOf(gradientStart, gradientEnd),
+                                    center = center,
+                                    radius = gradientRadius
+                                )
+                            } else {
+                                val dx = cos(gradientAngle) * gradientRadius
+                                val dy = sin(gradientAngle) * gradientRadius
+                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                    colors = listOf(gradientStart, gradientEnd),
+                                    start = Offset(center.x - dx, center.y - dy),
+                                    end = Offset(center.x + dx, center.y + dy)
+                                )
                             }
-                            else -> drawRoundRect(shapeColor, Offset(left, top), androidx.compose.ui.geometry.Size(w, h),
-                                androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f).dp.toPx()))
+                        } else androidx.compose.ui.graphics.SolidColor(fillColor)
+                        val shapePath = Path().apply {
+                            when (shapeType) {
+                                "Circle/Oval" -> addOval(androidx.compose.ui.geometry.Rect(left, top, left + w, top + h))
+                                "Line" -> { moveTo(left, center.y); lineTo(left + w, center.y) }
+                                "Triangle" -> { moveTo(center.x, top); lineTo(left + w, top + h); lineTo(left, top + h); close() }
+                                else -> {
+                                    addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                                        left, top, left + w, top + h,
+                                        androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f).dp.toPx())
+                                    ))
+                                }
+                            }
+                        }
+                        if (shapeType == "Line") {
+                            val lineWidth = number("Stroke / Border Width", 3f).dp.toPx().coerceAtLeast(1f)
+                            drawPath(shapePath, fillColor, style = Stroke(width = lineWidth))
+                        } else {
+                            drawPath(shapePath, brush = gradientBrush)
+                        }
+                        val strokeWidth = number("Stroke / Border Width", 0f).dp.toPx()
+                        if (strokeWidth > 0f && shapeType != "Line") {
+                            val strokeStyle = textValue("Stroke Style", "Solid")
+                            val dash = when (strokeStyle) {
+                                "Dashed" -> floatArrayOf(strokeWidth * 4f, strokeWidth * 2f)
+                                "Dotted" -> floatArrayOf(strokeWidth, strokeWidth * 1.8f)
+                                else -> null
+                            }
+                            val pathEffect = dash?.let { androidx.compose.ui.graphics.PathEffect.dashPathEffect(it) }
+                            val strokeColor = runCatching {
+                                Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")))
+                            }.getOrDefault(Color.White).copy(alpha = opacity)
+                            drawPath(shapePath, strokeColor, style = Stroke(width = strokeWidth, pathEffect = pathEffect))
                         }
                     }
-                    StudioElementType.BACKGROUND -> Unit
+                    StudioElementType.BACKGROUND -> {
+                        val sourceType = textValue("Source Type", "Solid Color")
+                        if (sourceType == "Solid Color") {
+                            val backgroundColor = runCatching {
+                                Color(android.graphics.Color.parseColor(textValue("Color", colorText)))
+                            }.getOrDefault(Color.Black)
+                            val alpha = number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * opacity
+                            drawRect(backgroundColor.copy(alpha = alpha))
+                        }
+                    }
                     StudioElementType.AUDIO_PROVIDER -> Unit
                 }
             }

@@ -3083,16 +3083,17 @@ private fun ThinSlider(
 ) {
     val safeValue = value.coerceIn(valueRange)
     val safeDefault = defaultValue.coerceIn(valueRange)
+    val currentValue by rememberUpdatedState(safeValue)
     val updateValue by rememberUpdatedState(onValueChange)
     val finishChange by rememberUpdatedState(onValueChangeFinished)
     var draggingThumb by remember { mutableStateOf(false) }
     val updateDefault by rememberUpdatedState(safeDefault)
     Canvas(
         modifier.fillMaxWidth().height(24.dp)
-            .pointerInput(valueRange, safeValue, safeDefault) {
+            .pointerInput(valueRange, safeDefault) {
                 val inset = 6.dp.toPx()
                 val usable = (size.width - inset * 2f).coerceAtLeast(1f)
-                val thumbX = inset + ((safeValue - valueRange.start) /
+                val thumbX = inset + ((currentValue - valueRange.start) /
                     (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)) * usable
                 val thumbHitRadius = 18.dp.toPx()
                 detectHorizontalDragGestures(
@@ -3115,11 +3116,11 @@ private fun ThinSlider(
                     onDragCancel = { draggingThumb = false }
                 )
             }
-            .pointerInput(valueRange, safeValue, safeDefault) {
+            .pointerInput(valueRange, safeDefault) {
                 detectTapGestures(onDoubleTap = { point ->
                     val inset = 6.dp.toPx()
                     val usable = (size.width - inset * 2f).coerceAtLeast(1f)
-                    val thumbX = inset + ((safeValue - valueRange.start) /
+                    val thumbX = inset + ((currentValue - valueRange.start) /
                         (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)) * usable
                     if (kotlin.math.abs(point.x - thumbX) <= 18.dp.toPx()) {
                         updateValue(safeDefault)

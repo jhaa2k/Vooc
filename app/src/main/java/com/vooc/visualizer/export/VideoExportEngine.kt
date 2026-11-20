@@ -1043,6 +1043,16 @@ object VideoExportEngine {
                             number("Green Offset X", 0f) to number("Green Offset Y", 0f),
                             number("Blue Offset X", 4f) to number("Blue Offset Y", 0f)
                         )
+                        val contentBlend = when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> android.graphics.PorterDuff.Mode.ADD
+                            "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                            "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                            "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                            "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                            "Exclusion", "Difference" -> android.graphics.PorterDuff.Mode.XOR
+                            "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                        }
                         channelColors.forEachIndexed { index, tint ->
                             val base = channelOffsets[index]
                             val dx = (base.first * scale + cos(angle) * amount * (index - 1)) * radialScale * width / 1080f
@@ -1050,6 +1060,9 @@ object VideoExportEngine {
                             val channelPaint = Paint(paint).apply {
                                 this.alpha = (alpha * 0.72f).toInt().coerceIn(0, 255)
                                 colorFilter = android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.SCREEN)
+                                if (contentBlend != android.graphics.PorterDuff.Mode.SRC_OVER) {
+                                    xfermode = android.graphics.PorterDuffXfermode(contentBlend)
+                                }
                             }
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
                                 cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), channelPaint)

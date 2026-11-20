@@ -2525,6 +2525,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val particleShape = textValue("Particle Shape", "Circle")
                         val screenBlend = props["Particle Screen Blend"] == ElementValue.Bool(true)
                         val additiveBlend = props["Particle Additive Blend"] == ElementValue.Bool(true)
+                        val particleBlendMode = if (screenBlend) androidx.compose.ui.graphics.BlendMode.Screen else if (additiveBlend) androidx.compose.ui.graphics.BlendMode.Plus else androidx.compose.ui.graphics.BlendMode.SrcOver
                         val startSize = number("Start Size", 8f).coerceAtLeast(0f)
                         val endSize = number("End Size", 2f).coerceAtLeast(0f)
                         val endRandom = number("End Size Random", number("Particle Size Random", 0f)).coerceIn(0f, 1f)
@@ -2628,16 +2629,24 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             fun drawParticleAt(x: Float, y: Float) {
                                 if (trailLength > 0f) {
                                     drawLine(particleColor.copy(alpha = alpha * 0.5f), Offset(x - trailX, y - trailY), Offset(x, y),
-                                        (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                        (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f), cap = androidx.compose.ui.graphics.StrokeCap.Round, blendMode = particleBlendMode)
                                 }
                                 if (customParticle != null) {
                                     rotate(visualAngle, Offset(x, y)) {
                                         drawImage(customParticle,
                                             dstOffset = androidx.compose.ui.unit.IntOffset((x - particleWidth / 2f).toInt(), (y - particleHeight / 2f).toInt()),
-                                            dstSize = androidx.compose.ui.unit.IntSize(particleWidth.toInt().coerceAtLeast(1), particleHeight.toInt().coerceAtLeast(1)))
+                                            dstSize = androidx.compose.ui.unit.IntSize(particleWidth.toInt().coerceAtLeast(1), particleHeight.toInt().coerceAtLeast(1)), blendMode = particleBlendMode)
                                     }
                                 } else {
-                                    drawCircle(particleColor, particleWidth.coerceAtLeast(1f) * 0.5f, Offset(x, y))
+                                    rotate(visualAngle, Offset(x, y)) {
+                                        when (particleShape) {
+                                            "Square" -> drawRect(particleColor, Offset(x - particleWidth / 2f, y - particleHeight / 2f), androidx.compose.ui.geometry.Size(particleWidth, particleHeight), blendMode = particleBlendMode)
+                                            "Triangle" -> { val p = Path().apply { moveTo(x, y - particleHeight / 2f); lineTo(x + particleWidth / 2f, y + particleHeight / 2f); lineTo(x - particleWidth / 2f, y + particleHeight / 2f); close() }; drawPath(p, particleColor, blendMode = particleBlendMode) }
+                                            "Star" -> { val p = Path(); for (v in 0 until 10) { val a = (v * 36f - 90f) * PI.toFloat() / 180f; val r = if (v % 2 == 0) 0.5f else 0.22f; val px2 = x + cos(a) * particleWidth * r; val py2 = y + sin(a) * particleHeight * r; if (v == 0) p.moveTo(px2, py2) else p.lineTo(px2, py2) }; p.close(); drawPath(p, particleColor, blendMode = particleBlendMode) }
+                                            "Line" -> drawLine(particleColor, Offset(x - particleWidth / 2f, y), Offset(x + particleWidth / 2f, y), particleHeight.coerceAtLeast(1f), blendMode = particleBlendMode)
+                                            else -> drawCircle(particleColor, particleWidth.coerceAtLeast(1f) * 0.5f, Offset(x, y), blendMode = particleBlendMode)
+                                        }
+                                    }
                                 }
                             }
                             if (mirrorX) drawParticleAt(size.width - px, py)

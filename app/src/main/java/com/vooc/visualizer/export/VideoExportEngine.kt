@@ -1088,7 +1088,7 @@ object VideoExportEngine {
                                 } else path
                                 val softnessAlpha = alpha
                                 val softnessPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                    color = shapeFill
+                                    this.color = shapeFill
                                     this.alpha = softnessAlpha
                                     style = Paint.Style.FILL
                                     maskFilter = android.graphics.BlurMaskFilter(

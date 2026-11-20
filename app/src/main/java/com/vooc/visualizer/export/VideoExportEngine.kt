@@ -884,7 +884,7 @@ object VideoExportEngine {
                         }
                         val overlay = runCatching { android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF")) }.getOrDefault(android.graphics.Color.TRANSPARENT)
                         val imagePaint = Paint(paint).apply {
-                            this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f) * number("Transparency Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
+                            this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
                             val colorMatrix = ColorMatrix().apply { setSaturation(saturation) }
                             if (android.graphics.Color.alpha(overlay) > 0) {

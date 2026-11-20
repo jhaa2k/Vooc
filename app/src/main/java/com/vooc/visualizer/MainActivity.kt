@@ -2434,6 +2434,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         v[base + 4] = v[base + 4] * (1f - a) + (if (row == 0) overlay.red else if (row == 1) overlay.green else overlay.blue) * a
                                     }
                                 }
+                                val blendAmount = number("Measure Color Blend", 0f).coerceIn(0f, 1f)
+                                if (blendAmount > 0f) {
+                                    val target = runCatching { Color(android.graphics.Color.parseColor(textValue("Color To", "#FFFFFFFF"))) }.getOrDefault(Color.White)
+                                    val v = values
+                                    val targetChannels = floatArrayOf(target.red, target.green, target.blue)
+                                    for (row in 0..2) {
+                                        val base = row * 5
+                                        for (column in 0..3) v[base + column] *= (1f - blendAmount)
+                                        v[base + 4] = v[base + 4] * (1f - blendAmount) + targetChannels[row] * 255f * blendAmount
+                                    }
+                                }
                             }
                             clipPath(clip) {
                                 drawImage(bitmap,

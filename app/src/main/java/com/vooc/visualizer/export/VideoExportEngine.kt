@@ -14,6 +14,7 @@ import com.vooc.visualizer.analyzer.SpectrumMapper
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.studio.ElementPropertyCatalog
+import com.vooc.visualizer.studio.BackgroundImageProcessor
 import com.vooc.visualizer.studio.ElementValue
 import com.vooc.visualizer.studio.StudioElementType
 import android.media.MediaCodec
@@ -295,13 +296,23 @@ object VideoExportEngine {
                 }
             }
         }
-        project.document.elements.filter { it.type in setOf(StudioElementType.IMAGE, StudioElementType.BARS_SEGMENTS, StudioElementType.PARTICLES, StudioElementType.RGB_SPLIT, StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT) }.forEach { element ->
-            val uriText = (if (element.type == StudioElementType.IMAGE) listOf("Import Image", "Custom Image", "Image Source / File") else listOf("Custom Bar Image", "Texture / Image", "Custom Image", "Image Source / File", "Target Image"))
-                .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
+        project.document.elements.filter { it.type in setOf(StudioElementType.IMAGE, StudioElementType.BACKGROUND, StudioElementType.BARS_SEGMENTS, StudioElementType.PARTICLES, StudioElementType.RGB_SPLIT, StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT) }.forEach { element ->
+            val uriKeys = when (element.type) {
+                StudioElementType.IMAGE -> listOf("Import Image", "Custom Image", "Image Source / File")
+                StudioElementType.BACKGROUND -> listOf("Image File / Source")
+                else -> listOf("Custom Bar Image", "Texture / Image", "Custom Image", "Image Source / File", "Target Image")
+            }
+            val uriText = uriKeys.firstNotNullOfOrNull { key ->
+                (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
+            }.orEmpty()
             if (uriText.isNotBlank()) runCatching {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                     BitmapFactory.decodeStream(stream)?.let { source ->
-                        if (element.type == StudioElementType.IMAGE) {
+                        if (element.type == StudioElementType.BACKGROUND) {
+                            val processed = BackgroundImageProcessor.process(source, element)
+                            imageCache["${uriText}#${element.id}"] = processed
+                            imageCache[uriText] = source
+                        } else if (element.type == StudioElementType.IMAGE) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {
                                 resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }

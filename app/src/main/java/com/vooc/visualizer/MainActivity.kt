@@ -2487,7 +2487,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     androidx.compose.ui.geometry.Rect(center.x - w / 2f, center.y - h / 2f, center.x + w / 2f, center.y + h / 2f)
                                 }
                             }
-                            val shapeName = textValue("Shape", textValue("Mask / Shape", "Rectangle"))
+                            val shapeName = textValue("Shape", "Rectangle").takeIf { it != "Rectangle" } ?: textValue("Mask / Shape", "Rectangle")
                             val clip = Path().apply {
                                 when (shapeName) {
                                     "Circle", "Ellipse", "Circle/Oval" -> addOval(destination)
@@ -2501,6 +2501,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
                             val imageColorMatrix = ColorMatrix().apply {
                                 setToSaturation(saturation)
+                                val layerTint = runCatching { Color(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF"))) }.getOrDefault(Color.White)
+                                val tintValues = values
+                                val tintChannels = floatArrayOf(layerTint.red, layerTint.green, layerTint.blue)
+                                for (row in 0..2) {
+                                    val base = row * 5
+                                    for (column in 0..3) tintValues[base + column] *= tintChannels[row]
+                                    tintValues[base + 4] *= tintChannels[row]
+                                }
                                 if (overlay.alpha > 0f) {
                                     val a = overlay.alpha
                                     val v = values

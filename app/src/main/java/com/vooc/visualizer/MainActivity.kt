@@ -1979,9 +1979,30 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                             if (peakEnabled) {
                                 val peakY = top - peakValue * maxHeight
-                                drawLine(peakColor.copy(alpha = opacity), Offset(left - peakWidth, peakY), Offset(left + width + peakWidth, peakY), peakWidth)
+                                val indicator = textValue("Peak Indicator Style", "Line")
+                                when (indicator) {
+                                    "Dot" -> drawCircle(
+                                        peakColor.copy(alpha = opacity),
+                                        (peakWidth * 1.5f).coerceAtLeast(1f),
+                                        Offset(left + width / 2f, peakY)
+                                    )
+                                    "Bar" -> drawRect(
+                                        peakColor.copy(alpha = opacity),
+                                        Offset(left, peakY - peakWidth),
+                                        androidx.compose.ui.geometry.Size(width, peakWidth * 2f)
+                                    )
+                                    "Line" -> drawLine(
+                                        peakColor.copy(alpha = opacity),
+                                        Offset(left - peakWidth, peakY),
+                                        Offset(left + width + peakWidth, peakY),
+                                        peakWidth
+                                    )
+                                    else -> Unit
+                                }
                             }
                         }
+                        val segmentsPerBar = number("Segments Per Bar", 1f).toInt().coerceIn(1, 64)
+                        val segmentGap = (gap * 0.55f).coerceAtMost(6.dp.toPx())
                         repeat(count) { index ->
                             val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                             var level = levels[sourceIndex].coerceIn(0f, 1f)
@@ -2009,10 +2030,16 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 else -> elementColor
                             }
                             rotate(barRotation, Offset(x + barWidth / 2f, baseline)) {
-                                drawBarShape(x, top, barWidth, height, colorForBar, peaks[sourceIndex], index)
-                                if (verticalMirror || centerSymmetry) {
-                                    drawBarShape(x, baseline, barWidth, height, colorForBar, peaks[sourceIndex], index)
+                                val segmentHeight = ((height - segmentGap * (segmentsPerBar - 1)) / segmentsPerBar).coerceAtLeast(0.5f)
+                                repeat(segmentsPerBar) { segment ->
+                                    val segmentTop = top + segment * (segmentHeight + segmentGap)
+                                    drawBarShape(x, segmentTop, barWidth, segmentHeight, colorForBar, 0f, index)
+                                    if (verticalMirror || centerSymmetry) {
+                                        val mirrorTop = baseline + segment * (segmentHeight + segmentGap)
+                                        drawBarShape(x, mirrorTop, barWidth, segmentHeight, colorForBar, 0f, index)
+                                    }
                                 }
+                                if (peakEnabled) drawBarShape(x, top, barWidth, 1f, colorForBar, peaks[sourceIndex], index)
                             }
                         }
                     }

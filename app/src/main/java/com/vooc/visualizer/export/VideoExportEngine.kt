@@ -41,6 +41,9 @@ import kotlin.math.pow
 import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.MeasureWhatEngine
+import com.vooc.visualizer.studio.AudioReactivityRuntime
+import com.vooc.visualizer.studio.audioReactivitySources
+import com.vooc.visualizer.studio.audioReactivityTransform
 
 /** Encodes H.264 video and muxes a compatible AAC source track into one MP4 timeline. */
 object VideoExportEngine {
@@ -181,6 +184,7 @@ object VideoExportEngine {
         val imageCache = mutableMapOf<String, Bitmap>()
         val barRuntimes = mutableMapOf<String, SpectrumBarsRuntime>()
         val barLastUpdateMs = mutableMapOf<String, Long>()
+        val audioReactivityRuntimes = mutableMapOf<String, AudioReactivityRuntime>()
         project.layers.filter { it.kind == LayerKind.IMAGE && it.imageUri.isNotBlank() }.forEach { layer ->
             runCatching {
                 resolver.openInputStream(Uri.parse(layer.imageUri))?.use { stream ->
@@ -249,7 +253,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f })
+                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -462,7 +466,7 @@ object VideoExportEngine {
         return blurred
     }
 
-    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float, providerBpm: Float) {
+    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float, providerBpm: Float) {
         val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         canvas.save()
         canvas.clipRect(0, 0, width, height)
@@ -574,6 +578,14 @@ object VideoExportEngine {
             fun textValue(name: String, fallback: String = ""): String = (props[name] as? ElementValue.Text)?.value ?: fallback
             val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
             val safeElementSamples = providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
+            val reactivitySources = audioReactivitySources(
+                samples = safeElementSamples,
+                overall = audioLevel,
+                beat = providerBeat
+            )
+            val reactivityValue = audioReactivityRuntimes.getOrPut(element.id) { AudioReactivityRuntime() }
+                .update(props, reactivitySources, 1f / project.fps.coerceIn(15, 60))
+            val reactivity = audioReactivityTransform(props, reactivityValue)
             val elementBandSize = (safeElementSamples.size / 5).coerceAtLeast(1)
             fun motionFor(property: String) = MeasureWhatEngine.evaluate(
                 mode = textValue(property, "Nothing"),
@@ -589,10 +601,10 @@ object VideoExportEngine {
             val posMotion = motionFor("Measure Pos (Measure What)")
             val scaleMotion = motionFor("Measure Scale (Measure What)")
             val rotMotion = motionFor("Measure Rot (Measure What)")
-            val cx = width * (0.5f + position.x.toFloat() / 200f + posMotion.offsetX)
-            val cy = height * (0.5f + position.y.toFloat() / 200f + posMotion.offsetY)
-            val scale = (number("Scale", 100f) / 100f * scaleMotion.scale).coerceIn(0f, 10f)
-            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation
+            val cx = width * (0.5f + (position.x.toFloat() + reactivity.xOffset) / 200f + posMotion.offsetX)
+            val cy = height * (0.5f + (position.y.toFloat() + reactivity.yOffset) / 200f + posMotion.offsetY)
+            val scale = (number("Scale", 100f) / 100f * scaleMotion.scale * reactivity.scaleMultiplier).coerceIn(0f, 10f)
+            val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation + reactivity.rotationOffset
             val opacityMode = textValue("Measure Opacity (Measure What)", "Nothing")
             val opacityMotion = motionFor("Measure Opacity (Measure What)")
             val measuredOpacity = if (opacityMode == "Nothing") 1f else maxOf(
@@ -601,7 +613,7 @@ object VideoExportEngine {
                 kotlin.math.abs(opacityMotion.offsetX) / 0.05f,
                 kotlin.math.abs(opacityMotion.offsetY) / 0.05f
             ).coerceIn(0f, 1f)
-            val alpha = (number("Opacity", 100f).coerceIn(0f, 100f) * measuredOpacity * 2.55f).toInt()
+            val alpha = (number("Opacity", 100f).coerceIn(0f, 100f) * measuredOpacity * reactivity.opacityMultiplier * 2.55f).toInt()
             val color = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
             paint.color = color
             paint.alpha = alpha

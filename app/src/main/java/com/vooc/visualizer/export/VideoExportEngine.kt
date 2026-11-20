@@ -1303,7 +1303,19 @@ object VideoExportEngine {
                     val sineMagnitudeRandom = number("Side Sine Wave Mag Random", 0f).coerceIn(0f, 1f)
                     val colorFrom = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Color From", textValue("Color", "#FFFFFFFF"))), reactivity.colorMultiplier) }.getOrDefault(color)
                     val colorTo = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Color To", textValue("Color", "#FFFFFFFF"))), reactivity.colorMultiplier) }.getOrDefault(color)
-                    val customParticle = imageCache[textValue("Custom Image")]
+                    val colorOverLifeMode = textValue("Color Over Life", "Gradient")
+                    val alphaOverLifeMode = textValue("Alpha Over Life", "Fade In Out")
+                    val colorOverLifeStart = runCatching {
+                        audioReactivityColor(android.graphics.Color.parseColor(
+                            textValue("Color Over Life Start", textValue("Color From", textValue("Color", "#FFFFFFFF")))
+                        ), reactivity.colorMultiplier)
+                    }.getOrDefault(colorFrom)
+                    val colorOverLifeEnd = runCatching {
+                        audioReactivityColor(android.graphics.Color.parseColor(
+                            textValue("Color Over Life End", textValue("Color To", textValue("Color", "#FFFFFFFF")))
+                        ), reactivity.colorMultiplier)
+                    }.getOrDefault(colorTo)
+                    val customParticle = imageCache[textValue("Texture / Image", textValue("Custom Image"))]
                     val mirrorX = (element.value("Mirror X") as? ElementValue.Bool)?.value == true
                     val mirrorY = (element.value("Mirror Y") as? ElementValue.Bool)?.value == true
                     val velocityAngle = (element.value("Velocity Angle") as? ElementValue.Bool)?.value == true
@@ -1370,13 +1382,30 @@ object VideoExportEngine {
                             (1f + (fadeInScale - 1f) * number("Fade In Size", 1f).coerceIn(0f, 10f))
                         val fadeOut = if (fadeTime > 0f) ((particleLifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
                         val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
-                        val particleAlpha = (alpha * fadeInScale * fadeOut * nearFade * (1f - randomA * opacityRandom)).toInt().coerceIn(0, 255)
-                        val colorT = (lifeT + (randomC - 0.5f) * colorRandom).coerceIn(0f, 1f)
-                        val particleColor = android.graphics.Color.argb(
-                            (particleAlpha * (android.graphics.Color.alpha(colorFrom) / 255f)).toInt(),
-                            (android.graphics.Color.red(colorFrom) + (android.graphics.Color.red(colorTo) - android.graphics.Color.red(colorFrom)) * colorT).toInt(),
-                            (android.graphics.Color.green(colorFrom) + (android.graphics.Color.green(colorTo) - android.graphics.Color.green(colorFrom)) * colorT).toInt(),
-                            (android.graphics.Color.blue(colorFrom) + (android.graphics.Color.blue(colorTo) - android.graphics.Color.blue(colorFrom)) * colorT).toInt()
+                        val alphaOverLife = when (alphaOverLifeMode) {
+                            "Constant" -> 1f
+                            "Fade In" -> lifeT
+                            "Fade Out" -> 1f - lifeT
+                            else -> (1f - abs(lifeT * 2f - 1f)).coerceIn(0f, 1f)
+                        }
+                        val randomizedColorT = (lifeT + (randomC - 0.5f) * colorRandom).coerceIn(0f, 1f)
+                        val colorT = when (colorOverLifeMode) {
+                            "Constant", "Fade To Transparent" -> 0f
+                            else -> randomizedColorT
+                        }
+                        val colorFadeAlpha = if (colorOverLifeMode == "Fade To Transparent") 1f - lifeT else 1f
+                        val colorAlpha = (
+                            android.graphics.Color.alpha(colorOverLifeStart) +
+                                (android.graphics.Color.alpha(colorOverLifeEnd) - android.graphics.Color.alpha(colorOverLifeStart)) * colorT
+                            ) / 255f
+                        val particleAlpha = (
+                            alpha * fadeInScale * fadeOut * nearFade * (1f - randomA * opacityRandom) *
+                                alphaOverLife * colorFadeAlpha * colorAlpha
+                            ).toInt().coerceIn(0, 255)
+                        val particleColor = android.graphics.Color.rgb(
+                            (android.graphics.Color.red(colorOverLifeStart) + (android.graphics.Color.red(colorOverLifeEnd) - android.graphics.Color.red(colorOverLifeStart)) * colorT).toInt(),
+                            (android.graphics.Color.green(colorOverLifeStart) + (android.graphics.Color.green(colorOverLifeEnd) - android.graphics.Color.green(colorOverLifeStart)) * colorT).toInt(),
+                            (android.graphics.Color.blue(colorOverLifeStart) + (android.graphics.Color.blue(colorOverLifeEnd) - android.graphics.Color.blue(colorOverLifeStart)) * colorT).toInt()
                         )
                         val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).coerceAtLeast(0.5f)
                         val particleHeight = (sizeT * particleScale * perspective * depthScale).coerceAtLeast(0.5f)

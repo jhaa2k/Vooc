@@ -185,9 +185,9 @@ object VideoExportEngine {
                 }
             }
         }
-        project.document.elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BARS_SEGMENTS || it.type == StudioElementType.PARTICLES }.forEach { element ->
-            val uriText = ((element.value("Custom Bar Image") as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
-                ?: (element.value("Custom Image") as? ElementValue.Text)?.value.orEmpty())
+        project.document.elements.filter { it.type in setOf(StudioElementType.IMAGE, StudioElementType.BARS_SEGMENTS, StudioElementType.PARTICLES, StudioElementType.RGB_SPLIT, StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT) }.forEach { element ->
+            val uriText = listOf("Custom Bar Image", "Custom Image", "Image Source / File", "Target Image")
+                .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
             if (uriText.isNotBlank()) runCatching {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                     BitmapFactory.decodeStream(stream)?.let { imageCache[uriText] = it }
@@ -774,34 +774,120 @@ object VideoExportEngine {
                     paint.style = Paint.Style.FILL
                 }
                 StudioElementType.IMAGE -> {
-                    val uriText = textValue("Custom Image")
+                    val uriText = textValue("Custom Image", textValue("Image Source / File"))
                     val image = imageCache[uriText]
                     if (image != null) {
-                        val drawWidth = width * 0.42f * scale
-                        val drawHeight = drawWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
-                        canvas.drawBitmap(image, null, RectF(cx - drawWidth / 2f, cy - drawHeight / 2f, cx + drawWidth / 2f, cy + drawHeight / 2f), paint)
-                    } else {
-                        paint.style = Paint.Style.STROKE
-                        paint.strokeWidth = max(1f, width / 540f)
-                        canvas.drawCircle(cx, cy, min(width, height) * 0.1f * scale, paint)
-                        paint.style = Paint.Style.FILL
+                        val frameWidth = width * 0.45f * scale
+                        val frameHeight = height * 0.45f * scale
+                        val fitMode = if (textValue("Keep Aspect Ratio And Crop To Fit", "false") == "true") "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
+                        val keepRatio = textValue("Keep Aspect Ratio", "true") != "false"
+                        val leftCrop = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * image.width).toInt()
+                        val topCrop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * image.height).toInt()
+                        val rightCrop = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * image.width).toInt()
+                        val bottomCrop = (number("Crop Bottom", 0f).coerceIn(0f, 0.95f) * image.height).toInt()
+                        val src = RectF(leftCrop.toFloat(), topCrop.toFloat(),
+                            (image.width - rightCrop).coerceAtLeast(leftCrop + 1).toFloat(),
+                            (image.height - bottomCrop).coerceAtLeast(topCrop + 1).toFloat())
+                        val ratio = src.width() / src.height().coerceAtLeast(1f)
+                        val frameRatio = frameWidth / frameHeight.coerceAtLeast(1f)
+                        val dst = when {
+                            fitMode == "Stretch" || !keepRatio -> RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
+                            fitMode == "Fill (Cover)" -> {
+                                val dw = if (ratio > frameRatio) frameHeight * ratio else frameWidth
+                                val dh = if (ratio > frameRatio) frameHeight else frameWidth / ratio
+                                RectF(cx - dw / 2f, cy - dh / 2f, cx + dw / 2f, cy + dh / 2f)
+                            }
+                            else -> {
+                                val dw = if (ratio > frameRatio) frameWidth else frameHeight * ratio
+                                val dh = if (ratio > frameRatio) frameWidth / ratio else frameHeight
+                                RectF(cx - dw / 2f, cy - dh / 2f, cx + dw / 2f, cy + dh / 2f)
+                            }
+                        }
+                        val shape = textValue("Shape", textValue("Mask / Shape", "Rectangle"))
+                        val clip = android.graphics.Path().apply {
+                            when (shape) {
+                                "Circle", "Ellipse", "Circle/Oval" -> addOval(dst, android.graphics.Path.Direction.CW)
+                                "Triangle" -> { moveTo(dst.centerX(), dst.top); lineTo(dst.right, dst.bottom); lineTo(dst.left, dst.bottom); close() }
+                                else -> addRect(dst, android.graphics.Path.Direction.CW)
+                            }
+                        }
+                        val overlay = runCatching { android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF")) }.getOrDefault(android.graphics.Color.TRANSPARENT)
+                        val imagePaint = Paint(paint).apply {
+                            alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt()
+                            colorFilter = if (android.graphics.Color.alpha(overlay) > 0) android.graphics.PorterDuffColorFilter(overlay, android.graphics.PorterDuff.Mode.SRC_ATOP) else null
+                        }
+                        canvas.save()
+                        canvas.clipPath(clip)
+                        canvas.drawBitmap(image, src, dst, imagePaint)
+                        canvas.restore()
                     }
                 }
                 StudioElementType.RGB_SPLIT -> {
-                    val radius = min(width, height) * 0.09f * scale
-                    val offset = number("Split Amount", 4f) * width / 1080f
-                    listOf(android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE).forEachIndexed { index, tint ->
-                        paint.color = tint; paint.alpha = alpha; paint.style = Paint.Style.STROKE
-                        paint.strokeWidth = max(1f, width / 540f)
-                        canvas.drawCircle(cx + (index - 1) * offset, cy, radius, paint)
+                    val image = imageCache[textValue("Target Image")]
+                    if (image != null) {
+                        val frameWidth = width * 0.45f * scale
+                        val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
+                        val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * width / 1080f
+                        val angle = (number("Angle / Direction", 0f) + seconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
+                        val channelColors = listOf("Split Color 0", "Split Color 1", "Split Color 2").mapIndexed { index, key ->
+                            runCatching { android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index])) }.getOrDefault(listOf(android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE)[index])
+                        }
+                        val channelOffsets = listOf(
+                            number("Red Offset X", -4f) to number("Red Offset Y", 0f),
+                            number("Green Offset X", 0f) to number("Green Offset Y", 0f),
+                            number("Blue Offset X", 4f) to number("Blue Offset Y", 0f)
+                        )
+                        channelColors.forEachIndexed { index, tint ->
+                            val base = channelOffsets[index]
+                            val dx = (base.first + cos(angle) * amount * (index - 1)) * scale * width / 1080f
+                            val dy = (base.second + sin(angle) * amount * (index - 1)) * scale * width / 1080f
+                            val channelPaint = Paint(paint).apply {
+                                alpha = (alpha * 0.72f).toInt()
+                                colorFilter = android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.SRC_ATOP)
+                            }
+                            canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
+                                cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), channelPaint)
+                        }
                     }
-                    paint.style = Paint.Style.FILL
                 }
-                StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT -> {
-                    paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = max(1f, number("Blur Radius", 12f) * scale * width / 1080f * 0.2f)
-                    canvas.drawCircle(cx, cy, min(width, height) * 0.1f * scale, paint)
-                    paint.style = Paint.Style.FILL
+                StudioElementType.BLUR_EFFECT -> {
+                    val image = imageCache[textValue("Target Image")]
+                    if (image != null) {
+                        val frameWidth = width * 0.45f * scale
+                        val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
+                        canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f), paint)
+                    }
+                }
+                StudioElementType.MOTION_BLUR_EFFECT -> {
+                    val image = imageCache[textValue("Target Image")]
+                    if (image != null) {
+                        val frameWidth = width * 0.45f * scale
+                        val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
+                        val samples = number("Samples / Iterations", 8f).toInt().coerceIn(1, 64)
+                        val length = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * width / 1080f
+                        val angle = number("Blur Direction / Angle", 0f) * PI.toFloat() / 180f
+                        val trails = number("Trails / Echo", 0f).toInt().coerceIn(0, 32)
+                        val fade = number("Trail Opacity / Fade", 0.75f).coerceIn(0f, 1f)
+                        for (sample in samples downTo 1) {
+                            val t = sample.toFloat() / samples
+                            val dx = cos(angle) * length * t
+                            val dy = sin(angle) * length * t
+                            val p = Paint(paint).apply { alpha = (alpha * fade * (1f - t * 0.55f)).toInt() }
+                            canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
+                                cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), p)
+                        }
+                        repeat(trails) { index ->
+                            val t = (index + 1f) / (trails + 1f)
+                            val dx = -cos(angle) * length * t
+                            val dy = -sin(angle) * length * t
+                            val p = Paint(paint).apply { alpha = (alpha * fade * (1f - t)).toInt() }
+                            canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
+                                cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), p)
+                        }
+                        if (textValue("Show Unblurred Content", "false") == "true") {
+                            canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f), paint)
+                        }
+                    }
                 }
                 StudioElementType.SHAPE -> {
                     val shapeWidth = number("Width", 300f) * scale * width / 1080f

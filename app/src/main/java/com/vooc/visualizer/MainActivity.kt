@@ -2435,7 +2435,22 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val spawnInterval = number("Spawn Time", 0.02f).coerceIn(0f, 10f)
                         val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * size.width * 0.25f
                         val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * size.height * 0.25f
-                        val spawnArea = textValue("Spawn Area", "Point")
+                        val spawnArea = textValue("Particle Emitter Shape", textValue("Spawn Area", "Point"))
+                        val emitterPosition = props["Emitter Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                        val emitterX = center.x + (emitterPosition.x.toFloat() - 0.5f) * size.width
+                        val emitterY = center.y + (emitterPosition.y.toFloat() - 0.5f) * size.height
+                        val emitterRotation = number("Emitter Rotation", 0f) * PI.toFloat() / 180f
+                        val emitterRadius = number("Emitter Radius", 100f).coerceAtLeast(0f) * size.width / 1080f
+                        val emitterInnerRadius = number("Emitter Inner Radius", 0f).coerceIn(0f, number("Emitter Radius", 100f)) * size.width / 1080f
+                        val emitterArcStart = number("Emitter Arc Start", 0f) * PI.toFloat() / 180f
+                        val emitterArcSweep = number("Emitter Arc Sweep", 360f).coerceIn(-360f, 360f) * PI.toFloat() / 180f
+                        val emitterBurstCount = number("Emitter Burst Count", 0f).toInt().coerceAtLeast(0)
+                        val emitterBurstInterval = number("Emitter Burst Interval", 1f).coerceAtLeast(0.001f)
+                        val emitterLoop = props["Emitter Loop"] != ElementValue.Bool(false)
+                        val particleMass = number("Particle Mass", 1f).coerceAtLeast(0.001f)
+                        val particleDamping = number("Particle Damping", 0f).coerceIn(0f, 1f)
+                        val angularVelocity = number("Particle Angular Velocity", number("Rotation Speed", 0f))
+                        val angularVelocityRandom = number("Particle Angular Velocity Random", 0f).coerceAtLeast(0f)
                         val relativeToCenter = props["Vector Relative To Center"] == ElementValue.Bool(true)
                         val randomVector = props["Use Random Vector Instead"] == ElementValue.Bool(true)
                         val baseAngle = Math.toRadians(number("Vector Angle", number("Direction / Angle", -90f)).toDouble()).toFloat()
@@ -2484,29 +2499,32 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val randomC = kotlin.math.abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
                             val age = ((playbackSeconds + index * spawnInterval) % lifetime).coerceIn(0f, lifetime)
                             val lifeT = (age / lifetime).coerceIn(0f, 1f)
-                            val spawnX = when (spawnArea) {
-                                "Rectangle" -> center.x + (randomA * 2f - 1f) * spawnWidth
-                                "Circle" -> center.x + cos(randomA * 2f * PI.toFloat()) * spawnWidth * randomB
-                                "Line" -> center.x + (randomA * 2f - 1f) * spawnWidth
-                                "Edge" -> center.x + (if (randomA < 0.5f) -spawnWidth else spawnWidth)
-                                else -> center.x
+                            val emitterAngle = emitterArcStart + randomA * emitterArcSweep
+                            val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
+                            val localX: Float
+                            val localY: Float
+                            when (spawnArea) {
+                                "Rectangle" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
+                                "Ellipse", "Circle" -> { localX = cos(emitterAngle) * radialDistance.coerceAtLeast(spawnWidth * randomB); localY = sin(emitterAngle) * (if (spawnArea == "Circle") radialDistance else (emitterRadius * spawnHeight / spawnWidth.coerceAtLeast(1f))) }
+                                "Ring" -> { localX = cos(emitterAngle) * radialDistance; localY = sin(emitterAngle) * radialDistance }
+                                "Line" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = 0f }
+                                "Edge" -> { localX = if (randomA < 0.5f) -spawnWidth else spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
+                                else -> { localX = 0f; localY = 0f }
                             }
-                            val spawnY = when (spawnArea) {
-                                "Rectangle" -> center.y + (randomB * 2f - 1f) * spawnHeight
-                                "Circle" -> center.y + sin(randomA * 2f * PI.toFloat()) * spawnHeight * randomB
-                                "Line" -> center.y
-                                "Edge" -> center.y + (randomB * 2f - 1f) * spawnHeight
-                                else -> center.y
-                            }
+                            val spawnX = emitterX + localX * cos(emitterRotation) - localY * sin(emitterRotation)
+                            val spawnY = emitterY + localX * sin(emitterRotation) + localY * cos(emitterRotation)
                             val radialAngle = kotlin.math.atan2(spawnY - center.y, spawnX - center.x)
                             val angle = when {
                                 randomVector -> randomA * 2f * PI.toFloat()
                                 relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle
                                 else -> baseAngle + (randomA - 0.5f) * spreadAngle
                             }
-                            val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom)
+                            val burstIndex = if (emitterBurstCount > 0) (playbackSeconds / emitterBurstInterval).toInt() else 0
+                            val inBurst = emitterBurstCount <= 0 || (index % count.coerceAtLeast(1)) < emitterBurstCount
+                            val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                             var vx = cos(angle) * velocity
                             var vy = sin(angle) * velocity
+                            if (emitterBurstCount > 0 && (!inBurst || (!emitterLoop && burstIndex > 0))) { vx = 0f; vy = 0f }
                             val fieldX = center.x + forcePosition.x.toFloat() * size.width - center.x
                             val fieldY = center.y + forcePosition.y.toFloat() * size.height - center.y
                             val dx = fieldX - spawnX
@@ -2520,8 +2538,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val frequency = sineFrequency * (1f + randomB * sineFrequencyRandom)
                             val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
                                 sineMagnitude * (1f + randomA * sineMagnitudeRandom)
-                            var px = spawnX + vx * age * 0.01f + gravityX * age * age * 0.005f + wave
-                            var py = spawnY + vy * age * 0.01f + gravityY * age * age * 0.005f
+                            val dampingFactor = (1f - particleDamping).coerceAtLeast(0f)
+                            val travelTime = if (particleDamping > 0f) (1f - kotlin.math.exp(-particleDamping * age)) / particleDamping else age
+                            var px = spawnX + vx * travelTime * 0.01f + gravityX * age * age * 0.005f + wave * dampingFactor
+                            var py = spawnY + vy * travelTime * 0.01f + gravityY * age * age * 0.005f
                             val depth = randomB * perspectiveDepth
                             val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)
                             val depthScale = (1f + number("End Size ZFactor", 0f) * depth / 1000f).coerceAtLeast(0.05f)
@@ -2541,7 +2561,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             )
                             val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).dp.toPx().coerceAtLeast(0.5f)
                             val particleHeight = (sizeT * particleScale * perspective * depthScale).dp.toPx().coerceAtLeast(0.5f)
-                            val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Rotation Speed", 0f) * age
+                            val randomAngularVelocity = angularVelocity + (randomB * 2f - 1f) * angularVelocityRandom
+                            val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
                             val trailX = vx * trailLength * 0.001f
                             val trailY = vy * trailLength * 0.001f
                             fun drawParticleAt(x: Float, y: Float) {

@@ -271,7 +271,22 @@ object ElementPropertyCatalog {
         number("Blur Radius", "Background", 24.0, 0.0, 256.0),
         number("Corner Radius", "Background", 0.0, 0.0, 512.0),
         text("Color Overlay", "Background", "#00000000"),
-        number("Opacity / Alpha", "Background", 1.0, 0.0, 1.0)
+        number("Opacity / Alpha", "Background", 1.0, 0.0, 1.0),
+        text("Background Fit Alignment", "Background", "Center", listOf("Center", "Top", "Bottom", "Left", "Right")),
+        bool("Background Tile", "Background", false),
+        number("Background Tile Scale", "Background", 1.0, 0.01, 100.0),
+        number("Background Image Offset X", "Background", 0.0, -10000.0, 10000.0),
+        number("Background Image Offset Y", "Background", 0.0, -10000.0, 10000.0),
+        number("Background Blur Quality", "Background", 1.0, 0.1, 4.0),
+        number("Background Brightness", "Background", 1.0, 0.0, 4.0),
+        number("Background Contrast", "Background", 1.0, 0.0, 4.0),
+        number("Background Saturation", "Background", 1.0, 0.0, 4.0),
+        bool("Background Grayscale", "Background", false),
+        bool("Background Invert", "Background", false),
+        text("Background Gradient Type", "Background", "Linear", listOf("Linear", "Radial")),
+        text("Background Gradient Start", "Background", "#FF000000"),
+        text("Background Gradient End", "Background", "#FFFFFFFF"),
+        number("Background Gradient Angle", "Background", 0.0, -360.0, 360.0)
     )
 
 
@@ -1128,7 +1143,18 @@ object ElementPropertyCatalog {
         number("Reflection Opacity", "Mirror", 1.0, 0.0, 1.0),
         bool("Mirror Original", "Mirror", true),
         bool("Mirror Flip", "Mirror", false),
-        text("Mirror Blend Mode", "Mirror", "Alpha", listOf("Alpha", "Add", "Screen", "Multiply", "Overlay"))
+        text("Mirror Blend Mode", "Mirror", "Alpha", listOf("Alpha", "Add", "Screen", "Multiply", "Overlay")),
+        bool("Mirror Enabled", "Mirror", true),
+        text("Mirror Origin", "Mirror", "Center", listOf("Center", "Top", "Bottom", "Left", "Right", "Custom")),
+        ElementPropertySpec("Mirror Center", "Mirror", ElementValueType.VECTOR2, ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        number("Mirror Rotation", "Mirror", 0.0, -360.0, 360.0),
+        number("Mirror Scale", "Mirror", 1.0, 0.0, 10.0),
+        number("Mirror Spacing", "Mirror", 0.0, -1024.0, 1024.0),
+        number("Mirror Color Tint", "Mirror", 0.0, 0.0, 1.0),
+        text("Mirror Tint Color", "Mirror", "#FFFFFFFF"),
+        bool("Mirror Use Source Alpha", "Mirror", true),
+        bool("Mirror Seamless Edge", "Mirror", true),
+        number("Mirror Edge Softness", "Mirror", 0.0, 0.0, 1.0)
     )
 
     private val customShader = listOf(
@@ -1150,7 +1176,20 @@ object ElementPropertyCatalog {
         text("Shader Uniform 3 Value", "Shader", "#FFFFFFFF"),
         text("Shader Blend Mode", "Shader", "Alpha", listOf("Alpha", "Add", "Screen", "Multiply", "Overlay")),
         bool("Shader Use Audio", "Shader", false),
-        text("Shader Audio Source", "Shader", "Overall Audio Level", listOf("Overall Audio Level", "Bass", "Mid", "Treble", "Beat", "Peak", "RMS"))
+        text("Shader Audio Source", "Shader", "Overall Audio Level", listOf("Overall Audio Level", "Bass", "Mid", "Treble", "Beat", "Peak", "RMS")),
+        text("Shader Precision", "Shader", "Medium", listOf("Low", "Medium", "High")),
+        bool("Shader Use Alpha", "Shader", true),
+        bool("Shader Premultiplied Alpha", "Shader", false),
+        bool("Shader Use Time", "Shader", true),
+        bool("Shader Use Resolution", "Shader", true),
+        bool("Shader Use Mouse", "Shader", false),
+        number("Shader Audio Sensitivity", "Shader", 1.0, 0.0, 32.0),
+        number("Shader Audio Smoothing", "Shader", 0.2, 0.0, 1.0),
+        text("Shader Audio Band", "Shader", "Full", listOf("Full", "Bass", "Mid", "Treble")),
+        number("Shader Render Scale", "Shader", 1.0, 0.1, 2.0),
+        integer("Shader Frame Skip", "Shader", 0, 0.0, 10.0),
+        bool("Shader Debug Preview", "Shader", false),
+        text("Shader Error Policy", "Shader", "Disable On Error", listOf("Disable On Error", "Keep Last Frame", "Show Error Overlay"))
     )
 
     private val composition = listOf(
@@ -1169,7 +1208,18 @@ object ElementPropertyCatalog {
         number("Composition Time Offset", "Composition", 0.0, -86400.0, 86400.0),
         bool("Composition Loop", "Composition", false),
         bool("Composition Isolated Audio", "Composition", false),
-        bool("Composition Export Enabled", "Composition", true)
+        bool("Composition Export Enabled", "Composition", true),
+        text("Composition Resolution Preset", "Composition", "Custom", listOf("Custom", "720p", "1080p", "1440p", "4K", "Vertical 1080x1920", "Square 1080x1080")),
+        text("Composition Frame Rate Mode", "Composition", "Constant", listOf("Constant", "Variable")),
+        text("Composition Pixel Format", "Composition", "RGBA 8-bit", listOf("RGBA 8-bit", "RGBA 16-bit", "RGB 8-bit")),
+        text("Composition Color Space", "Composition", "sRGB", listOf("sRGB", "Display P3", "Linear sRGB")),
+        bool("Composition Transparent Background", "Composition", false),
+        bool("Composition Use Audio", "Composition", true),
+        number("Composition Audio Gain", "Composition", 1.0, 0.0, 8.0),
+        number("Composition Audio Offset", "Composition", 0.0, -86400.0, 86400.0),
+        bool("Composition Preserve Aspect Ratio", "Composition", true),
+        text("Composition Scaling Mode", "Composition", "Fit", listOf("Fit", "Fill", "Stretch")),
+        integer("Composition Layer Limit", "Composition", 128, 1.0, 4096.0)
     )
 
     private val sharedAnimation = listOf(

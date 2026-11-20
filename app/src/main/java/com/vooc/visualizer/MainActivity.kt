@@ -2271,6 +2271,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val glowAlpha = number("Glow Strength", 0.35f).coerceIn(0f, 1f)
                         val barGlowRadius = number("Bar Glow Radius", 8f).dp.toPx().coerceIn(0f, 256.dp.toPx())
                         val barGlowColorStrength = number("Bar Glow Color Strength", 1f).coerceIn(0f, 1f)
+                        val barSoftnessRadius = number("Softness", 0f).coerceIn(0f, 20f).dp.toPx()
                         val peakEnabled = props["Peak / Cap"] == ElementValue.Bool(true)
                         val peakWidth = number("Peak Width", 2f).dp.toPx().coerceAtLeast(0.5f)
                         val barRotation = number("Bar Rotation", 0f)
@@ -2293,6 +2294,22 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     "Cross" -> { moveTo(left + width * 0.35f, top); lineTo(left + width * 0.65f, top); lineTo(left + width * 0.65f, top + height * 0.35f); lineTo(left + width, top + height * 0.35f); lineTo(left + width, top + height * 0.65f); lineTo(left + width * 0.65f, top + height * 0.65f); lineTo(left + width * 0.65f, top + height); lineTo(left + width * 0.35f, top + height); lineTo(left + width * 0.35f, top + height * 0.65f); lineTo(left, top + height * 0.65f); lineTo(left, top + height * 0.35f); lineTo(left + width * 0.35f, top + height * 0.35f); close() }
                                     "Wave" -> { moveTo(left, top + height * 0.2f); lineTo(left + width * 0.5f, top); lineTo(left + width, top + height * 0.2f); lineTo(left + width, top + height); lineTo(left + width * 0.5f, top + height * 0.8f); lineTo(left, top + height); close() }
                                     else -> { moveTo(left, top); lineTo(left + width, top); lineTo(left + width, top + height); lineTo(left, top + height); close() }
+                                }
+                            }
+                            if (barSoftnessRadius > 0f) {
+                                val softnessPath = if (design == "Circle / Dot") {
+                                    android.graphics.Path().apply {
+                                        addCircle(left + width / 2f, top + height / 2f, (height / 2f).coerceAtLeast(0.5f), android.graphics.Path.Direction.CW)
+                                    }
+                                } else path.asAndroidPath()
+                                drawIntoCanvas { composeCanvas ->
+                                    val softnessPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = fill.toArgb()
+                                        alpha = (opacity * 255f).toInt().coerceIn(0, 255)
+                                        style = android.graphics.Paint.Style.FILL
+                                        maskFilter = android.graphics.BlurMaskFilter(barSoftnessRadius, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                                    }
+                                    composeCanvas.nativeCanvas.drawPath(softnessPath, softnessPaint)
                                 }
                             }
                             if (glowEnabled && barGlowRadius > 0f && barGlowColorStrength > 0f) {

@@ -530,7 +530,22 @@ object ElementPropertyCatalog {
         number("Generated Album Art Hint Shift Hue", "Generated Album Art", 0.0, -360.0, 360.0),
         bool("Generated Album Art Hint No Text", "Generated Album Art", false),
         bool("Generated Album Art Hint Force Gen", "Generated Album Art", false),
-        text("Generated Album Art Color", "Generated Album Art", "#FFFFFFFF")
+        text("Generated Album Art Color", "Generated Album Art", "#FFFFFFFF"),
+        text("Image Sampling", "Image", "Linear", listOf("Nearest", "Linear", "Cubic")),
+        text("Image Tile Mode X", "Image", "Clamp", listOf("Clamp", "Repeat", "Mirror")),
+        text("Image Tile Mode Y", "Image", "Clamp", listOf("Clamp", "Repeat", "Mirror")),
+        number("Image Brightness", "Color", 1.0, 0.0, 4.0),
+        number("Image Contrast", "Color", 1.0, 0.0, 4.0),
+        number("Image Hue", "Color", 0.0, -360.0, 360.0),
+        number("Image Gamma", "Color", 1.0, 0.1, 4.0),
+        number("Image Color Temperature", "Color", 6500.0, 1000.0, 12000.0),
+        bool("Image Flip Horizontal", "Image", false),
+        bool("Image Flip Vertical", "Image", false),
+        number("Image Parallax X", "Image", 0.0, -1.0, 1.0),
+        number("Image Parallax Y", "Image", 0.0, -1.0, 1.0),
+        text("Image Border Color", "Image", "#00000000"),
+        number("Image Border Width", "Image", 0.0, 0.0, 256.0),
+        text("Image Custom Shape Path", "Image", "")
     )
 
     private val rgbGeneral = listOf(
@@ -585,6 +600,16 @@ object ElementPropertyCatalog {
         number("Blue Offset X", "RGB Split", 4.0, -256.0, 256.0),
         number("Blue Offset Y", "RGB Split", 0.0, -256.0, 256.0),
         number("Split Amount / Distance", "RGB Split", 4.0, 0.0, 256.0),
+        text("RGB Split Mode", "RGB Split", "Directional", listOf("Directional", "Radial", "Chromatic Aberration", "Channel Offset")),
+        bool("RGB Split Enabled", "RGB Split", true),
+        number("Red Channel Opacity", "RGB Split", 1.0, 0.0, 1.0),
+        number("Green Channel Opacity", "RGB Split", 1.0, 0.0, 1.0),
+        number("Blue Channel Opacity", "RGB Split", 1.0, 0.0, 1.0),
+        number("RGB Split Angle Variation", "RGB Split", 0.0, -180.0, 180.0),
+        number("RGB Split Audio Amount", "RGB Split", 0.0, 0.0, 32.0),
+        text("RGB Split Audio Source", "RGB Split", "Overall Audio Level", listOf("Overall Audio Level", "Bass", "Mid", "Treble", "Beat")),
+        number("RGB Split Edge Softness", "RGB Split", 0.0, 0.0, 1.0),
+        bool("RGB Split Preserve Luminance", "RGB Split", true),
         number("Angle / Direction", "RGB Split", 0.0, -360.0, 360.0),
         ElementPropertySpec("Center / Focus Point", "RGB Split", ElementValueType.VECTOR2,
             ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
@@ -644,7 +669,19 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(0.0, 0.0), 0.0, 10.0),
         text("1layer Color", "Blur", "#FFFFFFFF"),
         text("2layer Color", "Blur", "#FFFFFFFF"),
-        text("3layer Color", "Blur", "#FFFFFFFF")
+        text("3layer Color", "Blur", "#FFFFFFFF"),
+        text("Blur Algorithm", "Blur", "Gaussian", listOf("Gaussian", "Box", "Kawase", "Directional", "Radial", "Zoom")),
+        integer("Blur Passes", "Blur", 2, 1.0, 16.0),
+        number("Blur Quality", "Blur", 1.0, 0.1, 4.0),
+        number("Blur Direction", "Blur", 0.0, -360.0, 360.0),
+        number("Blur Zoom Amount", "Blur", 0.0, 0.0, 4.0),
+        ElementPropertySpec("Blur Center", "Blur", ElementValueType.VECTOR2, ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        bool("Blur Alpha Only", "Blur", false),
+        bool("Blur Preserve Edges", "Blur", false),
+        text("Blur Mask Mode", "Blur", "None", listOf("None", "Alpha", "Luminance", "Inverted Alpha", "Inverted Luminance")),
+        number("Blur Mask Strength", "Blur", 1.0, 0.0, 1.0),
+        number("Blur Threshold", "Blur", 0.0, 0.0, 1.0),
+        number("Blur Spread", "Blur", 0.0, 0.0, 128.0)
     )
 
     private val barsGeneral = listOf(
@@ -756,6 +793,25 @@ object ElementPropertyCatalog {
         number("Reaction Delay", "Behavior", 0.0, 0.0, 5000.0),
         number("Accumulated Delay", "Behavior", 0.0, 0.0, 5000.0),
         number("Reaction Accumulated Delay", "Behavior", 0.0, 0.0, 5000.0),
+        number("Frequency Range Start", "Audio", 20.0, 1.0, 24000.0),
+        number("Frequency Range End", "Audio", 18000.0, 1.0, 24000.0),
+        integer("Frequency Band Offset", "Audio", 0, -2048.0, 2048.0),
+        number("Frequency Mapping Curve", "Audio", 1.0, 0.1, 8.0),
+        number("Frequency Mapping Bias", "Audio", 0.0, -1.0, 1.0),
+        text("Audio Channel", "Audio", "Mixed", listOf("Mixed", "Left", "Right", "Mid", "Side")),
+        text("Amplitude Mode", "Audio", "Magnitude", listOf("Magnitude", "Power", "Decibel", "RMS", "Peak")),
+        number("Amplitude Threshold", "Audio", 0.0, 0.0, 1.0),
+        number("Amplitude Offset", "Audio", 0.0, -1.0, 1.0),
+        number("Bar Height Random", "Layout", 0.0, 0.0, 1.0),
+        number("Bar Width Random", "Layout", 0.0, 0.0, 1.0),
+        number("Bar Spacing Random", "Layout", 0.0, 0.0, 1.0),
+        bool("Alternate Bar Direction", "Layout", false),
+        bool("Use Audio Provider Smoothing", "Behavior", true),
+        bool("Peak Hold Enabled", "Modifiers", true),
+        number("Peak Reset Threshold", "Modifiers", 0.0, 0.0, 1.0),
+        number("Peak Fall Delay", "Modifiers", 0.0, 0.0, 10.0),
+        number("Bar Glow Radius", "Modifiers", 8.0, 0.0, 256.0),
+        number("Bar Glow Color Strength", "Modifiers", 1.0, 0.0, 1.0),
         number("Softness", "Behavior", 0.0, 0.0, 1.0),
         text("Segment 1 Color From", "Segment 1", "#FF56D8FF"),
         text("Segment 1 Color To", "Segment 1", "#FF9B5CFF"),
@@ -872,7 +928,29 @@ object ElementPropertyCatalog {
         number("Side Sine Wave Freq", "Wave Behaviour", 0.0, -100.0, 100.0),
         number("Side Sine Wave Freq Random", "Wave Behaviour", 0.0, 0.0, 1.0),
         number("Side Sine Wave Mag", "Wave Behaviour", 0.0, -1000.0, 1000.0),
-        number("Side Sine Wave Mag Random", "Wave Behaviour", 0.0, 0.0, 1.0)
+        number("Side Sine Wave Mag Random", "Wave Behaviour", 0.0, 0.0, 1.0),
+        text("Particle Emitter Shape", "Emitter", "Point", listOf("Point", "Line", "Rectangle", "Ellipse", "Ring", "Edge", "Custom")),
+        ElementPropertySpec("Emitter Position", "Emitter", ElementValueType.VECTOR2, ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
+        number("Emitter Rotation", "Emitter", 0.0, -360.0, 360.0),
+        number("Emitter Radius", "Emitter", 100.0, 0.0, 10000.0),
+        number("Emitter Inner Radius", "Emitter", 0.0, 0.0, 10000.0),
+        number("Emitter Arc Start", "Emitter", 0.0, -360.0, 360.0),
+        number("Emitter Arc Sweep", "Emitter", 360.0, -360.0, 360.0),
+        bool("Emitter Loop", "Emitter", true),
+        number("Emitter Burst Count", "Emitter", 0.0, 0.0, 10000.0),
+        number("Emitter Burst Interval", "Emitter", 1.0, 0.0, 3600.0),
+        number("Particle Rotation Random", "Particles", 0.0, 0.0, 360.0),
+        number("Particle Angular Velocity", "Particles", 0.0, -3600.0, 3600.0),
+        number("Particle Angular Velocity Random", "Particles", 0.0, 0.0, 3600.0),
+        number("Particle Mass", "Particles", 1.0, 0.001, 10000.0),
+        number("Particle Damping", "Particles", 0.0, 0.0, 1.0),
+        bool("Particle Screen Blend", "Appearance", false),
+        bool("Particle Additive Blend", "Appearance", false),
+        number("Particle Trail Width", "Appearance", 1.0, 0.0, 100.0),
+        number("Particle Trail Fade", "Appearance", 0.8, 0.0, 1.0),
+        text("Particle Shape", "Appearance", "Image", listOf("Image", "Circle", "Square", "Triangle", "Star", "Line")),
+        number("Particle Opacity Random", "Appearance", 0.0, 0.0, 1.0),
+        number("Particle Color Random", "Appearance", 0.0, 0.0, 1.0)
     )
 
     private val textGeneral = listOf(
@@ -1027,7 +1105,15 @@ object ElementPropertyCatalog {
         text("Relative Motion Mode", "Motion Blur", "Composition", listOf(
             "Relative", "Absolute", "Target Relative"
         )),
-        number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0)
+        number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0),
+        text("Motion Blur Mode", "Motion Blur", "Directional", listOf("Directional", "Radial", "Zoom", "Vector")),
+        number("Motion Blur Shutter Angle", "Motion Blur", 180.0, 0.0, 360.0),
+        number("Motion Blur Exposure", "Motion Blur", 0.5, 0.0, 1.0),
+        number("Motion Blur Sample Jitter", "Motion Blur", 0.0, 0.0, 1.0),
+        number("Motion Blur Velocity Scale", "Motion Blur", 1.0, 0.0, 32.0),
+        bool("Motion Blur Use Alpha", "Motion Blur", true),
+        bool("Motion Blur Normalize Samples", "Motion Blur", true),
+        text("Motion Blur Edge Mode", "Motion Blur", "Clamp", listOf("Clamp", "Transparent", "Repeat", "Mirror"))
     )
 
     private val mirrorEffect = listOf(

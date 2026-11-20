@@ -848,9 +848,10 @@ object VideoExportEngine {
                     val minHeightScale = number("Min Height Scale", 0f).coerceIn(0f, 1f)
                     val minHeight = maxOf(number("Min Height", 0f) * width / 1080f, maxHeight * minHeightScale).coerceIn(0f, maxHeight)
                     val design = textValue("Bar Design", "Rounded Rect")
+                    val orientation = textValue("Orientation", "Vertical")
                     val alignment = textValue("Alignment", "Bottom")
                     val mirrorMode = textValue("Mirror Mode", "Off")
-                    val mirrorX = mirrorMode == "Horizontal" || mirrorMode == "Both" || (element.value("Mirror") as? ElementValue.Bool)?.value == true
+                    val mirrorX = orientation == "Mirror" || mirrorMode == "Horizontal" || mirrorMode == "Both" || (element.value("Mirror") as? ElementValue.Bool)?.value == true
                     val mirrorY = mirrorMode == "Vertical" || mirrorMode == "Both" || (element.value("Center Symmetry") as? ElementValue.Bool)?.value == true
                     val outline = (element.value("Outline / Stroke") as? ElementValue.Bool)?.value == true
                     val strokeWidth = (number("Stroke Width", 1.5f) * width / 1080f).coerceAtLeast(0.5f)
@@ -886,6 +887,8 @@ object VideoExportEngine {
                         (android.graphics.Color.green(a) + (android.graphics.Color.green(b) - android.graphics.Color.green(a)) * t).toInt(),
                         (android.graphics.Color.blue(a) + (android.graphics.Color.blue(b) - android.graphics.Color.blue(a)) * t).toInt()
                     )
+                    canvas.save()
+                    if (orientation == "Horizontal") canvas.rotate(90f, cx, cy)
                     repeat(count) { index ->
                         val sourceIndex = if (mirrorX) minOf(index, count - 1 - index) else index
                         var level = levels[sourceIndex].coerceIn(0f, 1f)
@@ -1007,6 +1010,7 @@ object VideoExportEngine {
                         if (mirrorY) drawShape(baseline, baseline + h)
                         canvas.restore()
                     }
+                    canvas.restore()
                     paint.color = color
                     paint.alpha = alpha
                     paint.style = Paint.Style.FILL

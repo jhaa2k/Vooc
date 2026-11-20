@@ -334,6 +334,8 @@ object ElementPropertyCatalog {
     )
 
     private val provider = listOf(
+        text("Tag", "General", "Audio Provider"),
+        bool("Provider Enabled", "General", true),
         text("Sample Provider", "General", "Spectrum", listOf("Spectrum")),
         integer("Sample Out Count", "Spectrum", 201, 1.0, 2048.0),
         bool("Mirror Samples", "Spectrum", false),
@@ -354,6 +356,13 @@ object ElementPropertyCatalog {
         number("Beat Range Bar Last", "Beat", 0.35, 0.0, 1.0),
         number("Beat Range Value Lower", "Beat", 0.0, 0.0, 100.0),
         number("Beat Range Value Higher", "Beat", 50.0, 0.0, 100.0),
+        text("Analysis Mode", "Performance", "Spectrum + Beat", listOf("Spectrum", "Beat", "Spectrum + Beat")),
+        text("Channel Mode", "Performance", "Mono Mix", listOf("Mono Mix", "Left", "Right", "Stereo Average")),
+        text("Window Function", "Performance", "Hann", listOf("Rectangular", "Hann", "Hamming", "Blackman")),
+        bool("Beat Detection Enabled", "Beat", true),
+        number("Beat Sensitivity", "Beat", 1.0, 0.0, 8.0),
+        number("Beat Threshold", "Beat", 0.65, 0.0, 1.0),
+        number("Beat Release", "Beat", 0.25, 0.0, 5.0),
         text("Fft Size", "Performance", "2048", listOf("256", "512", "1024", "2048", "4096", "8192"))
     )
 

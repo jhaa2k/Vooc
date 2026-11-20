@@ -3116,11 +3116,21 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 canvas.nativeCanvas.drawPath(shapePath.asAndroidPath(), shadowPaint)
                             }
                         }
+                        val shapeBlendMode = when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
+                            "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                            "Multiply", "Subtractive" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                            "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
+                            "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
+                            "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Difference
+                            "Copy" -> androidx.compose.ui.graphics.BlendMode.Src
+                            else -> androidx.compose.ui.graphics.BlendMode.SrcOver
+                        }
                         if (shapeType == "Line") {
                             val lineWidth = number("Stroke / Border Width", 3f).dp.toPx().coerceAtLeast(1f)
-                            drawPath(shapePath, fillColor, style = Stroke(width = lineWidth, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
+                            drawPath(shapePath, fillColor, blendMode = shapeBlendMode, style = Stroke(width = lineWidth, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
                         } else {
-                            drawPath(shapePath, brush = gradientBrush)
+                            drawPath(shapePath, brush = gradientBrush, blendMode = shapeBlendMode)
                         }
                         val strokeWidth = number("Stroke / Border Width", 0f).dp.toPx()
                         if (strokeWidth > 0f && shapeType != "Line") {
@@ -3138,7 +3148,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val strokeAlignment = textValue("Stroke Alignment", "Center")
                             val resolvedStrokeWidth = if (strokeAlignment == "Center") strokeWidth else strokeWidth * 2f
                             val drawStroke: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit = {
-                                drawPath(shapePath, strokeColor, style = Stroke(width = resolvedStrokeWidth, miter = number("Stroke Miter Limit", 4f).coerceIn(1f, 100f), pathEffect = pathEffect, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
+                                drawPath(shapePath, strokeColor, blendMode = shapeBlendMode, style = Stroke(width = resolvedStrokeWidth, miter = number("Stroke Miter Limit", 4f).coerceIn(1f, 100f), pathEffect = pathEffect, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
                             }
                             when (strokeAlignment) {
                                 "Inside" -> clipPath(shapePath) { drawStroke() }

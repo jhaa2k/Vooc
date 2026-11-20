@@ -962,8 +962,9 @@ object VideoExportEngine {
                                     "Hexagon" -> { moveTo(x + barWidth * 0.22f, yTop); lineTo(x + barWidth * 0.78f, yTop); lineTo(x + barWidth, (yTop + yBottom) / 2f); lineTo(x + barWidth * 0.78f, yBottom); lineTo(x + barWidth * 0.22f, yBottom); lineTo(x, (yTop + yBottom) / 2f); close() }
                                     "Pentagon", "Octagon" -> {
                                         val sides = if (design == "Pentagon") 5 else 8
+                                        val angleOffset = if (design == "Octagon") -22.5f else -90f
                                         for (point in 0 until sides) {
-                                            val angle = (point * 360f / sides - 90f) * PI.toFloat() / 180f
+                                            val angle = (point * 360f / sides + angleOffset) * PI.toFloat() / 180f
                                             val px = x + barWidth * (0.5f + cos(angle) * 0.5f)
                                             val py = yTop + h * (0.5f + sin(angle) * 0.5f)
                                             if (point == 0) moveTo(px, py) else lineTo(px, py)

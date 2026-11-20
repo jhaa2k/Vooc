@@ -1222,7 +1222,7 @@ object VideoExportEngine {
                         val fadeInScale = if (fadeTime > 0f) (age / fadeTime).coerceIn(0f, 1f) else 1f
                         val sizeT = (startSize + (endSize * endVariation - startSize) * lifeT) *
                             (1f + (fadeInScale - 1f) * number("Fade In Size", 1f).coerceIn(0f, 10f))
-                        val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
+                        val fadeOut = if (fadeTime > 0f) ((particleLifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
                         val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
                         val particleAlpha = (alpha * fadeInScale * fadeOut * nearFade * (1f - randomA * opacityRandom)).toInt().coerceIn(0, 255)
                         val colorT = (lifeT + (randomC - 0.5f) * colorRandom).coerceIn(0f, 1f)

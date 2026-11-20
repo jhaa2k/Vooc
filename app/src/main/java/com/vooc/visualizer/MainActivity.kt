@@ -2030,8 +2030,30 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
                             val barHeight = (minHeight + level * maxHeight).coerceIn(0f, size.height * 0.95f)
                             val drawHeight = if (centerSymmetry) barHeight / 2f else barHeight
-                            val x = center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
-                            val baseline = when (alignment) {
+                            val customPathMode = textValue("Shape Path", "Horizontal Line") == "Custom Path"
+                            val customPoints = if (customPathMode) textValue("Custom Path Points", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5")
+                                .split(";").mapNotNull { token ->
+                                    val parts = token.trim().split(",")
+                                    if (parts.size != 2) null else runCatching {
+                                        parts[0].trim().toFloat().coerceIn(0f, 1f) to parts[1].trim().toFloat().coerceIn(0f, 1f)
+                                    }.getOrNull()
+                                }.take(128) else emptyList()
+                            fun pathPoint(t: Float): Pair<Float, Float> {
+                                if (customPoints.size < 2) return (center.x - totalWidth / 2f + t * totalWidth) to (center.y + size.height * 0.25f)
+                                val scaled = t.coerceIn(0f, 1f) * (customPoints.size - 1)
+                                val segmentIndex = scaled.toInt().coerceAtMost(customPoints.size - 2)
+                                val fraction = scaled - segmentIndex
+                                val a = customPoints[segmentIndex]
+                                val b = customPoints[segmentIndex + 1]
+                                return (center.x - totalWidth / 2f + (a.first + (b.first - a.first) * fraction) * totalWidth) to
+                                    (center.y - size.height * 0.4f + (a.second + (b.second - a.second) * fraction) * size.height * 0.8f)
+                            }
+                            val point = if (customPathMode) pathPoint(if (count <= 1) 0f else index.toFloat() / (count - 1)) else 0f to 0f
+                            val beforePoint = if (customPathMode) pathPoint((index.toFloat() / count - 0.01f).coerceAtLeast(0f)) else point
+                            val afterPoint = if (customPathMode) pathPoint((index.toFloat() / (count - 1).coerceAtLeast(1) + 0.01f).coerceAtMost(1f)) else point
+                            val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
+                            val x = if (customPathMode) point.first - barWidth / 2f + barOffset else center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
+                            val baseline = if (customPathMode) point.second else when (alignment) {
                                 "Top" -> center.y - size.height * 0.38f
                                 "Center" -> center.y
                                 "Stretch" -> center.y + size.height * 0.44f
@@ -2051,7 +2073,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 )
                                 else -> elementColor
                             }
-                            rotate(barRotation, Offset(x + barWidth / 2f, baseline)) {
+                            rotate(barRotation + customAngle, Offset(x + barWidth / 2f, baseline)) {
                                 val segmentHeight = ((height - segmentGap * (segmentsPerBar - 1)) / segmentsPerBar).coerceAtLeast(0.5f)
                                 repeat(segmentsPerBar) { segment ->
                                     val segmentTop = top + segment * (segmentHeight + segmentGap)

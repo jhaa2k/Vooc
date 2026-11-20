@@ -139,6 +139,13 @@ data class ElementDocument(
         return when (name) {
             "Tag" -> updated.copy(tag = (valid as ElementValue.Text).value)
             "Visible" -> updated.copy(visible = (valid as ElementValue.Bool).value)
+            "Preset" -> {
+                var result = updated
+                ElementSpecAdditions.presetValues(type, (valid as ElementValue.Text).value).forEach { (key, presetValue) ->
+                    result = result.withValue(key, presetValue)
+                }
+                result
+            }
             else -> updated
         }
     }
@@ -807,7 +814,11 @@ object ElementPropertyCatalog {
         number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0)
     )
 
-    fun forElement(type: StudioElementType): List<ElementPropertySpec> {
+    /** Base catalog plus every specification property from [ElementSpecAdditions] (no duplicate names). */
+    fun forElement(type: StudioElementType): List<ElementPropertySpec> =
+        ElementSpecAdditions.apply(type, baseSpecs(type))
+
+    private fun baseSpecs(type: StudioElementType): List<ElementPropertySpec> {
         if (type == StudioElementType.AUDIO_PROVIDER) return provider
         if (type == StudioElementType.BLUR_EFFECT) {
             return (blurGeneral + blurAppearance + blurEffect)

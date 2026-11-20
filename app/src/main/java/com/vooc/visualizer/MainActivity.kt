@@ -123,6 +123,7 @@ import com.vooc.visualizer.studio.MeasureWhatEngine
 import com.vooc.visualizer.studio.AudioReactivityRuntime
 import com.vooc.visualizer.studio.audioReactivitySources
 import com.vooc.visualizer.studio.audioReactivityColor
+import com.vooc.visualizer.studio.processBarSpectrum
 import com.vooc.visualizer.studio.audioReactivityTransform
 import com.vooc.visualizer.studio.StudioPresets
 import com.vooc.visualizer.studio.TemplateStore
@@ -2102,12 +2103,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     StudioElementType.BARS_SEGMENTS -> {
                         val rawSamples: FloatArray = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
                         val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
-                        val amplitudeScale = number("Amplitude Scale", 1f).coerceIn(0f, 16f)
-                        val gamma = number("Amplitude Gamma", 1f).coerceIn(0.1f, 4f)
-                        val input = FloatArray(rawSamples.size.coerceAtLeast(1)) { i ->
-                            (rawSamples.getOrElse(i) { 0f }.coerceAtLeast(0f) * amplitudeScale).coerceAtLeast(0f)
-                                .let { value -> (value / (1f + value)).pow(gamma).coerceIn(0f, 1f) }
-                        }
+                        val input = processBarSpectrum(
+                            samples = rawSamples,
+                            amplitudeScale = number("Amplitude Scale", 1f),
+                            gamma = number("Amplitude Gamma", 1f),
+                            amplitudeMode = textValue("Amplitude Mode", "Magnitude"),
+                            threshold = number("Amplitude Threshold", 0f),
+                            offset = number("Amplitude Offset", 0f),
+                            mappingCurve = number("Frequency Mapping Curve", 1f),
+                            mappingBias = number("Frequency Mapping Bias", 0f),
+                            bandOffset = number("Frequency Band Offset", 0f).toInt()
+                        )
                         val nowMs = android.os.SystemClock.elapsedRealtime()
                         val previousMs = barLastUpdateMs.put(element.id, nowMs) ?: nowMs - 16L
                         val delta = ((nowMs - previousMs).coerceIn(1L, 100L) / 1000f)

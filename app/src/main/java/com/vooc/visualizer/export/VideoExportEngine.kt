@@ -775,6 +775,11 @@ object VideoExportEngine {
                         "Capitalize" -> rawText.split(" ").joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
                         else -> rawText
                     }
+                    val isRtl = when (textValue("Text Direction", "Auto")) {
+                        "Left To Right" -> false
+                        "Right To Left" -> true
+                        else -> android.text.TextDirectionHeuristics.FIRSTSTRONG_LTR.isRtl(displayText, 0, displayText.length)
+                    }
                     val fontStyle = when (textValue("Font Style", "Bold")) {
                         "Regular" -> Typeface.NORMAL
                         "Medium", "SemiBold", "Bold" -> Typeface.BOLD
@@ -784,13 +789,25 @@ object VideoExportEngine {
                     }
                     val family = textValue("Font Family", "Poppins").ifBlank { "Poppins" }
                     val fallbackFamily = when (textValue("Font Fallback", "Sans Serif")) { "Serif" -> "serif"; "Monospace" -> "monospace"; "Cursive" -> "cursive"; else -> "sans-serif" }
-                    val resolvedTypeface = if (family.equals("Poppins", ignoreCase = true)) {
-                        poppinsTypeface?.let { Typeface.create(it, fontStyle) } ?: Typeface.create(fallbackFamily, fontStyle)
-                    } else Typeface.create(family, fontStyle)
+                    val importedTypeface = if (textValue("Font Asset", "System Font") == "Imported Font") fontFaces[element.id] else null
+                    val resolvedTypeface = importedTypeface?.let { Typeface.create(it, fontStyle) }
+                        ?: if (family.equals("Poppins", ignoreCase = true)) {
+                            poppinsTypeface?.let { Typeface.create(it, fontStyle) } ?: Typeface.create(fallbackFamily, fontStyle)
+                        } else Typeface.create(family, fontStyle)
+                    val measureFontMode = textValue("Measure Font Size (Measure What)", "Nothing")
+                    val measureFontMotion = motionFor("Measure Font Size (Measure What)")
+                    val measureFontResponse = if (measureFontMode == "Nothing") 0f else maxOf(
+                        kotlin.math.abs(measureFontMotion.scale - 1f) / 0.32f,
+                        kotlin.math.abs(measureFontMotion.rotation) / 8f,
+                        kotlin.math.abs(measureFontMotion.offsetX) / 0.05f,
+                        kotlin.math.abs(measureFontMotion.offsetY) / 0.05f
+                    ).coerceIn(0f, 1f)
+                    val resolvedFontSize = number("Font Size", 48f) +
+                        number("Measure Font Size", 0f) * measureFontResponse
                     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
                         this.color = color
                         this.alpha = alpha
-                        textSize = (number("Font Size", 48f) * width / 1080f * scale).coerceAtLeast(6f)
+                        textSize = (resolvedFontSize * width / 1080f * scale).coerceAtLeast(6f)
                         typeface = resolvedTypeface
                         textAlign = when (textValue("Alignment", "Center")) {
                             "Left" -> Paint.Align.LEFT

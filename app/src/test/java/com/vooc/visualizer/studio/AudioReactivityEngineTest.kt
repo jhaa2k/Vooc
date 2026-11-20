@@ -65,9 +65,10 @@ class AudioReactivityEngineTest {
             "Audio Reactivity Attack" to ElementValue.Number(0.1),
             "Audio Reactivity Release" to ElementValue.Number(0.5)
         )
-        val sources = AudioReactivitySources(beat = 1f)
-        val first = runtime.update(properties, sources, 1f / 60f)!!
-        assertTrue(first > 0f && first < 1f)
+        val first = runtime.update(properties, AudioReactivitySources(beat = 0f), 1f / 60f)!!
+        val attacked = runtime.update(properties, AudioReactivitySources(beat = 1f), 1f / 60f)!!
+        assertEquals(0f, first, 0.0001f)
+        assertTrue(attacked > 0f && attacked < 1f)
         val disabled = runtime.update(emptyMap(), sources, 1f / 60f)
         assertNull(disabled)
         assertEquals(1f, runtime.update(properties, sources, 1f / 60f)!!, 0.0001f)

@@ -250,6 +250,56 @@ class ElementSystemTest {
     }
 
     @Test
+    fun imageBarsParticlesAndEffectsExposeExpandedControlCatalogs() {
+        val image = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).map { it.name }.toSet()
+        val bars = ElementPropertyCatalog.forElement(StudioElementType.BARS_SEGMENTS).map { it.name }.toSet()
+        val particles = ElementPropertyCatalog.forElement(StudioElementType.PARTICLES).map { it.name }.toSet()
+        val blur = ElementPropertyCatalog.forElement(StudioElementType.BLUR_EFFECT).map { it.name }.toSet()
+        val rgb = ElementPropertyCatalog.forElement(StudioElementType.RGB_SPLIT).map { it.name }.toSet()
+        val motion = ElementPropertyCatalog.forElement(StudioElementType.MOTION_BLUR_EFFECT).map { it.name }.toSet()
+
+        assertTrue(image.containsAll(setOf(
+            "Image Sampling", "Image Tile Mode X", "Image Tile Mode Y", "Image Brightness",
+            "Image Contrast", "Image Hue", "Image Gamma", "Image Color Temperature",
+            "Image Flip Horizontal", "Image Flip Vertical", "Image Parallax X",
+            "Image Parallax Y", "Image Border Color", "Image Border Width", "Image Custom Shape Path"
+        )))
+        assertTrue(bars.containsAll(setOf(
+            "Frequency Range Start", "Frequency Range End", "Frequency Band Offset",
+            "Frequency Mapping Curve", "Frequency Mapping Bias", "Audio Channel",
+            "Amplitude Mode", "Amplitude Threshold", "Amplitude Offset", "Bar Height Random",
+            "Bar Width Random", "Bar Spacing Random", "Alternate Bar Direction",
+            "Use Audio Provider Smoothing", "Peak Hold Enabled", "Peak Reset Threshold",
+            "Peak Fall Delay", "Bar Glow Radius", "Bar Glow Color Strength"
+        )))
+        assertTrue(particles.containsAll(setOf(
+            "Particle Emitter Shape", "Emitter Position", "Emitter Rotation", "Emitter Radius",
+            "Emitter Inner Radius", "Emitter Arc Start", "Emitter Arc Sweep", "Emitter Loop",
+            "Emitter Burst Count", "Emitter Burst Interval", "Particle Rotation Random",
+            "Particle Angular Velocity", "Particle Angular Velocity Random", "Particle Mass",
+            "Particle Damping", "Particle Screen Blend", "Particle Additive Blend",
+            "Particle Trail Width", "Particle Trail Fade", "Particle Shape",
+            "Particle Opacity Random", "Particle Color Random"
+        )))
+        assertTrue(blur.containsAll(setOf(
+            "Blur Algorithm", "Blur Passes", "Blur Quality", "Blur Direction", "Blur Zoom Amount",
+            "Blur Center", "Blur Alpha Only", "Blur Preserve Edges", "Blur Mask Mode",
+            "Blur Mask Strength", "Blur Threshold", "Blur Spread"
+        )))
+        assertTrue(rgb.containsAll(setOf(
+            "RGB Split Mode", "RGB Split Enabled", "Red Channel Opacity",
+            "Green Channel Opacity", "Blue Channel Opacity", "RGB Split Angle Variation",
+            "RGB Split Audio Amount", "RGB Split Audio Source", "RGB Split Edge Softness",
+            "RGB Split Preserve Luminance"
+        )))
+        assertTrue(motion.containsAll(setOf(
+            "Motion Blur Mode", "Motion Blur Shutter Angle", "Motion Blur Exposure",
+            "Motion Blur Sample Jitter", "Motion Blur Velocity Scale", "Motion Blur Use Alpha",
+            "Motion Blur Normalize Samples", "Motion Blur Edge Mode"
+        )))
+    }
+
+    @Test
     fun motionBlurExposesMaskAndContentAppearanceControls() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.MOTION_BLUR_EFFECT).associateBy { it.name }
         val required = setOf(

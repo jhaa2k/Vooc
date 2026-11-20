@@ -123,6 +123,11 @@ class AudioReactivityEngineTest {
         assertEquals(1f / 3f + 0.1f, gated[1], 0.0001f)
         val power = processBarSpectrum(floatArrayOf(0.5f), amplitudeMode = "Power")
         assertEquals(0.2f, power[0], 0.0001f)
+
+        val rms = processBarSpectrum(floatArrayOf(0.25f, 0.5f, 1f), amplitudeMode = "RMS")
+        assertEquals(0.398f, rms[1], 0.002f)
+        val peak = processBarSpectrum(floatArrayOf(0.25f, 0.5f, 1f), amplitudeMode = "Peak")
+        assertEquals(0.5f, peak[1], 0.0001f)
     }
 
     @Test fun barSpectrumProcessorMapsFrequencyBinsAndHandlesInvalidSamples() {

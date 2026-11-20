@@ -564,6 +564,7 @@ private fun VoocStudio(
     var multiSelectedIds by remember { mutableStateOf(setOf<Long>()) }
     var multiSelectedElementIds by remember { mutableStateOf(setOf<String>()) }
     var pendingElementImageProperty by remember { mutableStateOf<String?>(null) }
+    var pendingElementFontProperty by remember { mutableStateOf<String?>(null) }
     var savedTemplates by remember { mutableStateOf(TemplateStore.load(context)) }
     var presetStatus by remember { mutableStateOf("VOOC PRESETS: IMPORT OR EXPORT YOUR VISUALIZER DESIGN") }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -582,6 +583,18 @@ private fun VoocStudio(
             project = next; onSave(next)
         }
         pendingElementImageProperty = null
+    }
+    val elementFontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val property = pendingElementFontProperty
+        val element = project.document.elements.firstOrNull { it.id == selectedElementId }
+        if (uri != null && property != null && element != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            val updated = element.withValue(property, ElementValue.Text(uri.toString()))
+            val next = project.copy(document = project.document.copy(elements = project.document.elements.map { if (it.id == updated.id) updated else it }))
+            project = next
+            onSave(next)
+        }
+        pendingElementFontProperty = null
     }
     val projectExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) runCatching {
@@ -1016,6 +1029,10 @@ private fun VoocStudio(
                         selectedId = selectedElementId,
                         onSelect = { selectedElementId = it; activeSelection = "ELEMENT" },
                         onPickImage = { property -> pendingElementImageProperty = property; elementImagePicker.launch(arrayOf("image/*")) },
+                        onPickFont = { property ->
+                            pendingElementFontProperty = property
+                            elementFontPicker.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-opentype", "*/*"))
+                        },
                         onChange = { updated ->
                             val next = project.copy(document = project.document.copy(
                                 elements = project.document.elements.replacePreservingOrder(updated)
@@ -1361,6 +1378,7 @@ private fun ElementStudioEditor(
     selectedId: String,
     onSelect: (String) -> Unit,
     onPickImage: (String) -> Unit,
+    onPickFont: (String) -> Unit,
     onChange: (ElementDocument) -> Unit,
     onDelete: (String) -> Unit
 ) {

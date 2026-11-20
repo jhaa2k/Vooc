@@ -2347,9 +2347,10 @@ private fun ExportScreen(project: StudioProject, onProjectChange: (StudioProject
             scope.launch {
                 try {
                     val result = withContext(Dispatchers.IO) {
-                        com.vooc.visualizer.export.VideoExportEngine.export(context, context.contentResolver, project, uri) { value ->
-                            exportProgress = value
-                        }
+                        com.vooc.visualizer.export.VideoExportEngine.export(
+                            context, context.contentResolver, project, uri,
+                            onProgress = { value -> exportProgress = value }
+                        )
                     }
                     exportStatus = "Export complete • ${result.frames} frames • ${result.durationMs / 1000}s" +
                         if (result.audioMuxed) " • AAC audio included" else " • no audio track"

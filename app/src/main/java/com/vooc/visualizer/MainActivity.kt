@@ -1579,10 +1579,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     }
     val elementOriginalImages by produceState(
         initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
-        key1 = elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT }.map { element -> element.id to element.properties }
+        key1 = elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.map { element -> element.id to element.properties }
     ) {
         value = withContext(Dispatchers.IO) {
-            elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT }.mapNotNull { element ->
+            elements.filter { it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.mapNotNull { element ->
                 val uriText = (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
                 if (uriText.isBlank()) null else runCatching {
                     context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
@@ -1603,13 +1603,13 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                             val decoded = BitmapFactory.decodeStream(stream) ?: return@use null
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
-                            val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.MOTION_BLUR_EFFECT) && maskUri.isNotBlank()) {
+                            val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) && maskUri.isNotBlank()) {
                                 context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
                             } else null
                             val processed = when (element.type) {
                                 StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)
                                 StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
-                                StudioElementType.MOTION_BLUR_EFFECT -> processImageForPreview(decoded, element, maskBitmap)
+                                StudioElementType.MOTION_BLUR_EFFECT, StudioElementType.RGB_SPLIT -> processImageForPreview(decoded, element, maskBitmap)
                                 else -> decoded
                             }
                             val image = processed.asImageBitmap()
@@ -2550,6 +2550,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     StudioElementType.RGB_SPLIT -> {
                         val bitmap = elementImages[element.id]
                         if (bitmap != null) {
+                            val original = elementOriginalImages[element.id]
+                            val showUnder = props["Show Unblurred Content Under"] == ElementValue.Bool(true)
+                            val showOver = props["Show Unblurred Content"] == ElementValue.Bool(true)
+                            val frameWidth = size.width * 0.45f * scale
+                            val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
+                            val originalDestination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
+                            val originalSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
+                            if (showUnder && original != null) drawImage(original, dstOffset = originalDestination, dstSize = originalSize, alpha = opacity)
                             val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * scale
                             val angle = (number("Angle / Direction", 0f) + playbackSeconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
                             val focus = props["Center / Focus Point"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
@@ -2588,6 +2596,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     blendMode = contentBlend
                                 )
                             }
+                            if (showOver && original != null) drawImage(original, dstOffset = originalDestination, dstSize = originalSize, alpha = opacity)
                         }
                     }
                     StudioElementType.BLUR_EFFECT -> {

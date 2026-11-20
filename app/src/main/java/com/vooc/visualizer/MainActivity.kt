@@ -16,7 +16,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1354,7 +1354,7 @@ private fun ElementStudioEditor(
                                     is ElementValue.Integer -> default.value.toFloat()
                                     else -> current
                                 }
-                                LayerSlider(spec.name.uppercase(), current, minimum..maximum ) { next ->
+                                LayerSlider(spec.name.uppercase(), current, minimum..maximum, defaultValue = reset) { next ->
                                     val nextValue = if (spec.type == ElementValueType.INTEGER) ElementValue.Integer(next.toLong()) else ElementValue.Number(next.toDouble())
                                     onChange(selected.withValue(spec.name, nextValue))
                                 }
@@ -1399,10 +1399,10 @@ private fun ElementStudioEditor(
                                 val vector = value as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
                                 val minimum = (spec.min ?: -1000.0).toFloat()
                                 val maximum = (spec.max ?: 1000.0).toFloat().coerceAtLeast(minimum + 0.001f)
-                                LayerSlider("${spec.name.uppercase()} X", vector.x.toFloat(), minimum..maximum) { x ->
+                                LayerSlider("${spec.name.uppercase()} X", vector.x.toFloat(), minimum..maximum, defaultValue = (spec.defaultValue as? ElementValue.Vector2)?.x?.toFloat() ?: 0f) { x ->
                                     onChange(selected.withValue(spec.name, ElementValue.Vector2(x.toDouble(), vector.y)))
                                 }
-                                LayerSlider("${spec.name.uppercase()} Y", vector.y.toFloat(), minimum..maximum) { y ->
+                                LayerSlider("${spec.name.uppercase()} Y", vector.y.toFloat(), minimum..maximum, defaultValue = (spec.defaultValue as? ElementValue.Vector2)?.y?.toFloat() ?: 0f) { y ->
                                     onChange(selected.withValue(spec.name, ElementValue.Vector2(vector.x, y.toDouble())))
                                 }
                             }
@@ -3033,20 +3033,41 @@ private fun LayerSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
-    onChange: (Float) -> Unit
+    onChange: (Float) -> Unit,
+    defaultValue: Float = defaultSliderValue(label, value)
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(label.uppercase(), color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-            Text(value.toInt().toString(), color = Lime, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Text(value.toString().let { if (value % 1f == 0f) value.toInt().toString() else String.format("%.2f", value) }, color = Lime, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
         ThinSlider(
             label = label,
             value = value,
             valueRange = range,
+            defaultValue = defaultValue,
             onValueChange = onChange
         )
     }
+}
+
+private fun defaultSliderValue(label: String, current: Float): Float = when (label.uppercase()) {
+    "POSITION X", "POSITION Y", "ROTATION", "X", "Y", "ROT", "OFFSET X", "OFFSET Y" -> 0f
+    "SCALE" -> 100f
+    "OPACITY" -> 100f
+    "AUDIO SENSITIVITY", "SENSITIVITY", "GAIN" -> 100f
+    "SMOOTHING" -> 45f
+    "RED" -> 198f
+    "GREEN" -> 243f
+    "BLUE" -> 106f
+    "MIN FREQUENCY HZ" -> 30f
+    "MAX FREQUENCY HZ" -> 16000f
+    "BAR / SAMPLE COUNT" -> 64f
+    "THICKNESS" -> 2f
+    "SPACING" -> 1f
+    "RADIUS" -> 18f
+    "PARTICLE COUNT" -> 48f
+    else -> current
 }
 
 @Composable
@@ -3057,24 +3078,54 @@ private fun ThinSlider(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     steps: Int = 0,
+    defaultValue: Float = valueRange.start,
     onValueChangeFinished: (() -> Unit)? = null
 ) {
     val safeValue = value.coerceIn(valueRange)
+    val safeDefault = defaultValue.coerceIn(valueRange)
     val updateValue by rememberUpdatedState(onValueChange)
+    val finishChange by rememberUpdatedState(onValueChangeFinished)
+    var draggingThumb by remember { mutableStateOf(false) }
+    val updateDefault by rememberUpdatedState(safeDefault)
     Canvas(
         modifier.fillMaxWidth().height(24.dp)
-            .pointerInput(valueRange) {
-                fun update(x: Float) {
+            .pointerInput(valueRange, safeValue, safeDefault) {
+                val inset = 6.dp.toPx()
+                val usable = (size.width - inset * 2f).coerceAtLeast(1f)
+                val thumbX = inset + ((safeValue - valueRange.start) /
+                    (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)) * usable
+                val thumbHitRadius = 18.dp.toPx()
+                detectHorizontalDragGestures(
+                    onDragStart = { down ->
+                        // Only the thumb starts a slider drag. Touches beside it remain ordinary
+                        // scroll/tap gestures and can never change the numeric value.
+                        draggingThumb = kotlin.math.abs(down.x - thumbX) <= thumbHitRadius
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        if (draggingThumb) {
+                            change.consume()
+                            val fraction = ((change.position.x - inset) / usable).coerceIn(0f, 1f)
+                            val raw = valueRange.start + fraction * (valueRange.endInclusive - valueRange.start)
+                            val snapDistance = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f) * 0.0125f
+                            val snapped = if (kotlin.math.abs(raw - updateDefault) <= snapDistance) updateDefault else raw
+                            updateValue(snapped.coerceIn(valueRange))
+                        }
+                    },
+                    onDragEnd = { if (draggingThumb) finishChange?.invoke(); draggingThumb = false },
+                    onDragCancel = { draggingThumb = false }
+                )
+            }
+            .pointerInput(valueRange, safeValue, safeDefault) {
+                detectTapGestures(onDoubleTap = { point ->
                     val inset = 6.dp.toPx()
                     val usable = (size.width - inset * 2f).coerceAtLeast(1f)
-                    val fraction = ((x - inset) / usable).coerceIn(0f, 1f)
-                    updateValue((valueRange.start + fraction * (valueRange.endInclusive - valueRange.start)).coerceIn(valueRange))
-                }
-                detectDragGestures(
-                    onDragStart = { update(it.x) },
-                    onDrag = { change, _ -> change.consume(); update(change.position.x) },
-                    onDragEnd = { onValueChangeFinished?.invoke() }
-                )
+                    val thumbX = inset + ((safeValue - valueRange.start) /
+                        (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)) * usable
+                    if (kotlin.math.abs(point.x - thumbX) <= 18.dp.toPx()) {
+                        updateValue(safeDefault)
+                        finishChange?.invoke()
+                    }
+                })
             }
             .semantics {
                 contentDescription = label.uppercase()

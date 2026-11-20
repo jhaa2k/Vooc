@@ -1788,7 +1788,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val maxTextWidth = number("Max Width", 1000f).dp.toPx().coerceAtLeast(1f)
                         val wrapText = props["Wrap Text"] != ElementValue.Bool(false)
                         val textLines = if (!wrapText) listOf(displayText) else buildList {
-                            displayText.split("\\n").forEach { paragraph ->
+                            displayText.split("\n").forEach { paragraph ->
                                 var line = ""
                                 paragraph.split(Regex("\\s+")).forEach { word ->
                                     val candidate = if (line.isEmpty()) word else "$line $word"

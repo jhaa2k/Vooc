@@ -37,7 +37,6 @@ class ElementSystemTest {
                 }
             }
         }
-    }
         assertTrue("Invalid catalog defaults: " + invalidDefaults.joinToString("; "), invalidDefaults.isEmpty())
     }
     @Test

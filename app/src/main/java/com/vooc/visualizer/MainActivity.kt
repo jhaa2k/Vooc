@@ -1528,23 +1528,23 @@ private fun AnalyzerSettingsScreen(
                 val title = "BAND • ${band.label.uppercase()}"
                 expandedCategory = if (expandedCategory == title) "" else title
             }) {
-                LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f ) { value ->
+                LayerSlider("LOW CUT HZ", band.lowHz, 20f..10000f, defaultValue = defaultBandSpecs.firstOrNull { it.label == band.label }?.lowHz ?: band.lowHz) { value ->
                     val updated = config.bands.bands.map { current ->
                         if (current.label == band.label) current.copy(lowHz = value.coerceAtMost(current.highHz - 1f)) else current
                     }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
-                LayerSlider("HIGH CUT HZ", band.highHz, 250f..20000f ) { value ->
+                LayerSlider("HIGH CUT HZ", band.highHz, 250f..20000f, defaultValue = defaultBandSpecs.firstOrNull { it.label == band.label }?.highHz ?: band.highHz) { value ->
                     val updated = config.bands.bands.map { current ->
                         if (current.label == band.label) current.copy(highHz = value.coerceAtLeast(current.lowHz + 1f)) else current
                     }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
-                LayerSlider("GAIN", band.gain, 0f..2f) { value ->
+                LayerSlider("GAIN", band.gain, 0f..2f, defaultValue = 1f) { value ->
                     val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(gain = value) else current }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
-                LayerSlider("SMOOTHING", band.smoothing * 100f, 0f..99f ) { value ->
+                LayerSlider("SMOOTHING", band.smoothing * 100f, 0f..99f, defaultValue = 30f) { value ->
                     val updated = config.bands.bands.map { current -> if (current.label == band.label) current.copy(smoothing = value / 100f) else current }
                     onConfigChange(config.copy(bands = config.bands.copy(bands = updated)))
                 }
@@ -3069,6 +3069,19 @@ private fun defaultSliderValue(label: String, current: Float): Float = when (lab
     "SPACING" -> 1f
     "RADIUS" -> 18f
     "PARTICLE COUNT" -> 48f
+    "BEAT SENSITIVITY" -> 60f
+    "MANUAL BPM (0 = AUTO)" -> 0f
+    "BEAT COOLDOWN" -> 150f
+    "BEAT THRESHOLD" -> 1.5f
+    "TEMPORAL SMOOTHING" -> 50f
+    "ATTACK" -> 20f
+    "RELEASE" -> 180f
+    "RING BUFFER" -> 8192f
+    "WAVEFORM SAMPLES" -> 2048f
+    "DB FLOOR" -> -70f
+    "GAIN" -> 1f
+    "ATTACK MS" -> 20f
+    "RELEASE MS" -> 150f
     else -> current
 }
 

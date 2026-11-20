@@ -1945,14 +1945,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 "Per Bar" -> androidx.compose.ui.graphics.SolidColor(runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor))
                                 else -> androidx.compose.ui.graphics.SolidColor(elementColor)
                             }
-                            if (outline) {
-                                when (design) {
-                                    "Circle / Dot" -> drawCircle(strokeColor.copy(alpha = opacity), width * 0.5f, Offset(left + width / 2f, top + height / 2f), style = shapeStyle)
-                                    "Line" -> drawLine(strokeColor, Offset(left + width / 2f, top), Offset(left + width / 2f, top + height), strokeWidth, cap = StrokeCap.Round)
-                                    "Rounded Rect", "Capsule / Pill" -> drawRoundRect(strokeColor, rectTop, rectSize, androidx.compose.ui.geometry.CornerRadius(corner), style = shapeStyle)
-                                    else -> drawPath(path, strokeColor, style = shapeStyle)
-                                }
-                            } else if (design == "Custom Image" && customImage != null) {
+                            if (design == "Custom Image" && customImage != null) {
                                 drawImage(customImage, dstOffset = androidx.compose.ui.unit.IntOffset(left.toInt(), top.toInt()),
                                     dstSize = androidx.compose.ui.unit.IntSize(width.toInt().coerceAtLeast(1), height.toInt().coerceAtLeast(1)))
                             } else {
@@ -1961,6 +1954,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     "Line" -> drawLine(fill, Offset(left + width / 2f, top), Offset(left + width / 2f, top + height), width.coerceAtLeast(1f), cap = StrokeCap.Round)
                                     "Rounded Rect", "Capsule / Pill" -> drawRoundRect(brush = modeBrush, topLeft = rectTop, size = rectSize, cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner))
                                     else -> drawPath(path, modeBrush)
+                                }
+                            }
+                            if (outline) {
+                                when (design) {
+                                    "Circle / Dot" -> drawCircle(strokeColor.copy(alpha = opacity), width * 0.5f, Offset(left + width / 2f, top + height / 2f), style = shapeStyle)
+                                    "Line" -> {
+                                        val linePath = Path().apply {
+                                            moveTo(left + width / 2f, top)
+                                            lineTo(left + width / 2f, top + height)
+                                        }
+                                        drawPath(linePath, strokeColor.copy(alpha = opacity), style = shapeStyle)
+                                    }
+                                    "Rounded Rect", "Capsule / Pill" -> drawRoundRect(strokeColor.copy(alpha = opacity), rectTop, rectSize, androidx.compose.ui.geometry.CornerRadius(corner), style = shapeStyle)
+                                    else -> drawPath(path, strokeColor.copy(alpha = opacity), style = shapeStyle)
                                 }
                             }
                             if (capMode != "None") {

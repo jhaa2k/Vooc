@@ -904,6 +904,8 @@ object ElementPropertyCatalog {
         text("Color", "Appearance", "#FFFFFFFF"),
         integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
         text("Mask Image", "Appearance", ""),
+        text("Mask Mode", "Appearance", "Alpha Mask", listOf("Alpha Mask", "Luminance Mask", "Inverted Mask", "Normal Mask")),
+        number("Mask Strength", "Appearance", 1.0, 0.0, 1.0),
         bool("Show Unblurred Content", "Appearance", false),
         bool("Show Unblurred Content Under", "Appearance", false)
     )

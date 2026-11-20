@@ -145,9 +145,7 @@ private fun processBlurEffectForPreview(source: android.graphics.Bitmap, element
     val radius = (number("Blur Radius", 2f) * number("Blur Multiplier", 4.1f)).coerceIn(0f, 512f)
     if (radius <= 0.1f) return source
     val reduction = (1f / (1f + radius / 3f)).coerceIn(0.05f, 1f)
-    val reduced = android.graphics.Bitmap.createScaledBitmap(source,
-        (source.width * reduction).toInt().coerceAtLeast(1),
-        (source.height * reduction).toInt().coerceAtLeast(1), true)
+    val reduced = android.graphics.Bitmap.createScaledBitmap(source, (source.width * reduction).toInt().coerceAtLeast(1), (source.height * reduction).toInt().coerceAtLeast(1), true)
     val blurred = android.graphics.Bitmap.createScaledBitmap(reduced, source.width, source.height, true)
     if (reduced !== source) reduced.recycle()
     return blurred
@@ -163,156 +161,8 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
     fun enabled(name: String): Boolean = (element.value(name) as? ElementValue.Bool)?.value == true
     val blurRadius = if (enabled("Blur Enabled")) number("Blur Radius", 0f).coerceIn(0f, 128f) else 0f
     val blurDivider = number("Blur Divider", 2f).coerceIn(1f, 32f)
-    package com.vooc.visualizer
-
-import android.net.Uri
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import android.content.ComponentName
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.outlined.Collections
-import androidx.compose.material.icons.outlined.FileUpload
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.Stroke
-import android.graphics.BitmapFactory
-import com.vooc.visualizer.analyzer.ChannelSelect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.ExperimentalTextApi
-import androidx.compose.ui.text.font.FontVariation
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
-import com.google.common.util.concurrent.ListenableFuture
-import com.vooc.visualizer.analyzer.AnalysisFrame
-import com.vooc.visualizer.analyzer.AudioAnalyzer
-import com.vooc.visualizer.analyzer.AudioProviderFrame
-import com.vooc.visualizer.analyzer.AudioProviderProcessor
-import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
-import com.vooc.visualizer.analyzer.applyTo
-import com.vooc.visualizer.analyzer.toAudioProviderConfig
-import com.vooc.visualizer.analyzer.FftSize
-import com.vooc.visualizer.analyzer.ChannelMode
-import com.vooc.visualizer.analyzer.WindowFunction
-import com.vooc.visualizer.analyzer.Overlap
-import com.vooc.visualizer.analyzer.BeatAlgorithm
-import com.vooc.visualizer.playback.VoocAudioEngine
-import com.vooc.visualizer.playback.VoocPlaybackService
-import com.vooc.visualizer.studio.LayerKind
-import com.vooc.visualizer.studio.LayerAddMenuCatalog
-import com.vooc.visualizer.studio.LegacyLayerAdapter
-import com.vooc.visualizer.studio.ElementPropertyCatalog
-import com.vooc.visualizer.studio.ElementDocument
-import com.vooc.visualizer.studio.ElementValue
-import com.vooc.visualizer.studio.ElementValueType
-import com.vooc.visualizer.studio.StudioElementType
-import com.vooc.visualizer.studio.ProjectStore
-import com.vooc.visualizer.studio.PresetFileCodec
-import com.vooc.visualizer.studio.ProjectRepository
-import com.vooc.visualizer.studio.ProjectEntry
-import com.vooc.visualizer.studio.ProjectKeyframe
-import com.vooc.visualizer.studio.StudioProject
-import com.vooc.visualizer.studio.MeasureWhatEngine
-import com.vooc.visualizer.studio.StudioPresets
-import com.vooc.visualizer.studio.TemplateStore
-import com.vooc.visualizer.studio.VisualLayer
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.pow
-import kotlin.math.min
-
-private val Lime = Color(0xFFC6F36A)
-private val Ink = Color(0xFF0C0E0B)
-private val Panel = Color(0xFF171A14)
-private val Muted = Color(0xFF92998A)
-private fun processImageForPreview(source: android.graphics.Bitmap, element: ElementDocument, maskSource: android.graphics.Bitmap? = null): android.graphics.Bitmap {
-    fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
-        is ElementValue.Number -> value.value.toFloat()
-        is ElementValue.Integer -> value.value.toFloat()
-        else -> fallback
-    }
-    fun text(name: String, fallback: String = ""): String = (element.value(name) as? ElementValue.Text)?.value ?: fallback
-    fun enabled(name: String): Boolean = (element.value(name) as? ElementValue.Bool)?.value == true
-    val blurRadius = if (enabled("Blur Enabled")) number("Blur Radius", 0f).coerceIn(0f, 128f) else 0f
-    val blurDivider = number("Blur Divider", 2f).coerceIn(1f, 32f)
     val edgeBlur = number("Edge Blur", 0f).coerceIn(0f, 128f)
-        val blurredBorder = enabled("Blurred Border")
+    val blurredBorder = enabled("Blurred Border")
     val keyEnabled = enabled("Color Key Enabled")
     if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled && maskSource == null) return source
     val output = source.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
@@ -1694,9 +1544,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             elements.filter { it.type == StudioElementType.BLUR_EFFECT }.mapNotNull { element ->
                 val uriText = (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
                 if (uriText.isBlank()) null else runCatching {
-                    context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
-                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                    }
+                    context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
                 }.getOrNull()?.let { element.id to it }
             }.toMap()
         }
@@ -1717,7 +1565,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val maskBitmap = if (element.type == StudioElementType.IMAGE && maskUri.isNotBlank()) {
                                 context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
                             } else null
-                            val processed = when (element.type) {\n                                StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)\n                                StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)\n                                else -> decoded\n                            }
+                            val processed = when (element.type) {
+                                StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)
+                                StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
+                                else -> decoded
+                            }
                             val image = processed.asImageBitmap()
                             if (processed !== decoded) decoded.recycle()
                             maskBitmap?.recycle()
@@ -2692,12 +2544,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
                             val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
                             val destinationSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
-                            drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
                             if (props["Show Unblurred Content"] == ElementValue.Bool(true)) {
-                                elementOriginalImages[element.id]?.let { original ->
-                                    drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity * 0.35f)
-                                }
+                                elementOriginalImages[element.id]?.let { original -> drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity * 0.35f) }
                             }
+                            drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
                         }
                     }
                     StudioElementType.MOTION_BLUR_EFFECT -> {

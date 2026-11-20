@@ -544,6 +544,9 @@ private fun VoocStudio(
         val source = (element.properties["Audio Reactivity Source"] as? ElementValue.Text)?.value
         (element.properties["Audio Reactivity Enabled"] as? ElementValue.Bool)?.value == true &&
             (source == "Left Channel" || source == "Right Channel")
+    } || project.document.elements.any { element ->
+        element.type == StudioElementType.BARS_SEGMENTS &&
+            (element.value("Audio Channel") as? ElementValue.Text)?.value in setOf("Left", "Right", "Side")
     }
     var analyzerConfig by remember { mutableStateOf(analyzer.config) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -2151,7 +2154,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         textPaint.shader = null
                     }
                     StudioElementType.BARS_SEGMENTS -> {
-                        val rawSamples: FloatArray = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
+                        val selectedChannel = textValue("Audio Channel", "Mixed")
+                        val selectedSpectrum = when (selectedChannel) {
+                            "Left" -> frame?.channel(ChannelSelect.LEFT)?.spectrum
+                            "Right" -> frame?.channel(ChannelSelect.RIGHT)?.spectrum
+                            "Mid" -> frame?.channel(ChannelSelect.MID)?.spectrum
+                            "Side" -> frame?.channel(ChannelSelect.SIDE)?.spectrum
+                            else -> null
+                        }
+                        val rawSamples: FloatArray = if (selectedChannel == "Mixed") {
+                            providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
+                        } else selectedSpectrum ?: frame?.spectrum ?: FloatArray(64)
                         val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
                         val input = processBarSpectrum(
                             samples = rawSamples,
@@ -2175,7 +2188,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             damping = number("Smoothing / Damping", 0.72f),
                             peakHold = number("Peak Hold Time", number("Peak Hold", 0.65f)),
                             peakFallSpeed = number("Peak Fall Speed", 0.8f),
-                            logarithmicInput = providerFrame == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
+                            logarithmicInput = selectedChannel == "Mixed" && providerFrame == null && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                             reactionDelayMs = number("Reaction Delay", 0f),
                             accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),

@@ -2562,8 +2562,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val angle = (number("Angle / Direction", 0f) + playbackSeconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
                             val focus = props["Center / Focus Point"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                             val falloff = number("Falloff / Radial Split", 0f).coerceAtLeast(0f)
+                            val contentColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF"))) }.getOrDefault(Color.White)
                             val colors = listOf("Split Color 0", "Split Color 1", "Split Color 2").mapIndexed { index, key ->
-                                runCatching { Color(android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index]))) }.getOrDefault(listOf(Color.Red, Color.Green, Color.Blue)[index])
+                                val channel = runCatching { Color(android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index]))) }.getOrDefault(listOf(Color.Red, Color.Green, Color.Blue)[index])
+                                Color(channel.red * contentColor.red, channel.green * contentColor.green, channel.blue * contentColor.blue, channel.alpha * contentColor.alpha)
                             }
                             val offsets = listOf(
                                 Offset(number("Red Offset X", -4f), number("Red Offset Y", 0f)),

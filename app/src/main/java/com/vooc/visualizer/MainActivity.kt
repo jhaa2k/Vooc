@@ -219,7 +219,7 @@ private fun processImageForPreview(source: android.graphics.Bitmap, element: Ele
     val temperature = number("Image Color Temperature", 6500f).coerceIn(1000f, 12000f)
     val warm = ((temperature - 6500f) / 5500f).coerceIn(-1f, 1f)
     val adjustImageColor = brightness != 1f || contrast != 1f || hueShift != 0f || gamma != 1f || temperature != 6500f
-    if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled && maskSource == null) return source
+    if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled && maskSource == null && !adjustImageColor) return source
     val output = source.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
     val w = output.width
     val h = output.height

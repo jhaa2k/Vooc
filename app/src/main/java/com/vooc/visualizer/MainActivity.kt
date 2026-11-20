@@ -651,11 +651,13 @@ private fun VoocStudio(
                                 modifier = Modifier.background(Panel)) {
                                 LayerAddMenuCatalog.spectrumStyles.forEach { kind ->
                                     DropdownMenuItem(text = { Text(kind.title.uppercase()) }, onClick = {
-                                        val id = (project.layers.maxOfOrNull { it.id } ?: 0L) + 1L
-                                        val layer = VisualLayer(id, kind)
-                                        project = project.copy(layers = project.layers + layer)
-                                        selectedId = id
-                                        activeSelection = "LAYER"
+                                        val id = "spectrum-${kind.name.lowercase()}-${System.currentTimeMillis()}"
+                                        val created = LegacyLayerAdapter.createSpectrumElement(kind, id)
+                                        val next = project.copy(document = project.document.copy(elements = project.document.elements + created))
+                                        project = next
+                                        selectedElementId = id
+                                        activeSelection = "ELEMENT"
+                                        onSave(next)
                                         showLayerMenu = false
                                     })
                                 }

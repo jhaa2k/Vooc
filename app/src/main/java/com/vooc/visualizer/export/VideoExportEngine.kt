@@ -1181,6 +1181,11 @@ object VideoExportEngine {
                                 RectF(cx - dw / 2f, cy - dh / 2f, cx + dw / 2f, cy + dh / 2f)
                             }
                         }
+                        val parallaxX = number("Image Parallax X", 0f).coerceIn(-1f, 1f) * frameWidth
+                        val parallaxY = number("Image Parallax Y", 0f).coerceIn(-1f, 1f) * frameHeight
+                        dst.offset(parallaxX, parallaxY)
+                        val flipX = (element.value("Image Flip Horizontal") as? ElementValue.Bool)?.value == true
+                        val flipY = (element.value("Image Flip Vertical") as? ElementValue.Bool)?.value == true
                         val shape = textValue("Shape", "Rectangle").takeIf { it != "Rectangle" } ?: textValue("Mask / Shape", "Rectangle")
                         val clip = android.graphics.Path().apply {
                             when (shape) {
@@ -1289,6 +1294,7 @@ object VideoExportEngine {
                             }
                         }
                         canvas.save()
+                        if (flipX || flipY) canvas.scale(if (flipX) -1f else 1f, if (flipY) -1f else 1f, dst.centerX(), dst.centerY())
                         canvas.clipPath(clip)
                         if (showUnblurredUnder && original != null) {
                             canvas.drawBitmap(original, src, dst, unblurredPaint)
@@ -1298,6 +1304,16 @@ object VideoExportEngine {
                             canvas.drawBitmap(original, src, dst, unblurredPaint)
                         }
                         canvas.restore()
+                        val borderWidth = number("Image Border Width", 0f).coerceIn(0f, 256f) * width / 1080f
+                        if (borderWidth > 0f) {
+                            val borderColor = runCatching { android.graphics.Color.parseColor(textValue("Image Border Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT)
+                            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = borderColor
+                                style = Paint.Style.STROKE
+                                strokeWidth = borderWidth
+                            }
+                            canvas.drawPath(clip, borderPaint)
+                        }
                     }
                 }
                 StudioElementType.RGB_SPLIT -> {

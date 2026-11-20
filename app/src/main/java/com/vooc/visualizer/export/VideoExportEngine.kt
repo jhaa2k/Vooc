@@ -194,9 +194,14 @@ object VideoExportEngine {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                     BitmapFactory.decodeStream(stream)?.let { source ->
                         if (element.type == StudioElementType.IMAGE) {
-                            val processed = processImageForExport(source, element)
+                            val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                            val maskBitmap = if (maskUri.isNotBlank()) {
+                                resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                            } else null
+                            val processed = processImageForExport(source, element, maskBitmap)
                             imageCache["${uriText}#${element.id}"] = processed
                             if (processed !== source) source.recycle()
+                            maskBitmap?.recycle()
                         } else imageCache[uriText] = source
                     }
                 }
@@ -306,7 +311,7 @@ object VideoExportEngine {
         }
     }
 
-    private fun processImageForExport(source: Bitmap, element: com.vooc.visualizer.studio.ElementDocument): Bitmap {
+    private fun processImageForExport(source: Bitmap, element: com.vooc.visualizer.studio.ElementDocument, maskSource: Bitmap? = null): Bitmap {
         fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
             is ElementValue.Number -> value.value.toFloat()
             is ElementValue.Integer -> value.value.toFloat()
@@ -318,12 +323,15 @@ object VideoExportEngine {
         val blurDivider = number("Blur Divider", 2f).coerceIn(1f, 32f)
         val edgeBlur = number("Edge Blur", 0f).coerceIn(0f, 128f)
         val keyEnabled = enabled("Color Key Enabled")
-        if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled) return source
+        if (blurRadius <= 0f && edgeBlur <= 0f && !keyEnabled && maskSource == null) return source
         val output = source.copy(Bitmap.Config.ARGB_8888, true)
         val w = output.width
         val h = output.height
         val pixels = IntArray(w * h)
         output.getPixels(pixels, 0, w, 0, 0, w, h)
+        val mask = maskSource?.let { if (it.width == w && it.height == h) it else Bitmap.createScaledBitmap(it, w, h, true) }
+        val maskPixels = mask?.let { IntArray(w * h).also { values -> it.getPixels(values, 0, w, 0, 0, w, h) } }
+        val maskMode = (element.value("Mask Mode") as? ElementValue.Text)?.value ?: "Alpha Mask"
         val keyColor = if (enabled("Auto Detect Color Key")) {
             val samples = intArrayOf(pixels[0], pixels[w - 1], pixels[(h - 1) * w], pixels[h * w - 1])
             android.graphics.Color.rgb(
@@ -342,6 +350,17 @@ object VideoExportEngine {
                 val index = y * w + x
                 val pixel = pixels[index]
                 var alpha = android.graphics.Color.alpha(pixel).toFloat()
+                if (maskPixels != null) {
+                    val maskPixel = maskPixels[index]
+                    val maskAlpha = android.graphics.Color.alpha(maskPixel).toFloat() / 255f
+                    val luminance = (0.2126f * android.graphics.Color.red(maskPixel) + 0.7152f * android.graphics.Color.green(maskPixel) + 0.0722f * android.graphics.Color.blue(maskPixel)) / 255f
+                    val maskFactor = when (maskMode) {
+                        "Luminance Mask" -> luminance
+                        "Inverted Mask" -> 1f - maskAlpha
+                        else -> maskAlpha
+                    }
+                    alpha *= maskFactor
+                }
                 if (keyEnabled) {
                     val dr = android.graphics.Color.red(pixel) - keyR
                     val dg = android.graphics.Color.green(pixel) - keyG
@@ -357,6 +376,7 @@ object VideoExportEngine {
             }
         }
         output.setPixels(pixels, 0, w, 0, 0, w, h)
+        if (mask != null && mask !== maskSource) mask.recycle()
         if (blurRadius <= 0f) return output
         val scale = (1f / (1f + blurRadius / blurDivider)).coerceIn(0.08f, 1f)
         val smallW = (w * scale).toInt().coerceAtLeast(1)

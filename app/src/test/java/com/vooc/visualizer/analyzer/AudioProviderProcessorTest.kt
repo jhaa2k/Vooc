@@ -56,7 +56,7 @@ class AudioProviderProcessorTest {
     @Test fun aWeightingUsesFrequencyDependentStandardCurve() {
         val raw = FloatArray(1024) { 1f }
         val result = AudioProviderProcessor().process(
-            frame(raw), AudioProviderConfig(sampleOutCount = 2, lowerHz = 100f, higherHz = 10000f, aWeight = true, smooth = 0f)
+            frame(raw), AudioProviderConfig(sampleOutCount = 2, lowerHz = 100f, higherHz = 10000f, aWeight = 1f, smooth = 0f)
         )
         assertTrue("100 Hz should be attenuated more than 10 kHz", result.samples[0] < result.samples[1])
     }

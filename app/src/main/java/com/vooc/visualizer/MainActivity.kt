@@ -545,7 +545,8 @@ private fun VoocStudio(
         providerElements.associate { it.id to AudioProviderProcessor() }
     }
     val providerConfig = providerConfigs.first()
-    val needsStereoReactivity = project.document.elements.any { element ->
+    val needsStereoReactivity = providerConfigs.any { it.channelMode != com.vooc.visualizer.analyzer.ProviderChannelMode.MONO_MIX } ||
+        project.document.elements.any { element ->
         val source = (element.properties["Audio Reactivity Source"] as? ElementValue.Text)?.value
         (element.properties["Audio Reactivity Enabled"] as? ElementValue.Bool)?.value == true &&
             (source == "Left Channel" || source == "Right Channel")

@@ -1036,8 +1036,15 @@ object VideoExportEngine {
                             (focus.x.toFloat() - 0.5f) * (focus.x.toFloat() - 0.5f) +
                                 (focus.y.toFloat() - 0.5f) * (focus.y.toFloat() - 0.5f)
                         )
+                        val contentColor = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                         val channelColors = listOf("Split Color 0", "Split Color 1", "Split Color 2").mapIndexed { index, key ->
-                            runCatching { android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index])) }.getOrDefault(listOf(android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE)[index])
+                            val channel = runCatching { android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index])) }.getOrDefault(listOf(android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE)[index])
+                            android.graphics.Color.argb(
+                                android.graphics.Color.alpha(channel) * android.graphics.Color.alpha(contentColor) / 255,
+                                android.graphics.Color.red(channel) * android.graphics.Color.red(contentColor) / 255,
+                                android.graphics.Color.green(channel) * android.graphics.Color.green(contentColor) / 255,
+                                android.graphics.Color.blue(channel) * android.graphics.Color.blue(contentColor) / 255
+                            )
                         }
                         val channelOffsets = listOf(
                             number("Red Offset X", -4f) to number("Red Offset Y", 0f),

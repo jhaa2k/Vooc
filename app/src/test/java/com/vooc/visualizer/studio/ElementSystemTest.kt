@@ -79,7 +79,7 @@ class ElementSystemTest {
         assertEquals("Album Art", image.tag)
         assertEquals(ElementValue.Bool(true), image.value("Visible"))
         assertEquals(ElementValue.Text("Rectangle"), image.value("Mask / Shape"))
-        assertNotNull(image.value("Custom Image"))
+        assertNotNull(image.value("Image Source / File"))
         assertFalse(image.locked)
     }
     @Test

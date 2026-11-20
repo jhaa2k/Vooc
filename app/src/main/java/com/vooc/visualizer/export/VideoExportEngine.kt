@@ -1027,8 +1027,20 @@ object VideoExportEngine {
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
                         val samples = number("Samples / Iterations", 8f).toInt().coerceIn(1, 64)
-                        val length = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * width / 1080f
-                        val angle = number("Blur Direction / Angle", 0f) * PI.toFloat() / 180f
+                        val strength = number("Blur Amount / Strength", 1f).coerceIn(0f, 64f)
+                        val lengthBase = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * strength * width / 1080f
+                        val focus = element.value("Center / Focus Point") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                        val focusX = focus.x.toFloat() * width
+                        val focusY = focus.y.toFloat() * height
+                        val radialAngle = kotlin.math.atan2(cy - focusY, cx - focusX)
+                        val motionSource = textValue("Motion Source", "Transform Movement")
+                        val relativeMode = textValue("Relative Motion Mode", "Composition")
+                        val radial = element.value("Radial Motion") == ElementValue.Bool(true) || motionSource == "Target Motion" || relativeMode == "Target Relative"
+                        val measuredAngle = number("Blur Direction / Angle", 0f) + if (motionSource == "Measured Movement") sin(seconds * 2.4f) * 45f else 0f
+                        val resolvedAngle = if (radial) radialAngle else (measuredAngle + if (relativeMode == "Relative") number("Rotation", 0f) else 0f) * PI.toFloat() / 180f
+                        val velocity = if (element.value("Velocity Influence") == ElementValue.Bool(false)) 1f else (0.25f + audioLevel.coerceIn(0f, 1f) * 0.75f)
+                        val length = lengthBase * velocity
+                        val angle = resolvedAngle
                         val trails = number("Trails / Echo", 0f).toInt().coerceIn(0, 32)
                         val fade = number("Trail Opacity / Fade", 0.75f).coerceIn(0f, 1f)
                         for (sample in samples downTo 1) {

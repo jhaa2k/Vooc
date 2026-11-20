@@ -2642,7 +2642,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                             val parallaxX = number("Image Parallax X", 0f).coerceIn(-1f, 1f) * frameWidth
                             val parallaxY = number("Image Parallax Y", 0f).coerceIn(-1f, 1f) * frameHeight
-                            val imageDestination = destination.translate(parallaxX, parallaxY)
+                            val imageDestination = androidx.compose.ui.geometry.Rect(destination.left + parallaxX, destination.top + parallaxY, destination.right + parallaxX, destination.bottom + parallaxY)
                             val flipX = props["Image Flip Horizontal"] == ElementValue.Bool(true)
                             val flipY = props["Image Flip Vertical"] == ElementValue.Bool(true)
                             val shapeName = textValue("Shape", "Rectangle").takeIf { it != "Rectangle" } ?: textValue("Mask / Shape", "Rectangle")

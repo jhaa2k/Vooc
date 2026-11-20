@@ -206,7 +206,6 @@ object VideoExportEngine {
                             val blurred = processBlurEffectForExport(source, element)
                             imageCache["${uriText}#${element.id}"] = blurred
                             imageCache[uriText] = source
-                            if (blurred !== source) source.recycle()
                         } else if (element.type == StudioElementType.MOTION_BLUR_EFFECT) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {
@@ -1064,10 +1063,12 @@ object VideoExportEngine {
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
                         val destination = RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
-                        if ((element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true) {
-                            imageCache[sourceUri]?.let { original -> canvas.drawBitmap(original, null, destination, Paint(paint).apply { this.alpha = (this.alpha * 0.35f).toInt() }) }
-                        }
+                        val original = imageCache[sourceUri]
+                        val showUnder = (element.value("Show Unblurred Content Under") as? ElementValue.Bool)?.value == true
+                        val showOver = (element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true
+                        if (showUnder && original != null) canvas.drawBitmap(original, null, destination, paint)
                         canvas.drawBitmap(image, null, destination, paint)
+                        if (showOver && original != null) canvas.drawBitmap(original, null, destination, paint)
                     }
                 }
                 StudioElementType.MOTION_BLUR_EFFECT -> {

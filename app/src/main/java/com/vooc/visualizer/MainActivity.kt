@@ -2163,6 +2163,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         textPaint.shader = null
                     }
                     StudioElementType.BARS_SEGMENTS -> {
+                        val providerIndex = number("Audio Provider Index", 0f).toInt()
+                            .coerceIn(0, (providerFrames.size - 1).coerceAtLeast(0))
+                        val selectedProviderFrame = providerFrames.getOrNull(providerIndex) ?: providerFrame
                         val selectedChannel = textValue("Audio Channel", "Mixed")
                         val frequencyStartHz = number("Frequency Range Start", 20f).coerceAtLeast(0f)
                         val frequencyEndHz = number("Frequency Range End", 18000f).coerceAtLeast(frequencyStartHz + 1f)
@@ -2176,7 +2179,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         val useProviderSmoothing = props["Use Audio Provider Smoothing"] != ElementValue.Bool(false)
                         val sourceSamples: FloatArray = if (selectedChannel == "Mixed" && !customFrequencyRange && useProviderSmoothing) {
-                            providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
+                            selectedProviderFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
                         } else selectedSpectrum ?: frame?.spectrum ?: FloatArray(64)
                         val rawSamples = if (customFrequencyRange && frame != null) SpectrumMapper.cropFrequencyRange(
                             sourceSamples, frame!!.sampleRate, frequencyStartHz, frequencyEndHz
@@ -2204,7 +2207,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             damping = number("Smoothing / Damping", 0.72f),
                             peakHold = number("Peak Hold Time", number("Peak Hold", 0.65f)),
                             peakFallSpeed = number("Peak Fall Speed", 0.8f),
-                            logarithmicInput = (selectedChannel != "Mixed" || customFrequencyRange || providerFrame == null) && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
+                            logarithmicInput = (selectedChannel != "Mixed" || customFrequencyRange || selectedProviderFrame == null) && textValue("Frequency Scale", "Logarithmic") == "Logarithmic",
                             reactionDelayMs = number("Reaction Delay", 0f),
                             accumulatedDelayMs = maxOf(number("Accumulated Delay", 0f), number("Reaction Accumulated Delay", 0f)),
                             attackSmoothing = number("Attack Smoothing", 0.12f),

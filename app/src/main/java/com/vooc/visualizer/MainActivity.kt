@@ -2252,7 +2252,6 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             else -> null
                         }
                         val shapeStyle = if (outline) Stroke(strokeWidth, pathEffect = dashEffect) else androidx.compose.ui.graphics.drawscope.Fill
-                        val gradientBrush = if (textValue("Gradient Direction", "Vertical") == "Horizontal") androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(colorA, colorB)) else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB))
                         val barOffset = number("Bar Offset", 0f).dp.toPx()
                         val extrusion = props["3D / Extrusion"] == ElementValue.Bool(true)
                         val extrusionDepth = number("Extrusion Depth", 5f).dp.toPx()
@@ -2293,9 +2292,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 drawPath(shifted, fill.copy(alpha = opacity * 0.32f), style = shapeStyle)
                             }
                             val modeBrush = when (colorMode) {
-                                "Gradient" -> if (textValue("Gradient Direction", "Vertical") == "Horizontal") gradientBrush
-                                    else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
-                                "By Amplitude" -> androidx.compose.ui.graphics.SolidColor(fill)
+                                "Gradient", "By Amplitude" -> androidx.compose.ui.graphics.SolidColor(fill)
                                 "Alternating" -> androidx.compose.ui.graphics.SolidColor(if (index % 2 == 0) colorA else colorB)
                                 "Per Bar" -> androidx.compose.ui.graphics.SolidColor(runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor))
                                 else -> androidx.compose.ui.graphics.SolidColor(elementColor)
@@ -2487,8 +2484,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 else if (alignment == "Center") baseline - barHeight / 2f
                                 else if (alignment == "Top") baseline else baseline - barHeight
                             val height = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(size.height * 0.95f) else drawHeight
-                            val blendPosition = (index.toFloat() / (count - 1).coerceAtLeast(1) +
-                                number("Color Blend Offset", 0f)).coerceIn(0f, 1f)
+                            val colorBlendOffset = number("Color Blend Offset", 0f).coerceIn(-1f, 1f)
+                            val blendPosition = (if (colorMode == "Gradient" && textValue("Gradient Direction", "Vertical") == "Horizontal")
+                                index.toFloat() / (count - 1).coerceAtLeast(1) + colorBlendOffset
+                            else level + colorBlendOffset).coerceIn(0f, 1f)
                             val colorForBar = when (colorMode) {
                                 "Alternating" -> if (index % 2 == 0) colorA else colorB
                                 "Per Bar" -> runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor)

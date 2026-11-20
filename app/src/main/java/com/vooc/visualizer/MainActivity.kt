@@ -1759,7 +1759,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val baseTypeface = poppinsTypeface?.let {
                             android.graphics.Typeface.create(it, typefaceStyle)
                         } ?: android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, typefaceStyle)
-                        val textSize = (number("Font Size", 48f) * scale).coerceAtLeast(6f).sp.toPx()
+                        val resolvedTextSize = (number("Font Size", 48f) * scale).coerceAtLeast(6f).sp.toPx()
                         val shadowEnabled = props["Shadow Enabled"] == ElementValue.Bool(true)
                         val shadowColor = runCatching {
                             android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000"))
@@ -1774,7 +1774,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val strokeWidth = number("Stroke Thickness", 0f).dp.toPx().coerceAtLeast(0f)
                         val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                             color = elementColor.toArgb()
-                            textSize = textSize
+                            textSize = resolvedTextSize
                             textAlign = when (textValue("Alignment", "Center")) {
                                 "Left" -> android.graphics.Paint.Align.LEFT
                                 "Right" -> android.graphics.Paint.Align.RIGHT
@@ -1816,7 +1816,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 color = strokeColor.toArgb()
                                 style = android.graphics.Paint.Style.STROKE
                                 strokeJoin = android.graphics.Paint.Join.ROUND
-                                strokeWidth = strokeWidth
+                                this.strokeWidth = strokeWidth
                                 clearShadowLayer()
                             }
                             textLines.forEachIndexed { index, line ->

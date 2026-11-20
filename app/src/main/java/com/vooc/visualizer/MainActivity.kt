@@ -1940,7 +1940,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val modeBrush = when (colorMode) {
                                 "Gradient" -> if (textValue("Gradient Direction", "Vertical") == "Horizontal") gradientBrush
                                     else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
-                                "By Amplitude" -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
+                                "By Amplitude" -> androidx.compose.ui.graphics.SolidColor(fill)
                                 "Alternating" -> androidx.compose.ui.graphics.SolidColor(if (index % 2 == 0) colorA else colorB)
                                 "Per Bar" -> androidx.compose.ui.graphics.SolidColor(runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor))
                                 else -> androidx.compose.ui.graphics.SolidColor(elementColor)

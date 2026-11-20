@@ -136,6 +136,23 @@ private val Lime = Color(0xFFC6F36A)
 private val Ink = Color(0xFF0C0E0B)
 private val Panel = Color(0xFF171A14)
 private val Muted = Color(0xFF92998A)
+private fun processBlurEffectForPreview(source: android.graphics.Bitmap, element: ElementDocument): android.graphics.Bitmap {
+    fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
+        is ElementValue.Number -> value.value.toFloat()
+        is ElementValue.Integer -> value.value.toFloat()
+        else -> fallback
+    }
+    val radius = (number("Blur Radius", 2f) * number("Blur Multiplier", 4.1f)).coerceIn(0f, 512f)
+    if (radius <= 0.1f) return source
+    val reduction = (1f / (1f + radius / 3f)).coerceIn(0.05f, 1f)
+    val reduced = android.graphics.Bitmap.createScaledBitmap(source,
+        (source.width * reduction).toInt().coerceAtLeast(1),
+        (source.height * reduction).toInt().coerceAtLeast(1), true)
+    val blurred = android.graphics.Bitmap.createScaledBitmap(reduced, source.width, source.height, true)
+    if (reduced !== source) reduced.recycle()
+    return blurred
+}
+
 private fun processImageForPreview(source: android.graphics.Bitmap, element: ElementDocument, maskSource: android.graphics.Bitmap? = null): android.graphics.Bitmap {
     fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
         is ElementValue.Number -> value.value.toFloat()
@@ -1685,7 +1702,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val maskBitmap = if (element.type == StudioElementType.IMAGE && maskUri.isNotBlank()) {
                                 context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
                             } else null
-                            val processed = if (element.type == StudioElementType.IMAGE) processImageForPreview(decoded, element, maskBitmap) else decoded
+                            val processed = when (element.type) {\n                                StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)\n                                StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)\n                                else -> decoded\n                            }
                             val image = processed.asImageBitmap()
                             if (processed !== decoded) decoded.recycle()
                             maskBitmap?.recycle()
@@ -2653,13 +2670,25 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                         }
                     }
-                    StudioElementType.BLUR_EFFECT, StudioElementType.MOTION_BLUR_EFFECT -> {
-                        val radius = (number("Blur Radius", 12f) * scale).coerceIn(1f, size.minDimension)
-                        drawCircle(elementColor.copy(alpha = opacity * 0.28f), radius, center, style = Stroke(width = maxOf(1f, radius * 0.12f)))
-                        if (element.type == StudioElementType.MOTION_BLUR_EFFECT) {
-                            drawLine(elementColor.copy(alpha = opacity * 0.4f), Offset(center.x - radius, center.y - radius * 0.25f),
-                                Offset(center.x + radius, center.y + radius * 0.25f), maxOf(1f, radius * 0.08f))
+                    StudioElementType.BLUR_EFFECT -> {
+                        val bitmap = elementImages[element.id]
+                        if (bitmap != null) {
+                            val frameWidth = (size.width * 0.45f * scale).coerceAtLeast(1f)
+                            val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
+                            val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
+                            val destinationSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
+                            drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity)
+                            if (props["Show Unblurred Content"] == ElementValue.Bool(true)) {
+                                val original = bitmap
+                                drawImage(original, dstOffset = destination, dstSize = destinationSize, alpha = opacity * 0.35f)
+                            }
                         }
+                    }
+                    StudioElementType.MOTION_BLUR_EFFECT -> {
+                        val radius = (number("Blur Length", 24f) * scale).coerceIn(1f, size.minDimension)
+                        drawCircle(elementColor.copy(alpha = opacity * 0.28f), radius, center, style = Stroke(width = maxOf(1f, radius * 0.12f)))
+                        drawLine(elementColor.copy(alpha = opacity * 0.4f), Offset(center.x - radius, center.y - radius * 0.25f),
+                            Offset(center.x + radius, center.y + radius * 0.25f), maxOf(1f, radius * 0.08f))
                     }
                     StudioElementType.SHAPE -> {
                         val w = (number("Width", 300f).dp.toPx() * scale).coerceAtLeast(0f)

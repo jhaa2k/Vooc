@@ -2448,7 +2448,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val spacingRandom = number("Bar Spacing Random", 0f).coerceIn(0f, 1f)
                             val barWidth = (requestedWidth * (1f + (layoutRandom * 2f - 1f) * widthRandom)).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
                             val spacingJitter = (layoutRandom * 2f - 1f) * slot * 0.45f * spacingRandom
-                            val drawHeight = if (centerSymmetry) barHeight / 2f else barHeight
+                            val drawHeight = if (verticalSymmetry) barHeight / 2f else barHeight
                             val customPathMode = textValue("Shape Path", "Horizontal Line") == "Custom Path"
                             val customPoints = if (customPathMode) textValue("Custom Path Points", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5")
                                 .split(";").mapNotNull { token ->
@@ -2472,8 +2472,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val afterPoint = if (customPathMode) pathPoint((index.toFloat() / (count - 1).coerceAtLeast(1) + 0.01f).coerceAtMost(1f)) else point
                             val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
                             val x = if (customPathMode) point.first - barWidth / 2f + barOffset else center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + spacingJitter + barOffset
+                            val verticalSymmetry = verticalMirror || centerSymmetry
                             val alternateDirection = props["Alternate Bar Direction"] == ElementValue.Bool(true) &&
-                                !customPathMode && !centerSymmetry
+                                !customPathMode && !verticalSymmetry
                             val alternateFromTop = alternateDirection && index % 2 == 1
                             val baseline = if (customPathMode) point.second else if (alternateDirection) {
                                 if (alternateFromTop) center.y - size.height * 0.38f else center.y + size.height * 0.38f
@@ -2483,7 +2484,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 "Stretch" -> center.y + size.height * 0.44f
                                 else -> center.y + size.height * 0.38f
                             }
-                            val top = if (centerSymmetry) baseline - drawHeight else if (alternateFromTop) baseline
+                            val top = if (verticalSymmetry) baseline - drawHeight else if (alternateFromTop) baseline
                                 else if (alternateDirection) baseline - barHeight
                                 else if (alignment == "Center") baseline - barHeight / 2f
                                 else if (alignment == "Top") baseline else baseline - barHeight
@@ -2534,7 +2535,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 val peakStyle = textValue("Peak Indicator Style", "Line")
                                 if (peakEnabled && peakStyle != "None") {
                                     val peakLevel = peaks[sourceIndex].coerceIn(0f, 1f)
-                                    val peakTravel = peakLevel * maxHeight * if (centerSymmetry) 0.5f else 1f
+                                    val peakTravel = peakLevel * maxHeight * if (verticalMirror || centerSymmetry) 0.5f else 1f
                                     val peakY = if (alignment == "Top" && !customPathMode) baseline + peakTravel else baseline - peakTravel
                                     when (peakStyle) {
                                         "Dot" -> drawCircle(peakColor.copy(alpha = opacity), (peakWidth * 1.5f).coerceAtLeast(1f), Offset(x + barWidth / 2f, peakY))

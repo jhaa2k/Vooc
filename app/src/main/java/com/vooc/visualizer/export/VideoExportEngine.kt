@@ -1160,8 +1160,18 @@ object VideoExportEngine {
                                 "Copy" -> android.graphics.PorterDuff.Mode.SRC
                                 else -> android.graphics.PorterDuff.Mode.SRC_OVER
                             }
-                            if (layerBlend != android.graphics.PorterDuff.Mode.SRC_OVER) {
-                                xfermode = android.graphics.PorterDuffXfermode(layerBlend)
+                            val contentBlend = when (textValue("Blend Mode Content", "Alpha")) {
+                                "Add" -> android.graphics.PorterDuff.Mode.ADD
+                                "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                                "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                                "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                                "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                                "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                                "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                                else -> layerBlend
+                            }
+                            if (contentBlend != android.graphics.PorterDuff.Mode.SRC_OVER) {
+                                xfermode = android.graphics.PorterDuffXfermode(contentBlend)
                             }
                         }
                         val original = imageCache[uriText]

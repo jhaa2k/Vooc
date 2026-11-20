@@ -58,6 +58,13 @@ class AudioProviderConfigTest {
     }
 
     @Test
+    fun stereoAverageRequestsBothIndependentChannelSpectra() {
+        val applied = AudioProviderConfig(channelMode = ProviderChannelMode.STEREO_AVERAGE)
+            .applyTo(AnalyzerConfig())
+        assertEquals(ChannelMode.STEREO_SPLIT, applied.channelMode)
+    }
+
+    @Test
     fun invalidProviderBeatValuesAreClampedBeforeAnalyzerConfiguration() {
         val applied = AudioProviderConfig(
             beatSensitivity = 99f,

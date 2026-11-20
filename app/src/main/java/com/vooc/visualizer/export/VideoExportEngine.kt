@@ -29,6 +29,7 @@ import android.graphics.LinearGradient
 import android.graphics.Shader
 import android.graphics.DashPathEffect
 import android.graphics.Typeface
+import androidx.core.content.res.ResourcesCompat
 import java.nio.ByteBuffer
 import kotlin.math.PI
 import kotlin.math.abs
@@ -49,6 +50,7 @@ object VideoExportEngine {
         val width = (project.width.coerceIn(320, 3840) / 2) * 2
         val height = (project.height.coerceIn(320, 3840) / 2) * 2
         val fps = project.fps.coerceIn(15, 60)
+        val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         val audioUri = project.document.audioUri.takeIf { project.document.export.includeAudio && it.isNotBlank() }?.let(Uri::parse)
         val extractor = audioUri?.let { uri ->
             val afd = resolver.openAssetFileDescriptor(uri, "r") ?: throw IllegalStateException("Cannot open selected music.")
@@ -623,12 +625,15 @@ object VideoExportEngine {
                         "Bold Italic" -> Typeface.BOLD_ITALIC
                         else -> Typeface.BOLD
                     }
-                    val family = textValue("Font Family", "sans-serif").ifBlank { "sans-serif" }
+                    val family = textValue("Font Family", "Poppins").ifBlank { "Poppins" }
+                    val resolvedTypeface = if (family.equals("Poppins", ignoreCase = true)) {
+                        poppinsTypeface?.let { Typeface.create(it, fontStyle) } ?: Typeface.create("sans-serif", fontStyle)
+                    } else Typeface.create(family, fontStyle)
                     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
                         this.color = color
                         this.alpha = alpha
                         textSize = (number("Font Size", 48f) * width / 1080f * scale).coerceAtLeast(6f)
-                        typeface = Typeface.create(family, fontStyle)
+                        typeface = resolvedTypeface
                         textAlign = when (textValue("Alignment", "Center")) {
                             "Left" -> Paint.Align.LEFT
                             "Right" -> Paint.Align.RIGHT

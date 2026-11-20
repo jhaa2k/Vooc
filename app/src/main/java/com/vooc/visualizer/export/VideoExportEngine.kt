@@ -885,6 +885,8 @@ object VideoExportEngine {
                     val glowStrength = number("Glow Strength", 0.35f).coerceIn(0f, 1f)
                     val peakEnabled = (element.value("Peak / Cap") as? ElementValue.Bool)?.value == true
                     val peakWidth = (number("Peak Width", 2f) * width / 1080f).coerceAtLeast(0.5f)
+                    val segmentsPerBar = number("Segments Per Bar", 1f).toInt().coerceIn(1, 64)
+                    val segmentGap = (gap * 0.55f).coerceAtMost(6f * width / 1080f)
                     fun lerpColor(a: Int, b: Int, t: Float): Int = android.graphics.Color.argb(
                         alpha, (android.graphics.Color.red(a) + (android.graphics.Color.red(b) - android.graphics.Color.red(a)) * t).toInt(),
                         (android.graphics.Color.green(a) + (android.graphics.Color.green(b) - android.graphics.Color.green(a)) * t).toInt(),
@@ -916,7 +918,7 @@ object VideoExportEngine {
                             "By Amplitude" -> lerpColor(colorA, colorB, level)
                             else -> color
                         }
-                        fun drawShape(yTop: Float, yBottom: Float) {
+                        fun drawShape(yTop: Float, yBottom: Float, shapeFill: Int = fill) {
                             val rect = RectF(x, yTop, x + barWidth, yBottom)
                             val path = android.graphics.Path().apply {
                                 when (design) {
@@ -931,7 +933,7 @@ object VideoExportEngine {
                                     else -> { addRoundRect(rect, corner, corner, android.graphics.Path.Direction.CW) }
                                 }
                             }
-                            paint.color = if (outline) strokeColor else fill
+                            paint.color = if (outline) strokeColor else shapeFill
                             paint.alpha = alpha
                             paint.style = if (outline) Paint.Style.STROKE else Paint.Style.FILL
                             paint.strokeWidth = strokeWidth
@@ -1011,8 +1013,27 @@ object VideoExportEngine {
                         canvas.save()
                         if (radialLayout) canvas.rotate(index * (360f / count), cx, cy)
                         canvas.rotate(number("Bar Rotation", 0f), x + barWidth / 2f, baseline)
-                        drawShape(top, bottom)
-                        if (mirrorY) drawShape(baseline, baseline + h)
+                        val segmentHeight = ((h - segmentGap * (segmentsPerBar - 1)) / segmentsPerBar).coerceAtLeast(0.5f)
+                        repeat(segmentsPerBar) { segment ->
+                            val segmentNumber = segment + 1
+                            val prefix = if (segmentNumber <= 2) "Segment $segmentNumber " else ""
+                            val fixedHeight = prefix.isNotEmpty() && (element.value(prefix + "Fixed Height") as? ElementValue.Bool)?.value == true
+                            val multiplier = if (prefix.isNotEmpty()) number(prefix + "Bar Height Multiplier", 1f).coerceIn(0f, 10f) else 1f
+                            val renderedHeight = (if (fixedHeight) maxHeight / segmentsPerBar else segmentHeight) * multiplier
+                            val from = if (prefix.isNotEmpty()) runCatching { android.graphics.Color.parseColor(textValue(prefix + "Color From", "#FF56D8FF")) }.getOrDefault(fill) else fill
+                            val to = if (prefix.isNotEmpty()) runCatching { android.graphics.Color.parseColor(textValue(prefix + "Color To", "#FF9B5CFF")) }.getOrDefault(fill) else fill
+                            val segmentFill = lerpColor(from, to, level)
+                            val segmentTop = top + segment * (renderedHeight + segmentGap)
+                            val flipAlternate = prefix.isNotEmpty() && (element.value(prefix + "Flip Every Other") as? ElementValue.Bool)?.value == true && index % 2 == 1
+                            val mirrorSegment = prefix.isNotEmpty() && (element.value(prefix + "Mirror") as? ElementValue.Bool)?.value == true
+                            if (flipAlternate) {
+                                canvas.save()
+                                canvas.rotate(180f, x + barWidth / 2f, baseline)
+                            }
+                            drawShape(segmentTop, segmentTop + renderedHeight, segmentFill)
+                            if (mirrorY || mirrorSegment) drawShape(baseline + segment * (renderedHeight + segmentGap), baseline + segment * (renderedHeight + segmentGap) + renderedHeight, segmentFill)
+                            if (flipAlternate) canvas.restore()
+                        }
                         canvas.restore()
                     }
                     canvas.restore()

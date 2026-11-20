@@ -2326,6 +2326,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 when (shapeName) {
                                     "Circle", "Ellipse", "Circle/Oval" -> addOval(destination)
                                     "Triangle" -> { moveTo(destination.center.x, destination.top); lineTo(destination.right, destination.bottom); lineTo(destination.left, destination.bottom); close() }
+                                    "Rounded Rectangle", "Rounded Rect" -> addRoundRect(androidx.compose.ui.geometry.RoundRect(destination, androidx.compose.ui.geometry.CornerRadius((number("Corner Radius", 0f) * size.width / 1080f).coerceAtLeast(0f))))
                                     else -> addRect(destination)
                                 }
                             }

@@ -2472,7 +2472,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     StudioElementType.PARTICLES -> {
                         val count = number("Count Limit", number("Particle Count", 128f)).toInt().coerceIn(1, 10000)
                         val lifetime = number("Lifetime", number("Life Span", 3f)).coerceIn(0.01f, 3600f)
-                        val spawnInterval = number("Spawn Time", 0.02f).coerceIn(0f, 10f)
+                        val emissionRate = number("Emission Rate", 0f).coerceAtLeast(0f)
+                        val spawnInterval = if (emissionRate > 0f) 1f / emissionRate.coerceAtLeast(0.001f) else number("Spawn Time", 0.02f).coerceIn(0f, 10f)
                         val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * size.width * 0.25f
                         val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * size.height * 0.25f
                         val spawnArea = textValue("Particle Emitter Shape", textValue("Spawn Area", "Point"))
@@ -2510,6 +2511,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val baseSpeed = number("Speed", number("Start Velocity", 80f)) +
                             speedSource * (number("Measure Overall Speed A (X Amount)", 0f) + number("Measure Overall Speed B (Y Amount)", 0f))
                         val speedRandom = number("Speed Random", number("Velocity Random", 0f)).coerceIn(0f, 1f)
+                        val endVelocity = number("End Velocity", number("Speed", number("Start Velocity", 80f)))
+                        val friction = number("Friction / Drag", 0f).coerceIn(0f, 100f) / 100f
+                        val turbulence = number("Turbulence / Noise", 0f).coerceAtLeast(0f)
+                        val lifetimeRandom = number("Lifetime Random", 0f).coerceIn(0f, 1f)
+                        val wind = props["Wind"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+                        val collisionEnabled = props["Collision"] == ElementValue.Bool(true)
+                        val bounce = number("Bounce", 0.5f).coerceIn(0f, 1f)
+                        val trailWidth = number("Particle Trail Width", 1f).coerceAtLeast(0f)
+                        val trailFade = number("Particle Trail Fade", 0.8f).coerceIn(0f, 1f)
+                        val opacityRandom = number("Particle Opacity Random", 0f).coerceIn(0f, 1f)
+                        val colorRandom = number("Particle Color Random", 0f).coerceIn(0f, 1f)
+                        val particleShape = textValue("Particle Shape", "Circle")
+                        val screenBlend = props["Particle Screen Blend"] == ElementValue.Bool(true)
+                        val additiveBlend = props["Particle Additive Blend"] == ElementValue.Bool(true)
                         val startSize = number("Start Size", 8f).coerceAtLeast(0f)
                         val endSize = number("End Size", 2f).coerceAtLeast(0f)
                         val endRandom = number("End Size Random", number("Particle Size Random", 0f)).coerceIn(0f, 1f)
@@ -2537,7 +2552,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val randomA = kotlin.math.abs(sin(seed * 12.9898f) * 43758.5453f) % 1f
                             val randomB = kotlin.math.abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
                             val randomC = kotlin.math.abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
-                            val age = ((playbackSeconds + index * spawnInterval) % lifetime).coerceIn(0f, lifetime)
+                            val particleLifetime = (lifetime * (1f + (randomC * 2f - 1f) * lifetimeRandom)).coerceAtLeast(0.01f)
+                            val age = ((playbackSeconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
                             val lifeT = (age / lifetime).coerceIn(0f, 1f)
                             val emitterAngle = emitterArcStart + randomA * emitterArcSweep
                             val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
@@ -2561,7 +2577,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                             val burstIndex = if (emitterBurstCount > 0) (playbackSeconds / emitterBurstInterval).toInt() else 0
                             val inBurst = emitterBurstCount <= 0 || (index % count.coerceAtLeast(1)) < emitterBurstCount
-                            val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
+                            val particleSpeed = baseSpeed + (endVelocity - baseSpeed) * lifeT
+                            val velocity = particleSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                             var vx = cos(angle) * velocity
                             var vy = sin(angle) * velocity
                             if (emitterBurstCount > 0 && (!inBurst || (!emitterLoop && burstIndex > 0))) { vx = 0f; vy = 0f }
@@ -2579,9 +2596,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
                                 sineMagnitude * (1f + randomA * sineMagnitudeRandom)
                             val dampingFactor = (1f - particleDamping).coerceAtLeast(0f)
-                            val travelTime = if (particleDamping > 0f) (1f - kotlin.math.exp(-particleDamping * age)) / particleDamping else age
-                            var px = spawnX + vx * travelTime * 0.01f + gravityX * age * age * 0.005f + wave * dampingFactor
-                            var py = spawnY + vy * travelTime * 0.01f + gravityY * age * age * 0.005f
+                            val totalDrag = (1f - (1f - particleDamping) * (1f - friction)).coerceIn(0f, 0.999f)
+                            val travelTime = if (totalDrag > 0f) (1f - kotlin.math.exp(-totalDrag * age)) / totalDrag else age
+                            var px = spawnX + vx * travelTime * 0.01f + gravityX * age * age * 0.005f + wind.x.toFloat() * age * age * 0.005f + wave * dampingFactor + sin(age * 7f + randomA * 19f) * turbulence * age * 0.01f
+                            var py = spawnY + vy * travelTime * 0.01f + gravityY * age * age * 0.005f + wind.y.toFloat() * age * age * 0.005f + cos(age * 6f + randomB * 17f) * turbulence * age * 0.01f
+                            if (collisionEnabled) { if (px < 0f || px > size.width) vx = -vx * bounce; if (py < 0f || py > size.height) vy = -vy * bounce; px = px.coerceIn(0f, size.width); py = py.coerceIn(0f, size.height) }
                             val depth = randomB * perspectiveDepth
                             val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)
                             val depthScale = (1f + number("End Size ZFactor", 0f) * depth / 1000f).coerceAtLeast(0.05f)
@@ -2592,11 +2611,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 (1f + (fadeInScale - 1f) * fadeInSize)).coerceAtLeast(0f)
                             val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
                             val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
-                            val alpha = (opacity * fadeInScale * fadeOut * nearFade).coerceIn(0f, 1f)
+                            val alpha = (opacity * fadeInScale * fadeOut * nearFade * (1f - randomA * opacityRandom)).coerceIn(0f, 1f)
+                            val colorT = (lifeT + (randomC - 0.5f) * colorRandom).coerceIn(0f, 1f)
                             val particleColor = Color(
-                                colorFrom.red + (colorTo.red - colorFrom.red) * lifeT,
-                                colorFrom.green + (colorTo.green - colorFrom.green) * lifeT,
-                                colorFrom.blue + (colorTo.blue - colorFrom.blue) * lifeT,
+                                colorFrom.red + (colorTo.red - colorFrom.red) * colorT,
+                                colorFrom.green + (colorTo.green - colorFrom.green) * colorT,
+                                colorFrom.blue + (colorTo.blue - colorFrom.blue) * colorT,
                                 alpha
                             )
                             val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).dp.toPx().coerceAtLeast(0.5f)
@@ -2608,7 +2628,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             fun drawParticleAt(x: Float, y: Float) {
                                 if (trailLength > 0f) {
                                     drawLine(particleColor.copy(alpha = alpha * 0.5f), Offset(x - trailX, y - trailY), Offset(x, y),
-                                        (particleHeight * 0.35f).coerceAtLeast(0.5f), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                        (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f), cap = androidx.compose.ui.graphics.StrokeCap.Round)
                                 }
                                 if (customParticle != null) {
                                     rotate(visualAngle, Offset(x, y)) {

@@ -90,6 +90,8 @@ object VideoExportEngine {
         val providerConfig = providerElement.toAudioProviderConfig()
         val providerSamplesByFrame = Array(frameCount) { FloatArray(providerConfig.sampleOutCount) }
         val providerBeatByFrame = FloatArray(frameCount)
+        // Keep the analyzer's measured tempo alongside each offline visual frame.
+        val providerBpmByFrame = FloatArray(frameCount) { 120f }
         val providerFrameAssigned = BooleanArray(frameCount)
         if (audioUri != null) {
             PcmDecoder(context, audioUri).use { decoder ->
@@ -116,6 +118,7 @@ object VideoExportEngine {
                             for (frameIndex in firstFrame..lastFrame) {
                                 shaped.samples.copyInto(providerSamplesByFrame[frameIndex])
                                 providerBeatByFrame[frameIndex] = shaped.beatValue
+                                providerBpmByFrame[frameIndex] = analysis.beat.bpm.takeIf { it in 40f..240f } ?: 120f
                                 providerFrameAssigned[frameIndex] = true
                             }
                         }
@@ -144,13 +147,16 @@ object VideoExportEngine {
                 }
                 var lastSamples: FloatArray? = null
                 var lastBeat = 0f
+                var lastBpm = 120f
                 for (i in providerSamplesByFrame.indices) {
                     if (providerFrameAssigned[i]) {
                         lastSamples = providerSamplesByFrame[i]
                         lastBeat = providerBeatByFrame[i]
+                        lastBpm = providerBpmByFrame[i]
                     } else if (lastSamples != null) {
                         lastSamples.copyInto(providerSamplesByFrame[i])
                         providerBeatByFrame[i] = lastBeat
+                        providerBpmByFrame[i] = lastBpm
                     }
                 }
                 val firstAssigned = providerFrameAssigned.indexOfFirst { it }
@@ -158,6 +164,7 @@ object VideoExportEngine {
                     for (i in 0 until firstAssigned) {
                         providerSamplesByFrame[firstAssigned].copyInto(providerSamplesByFrame[i])
                         providerBeatByFrame[i] = providerBeatByFrame[firstAssigned]
+                        providerBpmByFrame[i] = providerBpmByFrame[firstAssigned]
                     }
                 }
             }
@@ -215,7 +222,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f })
+                            drawFrame(canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -291,7 +298,7 @@ object VideoExportEngine {
         }
     }
 
-    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float) {
+    private fun drawFrame(canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioLevel: Float, providerSamples: FloatArray?, providerBeat: Float, providerBpm: Float) {
         canvas.save()
         canvas.clipRect(0, 0, width, height)
         canvas.drawColor((project.document.backgroundArgb or (0xFFL shl 24)).toInt())
@@ -313,7 +320,7 @@ object VideoExportEngine {
                 beatPulse = providerBeat,
                 bass = bassLevel,
                 treble = trebleLevel,
-                bpm = 120f,
+                bpm = providerBpm,
                 seed = layer.id
             )
             val cx = width * (0.5f + layer.x / 200f + motion.offsetX)

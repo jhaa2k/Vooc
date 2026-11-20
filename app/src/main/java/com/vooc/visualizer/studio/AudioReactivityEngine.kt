@@ -116,3 +116,84 @@ class AudioReactivityEnvelope {
         return value
     }
 }
+
+/** Builds the same compact measurement snapshot for preview and offline export. */
+fun audioReactivitySources(
+    samples: FloatArray?,
+    overall: Float,
+    beat: Float,
+    peak: Float = overall,
+    rms: Float = overall
+): AudioReactivitySources {
+    val data = samples?.takeIf { it.isNotEmpty() }
+    fun average(from: Int, until: Int): Float {
+        if (data == null) return overall.coerceIn(0f, 1f)
+        val start = from.coerceIn(0, data.size - 1)
+        val end = until.coerceIn(start + 1, data.size)
+        return data.copyOfRange(start, end).map { it.takeIf(Float::isFinite)?.coerceIn(0f, 1f) ?: 0f }
+            .average().toFloat().coerceIn(0f, 1f)
+    }
+    val size = data?.size ?: 0
+    val fifth = (size / 5).coerceAtLeast(1)
+    val safe = data?.map { it.takeIf(Float::isFinite)?.coerceIn(0f, 1f) ?: 0f }.orEmpty()
+    return AudioReactivitySources(
+        overall = overall.coerceIn(0f, 1f),
+        bass = average(0, fifth),
+        mid = average(size / 2 - fifth / 2, size / 2 + fifth / 2),
+        treble = average(size - fifth, size),
+        beat = beat.coerceIn(0f, 1f),
+        peak = peak.coerceIn(0f, 1f),
+        rms = rms.coerceIn(0f, 1f),
+        waveform = overall.coerceIn(0f, 1f),
+        spectrumAverage = if (safe.isEmpty()) overall.coerceIn(0f, 1f) else safe.average().toFloat(),
+        spectrumMaximum = safe.maxOrNull() ?: overall.coerceIn(0f, 1f),
+        left = overall.coerceIn(0f, 1f),
+        right = overall.coerceIn(0f, 1f)
+    )
+}
+
+/** Per-layer state. Create one runtime per element and reset it when the track changes. */
+class AudioReactivityRuntime {
+    private val envelope = AudioReactivityEnvelope()
+
+    fun reset() = envelope.reset()
+
+    fun update(properties: Map<String, ElementValue>, sources: AudioReactivitySources, deltaSeconds: Float): Float? {
+        val mapped = AudioReactivityEngine.applyTo(properties, sources) ?: run {
+            envelope.reset()
+            return null
+        }
+        fun number(name: String, fallback: Float): Float = when (val value = properties[name]) {
+            is ElementValue.Number -> value.value.toFloat()
+            is ElementValue.Integer -> value.value.toFloat()
+            else -> fallback
+        }
+        val smoothing = number("Audio Reactivity Smoothing", 0f).coerceIn(0f, 1f)
+        val attack = maxOf(number("Audio Reactivity Attack", 0.12f), smoothing * 0.5f)
+        val release = maxOf(number("Audio Reactivity Release", 0.72f), smoothing)
+        return envelope.update(mapped, deltaSeconds, attack, release)
+    }
+}
+
+/** Interprets the mapped signal consistently in both renderers. */
+data class AudioReactivityTransform(
+    val xOffset: Float = 0f,
+    val yOffset: Float = 0f,
+    val scaleMultiplier: Float = 1f,
+    val rotationOffset: Float = 0f,
+    val opacityMultiplier: Float = 1f
+)
+
+fun audioReactivityTransform(properties: Map<String, ElementValue>, value: Float?): AudioReactivityTransform {
+    if (value == null) return AudioReactivityTransform()
+    val target = (properties["Audio Reactivity Apply To"] as? ElementValue.Text)?.value ?: "All Properties"
+    val amount = value.takeIf(Float::isFinite) ?: 0f
+    val all = target == "All Properties"
+    return AudioReactivityTransform(
+        xOffset = if (all || target == "Position") amount * 100f else 0f,
+        yOffset = if (all || target == "Position") amount * 100f else 0f,
+        scaleMultiplier = if (all || target == "Scale" || target == "Size") (1f + amount).coerceAtLeast(0f) else 1f,
+        rotationOffset = if (all || target == "Rotation") amount else 0f,
+        opacityMultiplier = if (all || target == "Opacity") amount.coerceIn(0f, 1f) else 1f
+    )
+}

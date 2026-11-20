@@ -2565,6 +2565,16 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val frameWidth = size.width * 0.45f * scale
                             val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
                             val destination = Offset(center.x - frameWidth / 2f, center.y - frameHeight / 2f)
+                            val contentBlend = when (textValue("Blend Mode Content", "Alpha")) {
+                                "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
+                                "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                                "Multiply", "Subtractive" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                                "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
+                                "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
+                                "Exclusion", "Difference" -> androidx.compose.ui.graphics.BlendMode.Difference
+                                "Copy" -> androidx.compose.ui.graphics.BlendMode.Src
+                                else -> androidx.compose.ui.graphics.BlendMode.SrcOver
+                            }
                             colors.forEachIndexed { index, tint ->
                                 val base = offsets[index]
                                 val radialScale = 1f + falloff * kotlin.math.sqrt((focus.x.toFloat() - 0.5f).pow(2) + (focus.y.toFloat() - 0.5f).pow(2))
@@ -2574,7 +2584,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     dstOffset = androidx.compose.ui.unit.IntOffset((destination.x + dx).toInt(), (destination.y + dy).toInt()),
                                     dstSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1)),
                                     alpha = opacity * 0.72f,
-                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint, androidx.compose.ui.graphics.BlendMode.Screen)
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint, androidx.compose.ui.graphics.BlendMode.Screen),
+                                    blendMode = contentBlend
                                 )
                             }
                         }

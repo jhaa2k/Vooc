@@ -1935,9 +1935,13 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             "Bold Italic" -> android.graphics.Typeface.BOLD_ITALIC
                             else -> android.graphics.Typeface.BOLD
                         }
-                        val baseTypeface = poppinsTypeface?.let {
-                            android.graphics.Typeface.create(it, typefaceStyle)
-                        } ?: android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, typefaceStyle)
+                        val fontFamily = textValue("Font Family", "Poppins").ifBlank { "Poppins" }
+                        val baseTypeface = if (fontFamily.equals("Poppins", ignoreCase = true)) {
+                            poppinsTypeface?.let { android.graphics.Typeface.create(it, typefaceStyle) }
+                                ?: android.graphics.Typeface.create("sans-serif", typefaceStyle)
+                        } else {
+                            android.graphics.Typeface.create(fontFamily, typefaceStyle)
+                        }
                         val resolvedTextSize = (number("Font Size", 48f) * scale).coerceAtLeast(6f).sp.toPx()
                         val shadowEnabled = props["Shadow Enabled"] == ElementValue.Bool(true)
                         val shadowColor = runCatching {
@@ -2002,10 +2006,25 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 native.drawText(line, textX, firstBaseline + index * lineHeight, outlinePaint)
                             }
                         }
+                        val gradientStart = runCatching {
+                            android.graphics.Color.parseColor(textValue("Text Gradient Start", "#FFFFFFFF"))
+                        }.getOrDefault(android.graphics.Color.WHITE)
+                        val gradientEnd = runCatching {
+                            android.graphics.Color.parseColor(textValue("Text Gradient End", "#FFFFFFFF"))
+                        }.getOrDefault(android.graphics.Color.WHITE)
+                        if (gradientStart != gradientEnd) {
+                            val widest = textLines.maxOfOrNull { textPaint.measureText(it) } ?: textPaint.textSize
+                            textPaint.shader = android.graphics.LinearGradient(
+                                center.x - widest * 0.5f, center.y,
+                                center.x + widest * 0.5f, center.y,
+                                gradientStart, gradientEnd, android.graphics.Shader.TileMode.CLAMP
+                            )
+                        }
                         textLines.forEachIndexed { index, line ->
                             native.drawText(line, textX, firstBaseline + index * lineHeight, textPaint)
                         }
                         textPaint.clearShadowLayer()
+                        textPaint.shader = null
                     }
                     StudioElementType.BARS_SEGMENTS -> {
                         val rawSamples: FloatArray = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)

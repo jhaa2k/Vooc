@@ -561,7 +561,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val barsAppearance = listOf(
@@ -578,7 +580,10 @@ object ElementPropertyCatalog {
 
     private val bars = listOf(
         integer("Audio Provider Index", "Bars", 0, 0.0, 31.0),
-        integer("Bar Count", "Layout", 64, 1.0, 512.0),
+        integer("Bar Count", "Layout", 64, 8.0, 256.0),
+        integer("Segments Per Bar", "Layout", 1, 1.0, 64.0),
+        text("Orientation", "Layout", "Vertical", listOf("Horizontal", "Vertical", "Radial", "Mirror")),
+        text("Shape Path", "Layout", "Horizontal Line", listOf("Horizontal Line", "Vertical Line", "Circle", "Custom Path")),
         number("Min Height", "Layout", 0.0, 0.0, 10000.0),
         number("Max Height", "Layout", 300.0, 0.0, 10000.0),
         text("Bar Design", "Design", "Rounded Rect", listOf(
@@ -586,7 +591,9 @@ object ElementPropertyCatalog {
             "Triangle", "Diamond", "Hexagon", "Star", "Chevron", "Arrow", "Cross", "Wave", "Custom Image"
         )),
         number("Bar Width", "Layout", 8.0, 0.5, 256.0),
+        number("Corner Radius", "Design", 4.0, 0.0, 128.0),
         number("Bar Offset", "Layout", 0.0, -4096.0, 4096.0),
+        number("Sensitivity", "Audio", 1.0, 0.0, 8.0),
         number("Amplitude Scale", "Audio", 1.0, 0.0, 16.0),
         number("Amplitude Gamma", "Audio", 1.0, 0.1, 4.0),
         number("Spacing / Gap", "Layout", 3.0, 0.0, 256.0),
@@ -605,7 +612,8 @@ object ElementPropertyCatalog {
         text("Stroke Style", "Modifiers", "Solid", listOf("Solid", "Dashed", "Dotted")),
         text("Bar Color A", "Color", "#FF56D8FF"),
         text("Bar Color B", "Color", "#FF9B5CFF"),
-        text("Color Mode", "Color", "Alternating", listOf("Single", "Alternating", "Gradient", "By Amplitude")),
+        text("Color Mode", "Color", "Alternating", listOf("Single", "Alternating", "Gradient", "By Amplitude", "Per Bar")),
+        text("Per-Bar Color", "Color", "#FFFFFFFF"),
         text("Peak Color", "Color", "#FFFFFFFF"),
         text("Cap Color", "Color", "#FFFFFFFF"),
         text("Custom Bar Image", "Design", ""),
@@ -623,6 +631,8 @@ object ElementPropertyCatalog {
         bool("Glow / Shadow", "Modifiers", false),
         number("Glow Strength", "Modifiers", 0.35, 0.0, 1.0),
         bool("Peak / Cap", "Modifiers", false),
+        text("Peak Indicator Style", "Modifiers", "Line", listOf("None", "Line", "Dot", "Bar")),
+        text("Peak Indicator Color", "Modifiers", "#FFFFFFFF"),
         number("Peak Hold", "Modifiers", 0.65, 0.0, 1.0),
         number("Peak Fall Speed", "Modifiers", 0.8, 0.0, 1.0),
         number("Peak Width", "Modifiers", 2.0, 0.5, 64.0),

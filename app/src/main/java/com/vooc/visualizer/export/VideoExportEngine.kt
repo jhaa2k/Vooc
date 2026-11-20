@@ -1645,11 +1645,13 @@ object VideoExportEngine {
                         when (shapeType) {
                             "Circle/Oval" -> {
                                 val startAngle = number("Ellipse Start Angle", 0f) + number("Trim Offset", 0f) * 360f
-                                val sweep = number("Ellipse Sweep Angle", 360f) * number("Trim Paths / Progress", 1f)
-                                addArc(rect, startAngle, sweep)
+                                val trimStart = number("Trim Start", 0f).coerceIn(0f, 1f)
+                                val trimEnd = number("Trim End", 1f).coerceIn(trimStart, 1f)
+                                val sweep = number("Ellipse Sweep Angle", 360f) * (trimEnd - trimStart) * number("Trim Paths / Progress", 1f).coerceIn(0f, 1f)
+                                addArc(rect, startAngle + trimStart * 360f, sweep)
                                 if (kotlin.math.abs(sweep) >= 359.9f) close()
                             }
-                            "Line" -> { moveTo(rect.left, cy); lineTo(rect.left + shapeWidth * number("Trim Paths / Progress", 1f).coerceIn(0f, 1f), cy) }
+                            "Line" -> { val progress = number("Trim Paths / Progress", 1f).coerceIn(0f, 1f); val a = number("Trim Start", 0f).coerceIn(0f, 1f); val z = number("Trim End", 1f).coerceIn(a, 1f); moveTo(rect.left + shapeWidth * a, cy); lineTo(rect.left + shapeWidth * (a + (z - a) * progress), cy) }
                             "Triangle" -> { moveTo(cx, rect.top); lineTo(rect.right, rect.bottom); lineTo(rect.left, rect.bottom); close() }
                             "Polygon", "Star" -> {
                                 val count = if (shapeType == "Star") number("Star Points", 5f).toInt().coerceIn(3, 128) * 2 else number("Polygon Sides", 6f).toInt().coerceIn(3, 128)

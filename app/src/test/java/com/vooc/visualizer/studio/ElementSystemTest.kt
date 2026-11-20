@@ -250,6 +250,41 @@ class ElementSystemTest {
     }
 
     @Test
+    fun backgroundMirrorShaderAndCompositionExposeExpandedControlCatalogs() {
+        val background = ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).map { it.name }.toSet()
+        val mirror = ElementPropertyCatalog.forElement(StudioElementType.MIRROR_EFFECT).map { it.name }.toSet()
+        val shader = ElementPropertyCatalog.forElement(StudioElementType.CUSTOM_SHADER).map { it.name }.toSet()
+        val composition = ElementPropertyCatalog.forElement(StudioElementType.COMPOSITION).map { it.name }.toSet()
+        assertTrue(background.containsAll(setOf(
+            "Background Fit Alignment", "Background Tile", "Background Tile Scale",
+            "Background Image Offset X", "Background Image Offset Y", "Background Blur Quality",
+            "Background Brightness", "Background Contrast", "Background Saturation",
+            "Background Grayscale", "Background Invert", "Background Gradient Type",
+            "Background Gradient Start", "Background Gradient End", "Background Gradient Angle"
+        )))
+        assertTrue(mirror.containsAll(setOf(
+            "Mirror Enabled", "Mirror Origin", "Mirror Center", "Mirror Rotation",
+            "Mirror Scale", "Mirror Spacing", "Mirror Color Tint", "Mirror Tint Color",
+            "Mirror Use Source Alpha", "Mirror Seamless Edge", "Mirror Edge Softness"
+        )))
+        assertTrue(shader.containsAll(setOf(
+            "Shader Precision", "Shader Use Alpha", "Shader Premultiplied Alpha",
+            "Shader Use Time", "Shader Use Resolution", "Shader Use Mouse",
+            "Shader Audio Sensitivity", "Shader Audio Smoothing", "Shader Audio Band",
+            "Shader Render Scale", "Shader Frame Skip", "Shader Debug Preview",
+            "Shader Error Policy"
+        )))
+        assertTrue(composition.containsAll(setOf(
+            "Composition Resolution Preset", "Composition Frame Rate Mode",
+            "Composition Pixel Format", "Composition Color Space",
+            "Composition Transparent Background", "Composition Use Audio",
+            "Composition Audio Gain", "Composition Audio Offset",
+            "Composition Preserve Aspect Ratio", "Composition Scaling Mode",
+            "Composition Layer Limit"
+        )))
+    }
+
+    @Test
     fun imageBarsParticlesAndEffectsExposeExpandedControlCatalogs() {
         val image = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).map { it.name }.toSet()
         val bars = ElementPropertyCatalog.forElement(StudioElementType.BARS_SEGMENTS).map { it.name }.toSet()

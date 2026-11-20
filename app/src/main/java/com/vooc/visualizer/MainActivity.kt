@@ -537,7 +537,7 @@ private fun VoocStudio(
     var providerFrame by remember { mutableStateOf<AudioProviderFrame?>(null) }
     var providerFrames by remember { mutableStateOf<List<AudioProviderFrame>>(emptyList()) }
     val providerElements = remember(project.document.elements) {
-        project.document.elements.filter { it.type == StudioElementType.AUDIO_PROVIDER && it.visible }
+        project.document.elements.filter { it.type == StudioElementType.AUDIO_PROVIDER && it.visible }.take(32)
             .ifEmpty { listOf(ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-default")) }
     }
     val providerConfigs = remember(providerElements) { providerElements.map { it.toAudioProviderConfig() } }

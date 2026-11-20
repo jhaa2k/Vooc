@@ -1299,7 +1299,35 @@ object VideoExportEngine {
                         if (showUnblurredUnder && original != null) {
                             canvas.drawBitmap(original, src, dst, unblurredPaint)
                         }
-                        canvas.drawBitmap(image, src, dst, imagePaint)
+                        val tileX = textValue("Image Tile Mode X", "Clamp")
+                        val tileY = textValue("Image Tile Mode Y", "Clamp")
+                        val tileScaleX = number("Image Tile Scale X", 1f).coerceIn(0.1f, 4f)
+                        val tileScaleY = number("Image Tile Scale Y", 1f).coerceIn(0.1f, 4f)
+                        if (tileX == "Clamp" && tileY == "Clamp" && tileScaleX == 1f && tileScaleY == 1f) {
+                            canvas.drawBitmap(image, src, dst, imagePaint)
+                        } else {
+                            val tileShader = android.graphics.BitmapShader(image,
+                                when (tileX) {
+                                    "Repeat" -> Shader.TileMode.REPEAT
+                                    "Mirror" -> Shader.TileMode.MIRROR
+                                    else -> Shader.TileMode.CLAMP
+                                },
+                                when (tileY) {
+                                    "Repeat" -> Shader.TileMode.REPEAT
+                                    "Mirror" -> Shader.TileMode.MIRROR
+                                    else -> Shader.TileMode.CLAMP
+                                })
+                            val tileMatrix = android.graphics.Matrix().apply {
+                                setRectToRect(
+                                    RectF(src),
+                                    RectF(dst.left, dst.top, dst.left + dst.width() * tileScaleX, dst.top + dst.height() * tileScaleY),
+                                    android.graphics.Matrix.ScaleToFit.FILL
+                                )
+                            }
+                            tileShader.setLocalMatrix(tileMatrix)
+                            val tilePaint = Paint(imagePaint).apply { shader = tileShader }
+                            canvas.drawRect(dst, tilePaint)
+                        }
                         if (showUnblurredOver && original != null) {
                             canvas.drawBitmap(original, src, dst, unblurredPaint)
                         }

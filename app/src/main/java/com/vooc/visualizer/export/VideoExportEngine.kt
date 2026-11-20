@@ -591,7 +591,15 @@ object VideoExportEngine {
             val cy = height * (0.5f + position.y.toFloat() / 200f + posMotion.offsetY)
             val scale = (number("Scale", 100f) / 100f * scaleMotion.scale).coerceIn(0f, 10f)
             val rotation = number("Rotation", 0f) + posMotion.rotation + scaleMotion.rotation + rotMotion.rotation
-            val alpha = (number("Opacity", 100f).coerceIn(0f, 100f) * 2.55f).toInt()
+            val opacityMode = textValue("Measure Opacity (Measure What)", "Nothing")
+            val opacityMotion = motionFor("Measure Opacity (Measure What)")
+            val measuredOpacity = if (opacityMode == "Nothing") 1f else maxOf(
+                kotlin.math.abs(opacityMotion.scale - 1f) / 0.32f,
+                kotlin.math.abs(opacityMotion.rotation) / 8f,
+                kotlin.math.abs(opacityMotion.offsetX) / 0.05f,
+                kotlin.math.abs(opacityMotion.offsetY) / 0.05f
+            ).coerceIn(0f, 1f)
+            val alpha = (number("Opacity", 100f).coerceIn(0f, 100f) * measuredOpacity * 2.55f).toInt()
             val color = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
             paint.color = color
             paint.alpha = alpha

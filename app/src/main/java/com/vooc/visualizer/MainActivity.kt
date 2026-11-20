@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -3095,6 +3096,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f).dp.toPx())))
                             }
                             fillType = if (textValue("Fill Rule", "Non Zero") == "Even Odd") androidx.compose.ui.graphics.PathFillType.EvenOdd else androidx.compose.ui.graphics.PathFillType.NonZero
+                        }
+                        val shadowEnabled = props["Shape Shadow Enabled"] == ElementValue.Bool(true)
+                        val shapeBlur = number("Shape Blur", 0f).dp.toPx().coerceIn(0f, 256f)
+                        if (shadowEnabled || shapeBlur > 0f) {
+                            val shadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shape Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                            val shadowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                color = if (shadowEnabled) shadowColor else android.graphics.Color.TRANSPARENT
+                                alpha = (255f * fillAlpha).toInt().coerceIn(0, 255)
+                                val blurRadius = (number("Shape Shadow Blur", 8f).dp.toPx() + shapeBlur).coerceAtLeast(0f)
+                                if (blurRadius > 0f) setShadowLayer(blurRadius, number("Shape Shadow Offset X", 0f).dp.toPx(), number("Shape Shadow Offset Y", 4f).dp.toPx(), shadowColor)
+                            }
+                            drawIntoCanvas { canvas ->
+                                canvas.nativeCanvas.drawPath(shapePath.asAndroidPath(), shadowPaint)
+                            }
                         }
                         if (shapeType == "Line") {
                             val lineWidth = number("Stroke / Border Width", 3f).dp.toPx().coerceAtLeast(1f)

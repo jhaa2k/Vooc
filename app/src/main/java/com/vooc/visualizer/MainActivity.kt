@@ -2752,6 +2752,18 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     for (column in 0..3) values[base + column] *= brightness * contrast * temperatureChannels[row]
                                     values[base + 4] = values[base + 4] * brightness * temperatureChannels[row] + 128f * (1f - contrast)
                                 }
+                                val hueRadians = Math.toRadians(number("Image Hue", 0f).toDouble())
+                                val hueCos = kotlin.math.cos(hueRadians).toFloat()
+                                val hueSin = kotlin.math.sin(hueRadians).toFloat()
+                                val hueMatrix = arrayOf(
+                                    floatArrayOf(0.213f + hueCos * 0.787f - hueSin * 0.213f, 0.715f - hueCos * 0.715f - hueSin * 0.715f, 0.072f - hueCos * 0.072f + hueSin * 0.928f),
+                                    floatArrayOf(0.213f - hueCos * 0.213f + hueSin * 0.143f, 0.715f + hueCos * 0.285f + hueSin * 0.140f, 0.072f - hueCos * 0.072f - hueSin * 0.283f),
+                                    floatArrayOf(0.213f - hueCos * 0.213f - hueSin * 0.787f, 0.715f - hueCos * 0.715f + hueSin * 0.715f, 0.072f + hueCos * 0.928f + hueSin * 0.072f)
+                                )
+                                val beforeHue = values.copyOf()
+                                for (row in 0..2) for (column in 0..4) {
+                                    values[row * 5 + column] = hueMatrix[row][0] * beforeHue[column] + hueMatrix[row][1] * beforeHue[5 + column] + hueMatrix[row][2] * beforeHue[10 + column]
+                                }
                                 val layerTint = runCatching { Color(android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF"))) }.getOrDefault(Color.White)
                                 val tintValues = values
                                 val tintChannels = floatArrayOf(layerTint.red, layerTint.green, layerTint.blue)

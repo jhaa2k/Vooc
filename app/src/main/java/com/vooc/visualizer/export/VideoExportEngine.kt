@@ -1674,8 +1674,7 @@ object VideoExportEngine {
                         val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)
                         val imageScaleY = (if ((element.value("Scale Is Uniform") as? ElementValue.Bool)?.value == true) imageScaleX else imageScale.y.toFloat()).coerceIn(0f, 10f)
                         val frameWidth = (width * 0.45f * scale * imageScaleX).coerceAtLeast(1f)
-                        val frameHeight = (frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)) *
-                            (imageScaleY / imageScaleX.coerceAtLeast(0.001f))
+                        val frameHeight = (height * 0.45f * scale * imageScaleY).coerceAtLeast(1f)
                         val mirrorBlend = when (textValue("Blend Mode Content", "Alpha")) {
                             "Add" -> android.graphics.PorterDuff.Mode.ADD
                             "Screen" -> android.graphics.PorterDuff.Mode.SCREEN

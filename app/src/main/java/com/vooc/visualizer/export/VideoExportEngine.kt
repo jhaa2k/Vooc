@@ -45,6 +45,7 @@ import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.MeasureWhatEngine
 import com.vooc.visualizer.studio.AudioReactivityRuntime
 import com.vooc.visualizer.studio.audioReactivitySources
+import com.vooc.visualizer.studio.audioReactivityColor
 import com.vooc.visualizer.studio.audioReactivityTransform
 
 /** Encodes H.264 video and muxes a compatible AAC source track into one MP4 timeline. */
@@ -648,7 +649,8 @@ object VideoExportEngine {
                 kotlin.math.abs(opacityMotion.offsetY) / 0.05f
             ).coerceIn(0f, 1f)
             val alpha = (number("Opacity", 100f).coerceIn(0f, 100f) * measuredOpacity * reactivity.opacityMultiplier * 2.55f).toInt()
-            val color = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+            val baseColor = runCatching { android.graphics.Color.parseColor(textValue("Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+            val color = audioReactivityColor(baseColor, reactivity.colorMultiplier)
             paint.color = color
             paint.alpha = alpha
             paint.style = Paint.Style.FILL
@@ -1253,7 +1255,7 @@ object VideoExportEngine {
                     if (image != null) {
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
-                        val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * width / 1080f
+                        val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * reactivity.effectStrengthMultiplier * width / 1080f
                         val angle = (number("Angle / Direction", 0f) + seconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
                         val focus = element.value("Center / Focus Point") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                         val falloff = number("Falloff / Radial Split", 0f).coerceAtLeast(0f)
@@ -1319,7 +1321,8 @@ object VideoExportEngine {
                         val showUnder = (element.value("Show Unblurred Content Under") as? ElementValue.Bool)?.value == true
                         val showOver = (element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true
                         if (showUnder && original != null) canvas.drawBitmap(original, null, destination, paint)
-                        canvas.drawBitmap(image, null, destination, paint)
+                        val effectPaint = Paint(paint).apply { alpha = (alpha * reactivity.effectStrengthMultiplier.coerceIn(0f, 1f)).toInt().coerceIn(0, 255) }
+                        canvas.drawBitmap(image, null, destination, effectPaint)
                         if (showOver && original != null) canvas.drawBitmap(original, null, destination, paint)
                     }
                 }
@@ -1333,7 +1336,7 @@ object VideoExportEngine {
                         val destination = RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
                         val samples = number("Samples / Iterations", 8f).toInt().coerceIn(1, 64)
                         val strength = number("Blur Amount / Strength", 1f).coerceIn(0f, 64f)
-                        val lengthBase = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * strength * width / 1080f
+                        val lengthBase = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * strength * reactivity.effectStrengthMultiplier * width / 1080f
                         val focus = element.value("Center / Focus Point") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                         val focusX = focus.x.toFloat() * width
                         val focusY = focus.y.toFloat() * height

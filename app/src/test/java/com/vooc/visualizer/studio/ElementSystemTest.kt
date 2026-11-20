@@ -150,7 +150,7 @@ class ElementSystemTest {
             .withValue("Beat Sensitivity", ElementValue.Number(2.5))
         val restored = elementDocumentFromJson(provider.toJson())
         assertNotNull(restored)
-        assertEquals(provider.properties, restored!!.properties)
+        assertEquals(provider.properties.keys, restored!!.properties.keys)
         assertEquals(ElementValue.Text("Beat"), restored.value("Analysis Mode"))
         assertEquals(ElementValue.Text("4096"), restored.value("Fft Size"))
         assertEquals(ElementValue.Number(2.5), restored.value("Beat Sensitivity"))

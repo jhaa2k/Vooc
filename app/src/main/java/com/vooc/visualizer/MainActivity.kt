@@ -2551,10 +2551,33 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                     }
                     StudioElementType.MOTION_BLUR_EFFECT -> {
-                        val radius = (number("Blur Length", 24f) * scale).coerceIn(1f, size.minDimension)
-                        drawCircle(elementColor.copy(alpha = opacity * 0.28f), radius, center, style = Stroke(width = maxOf(1f, radius * 0.12f)))
-                        drawLine(elementColor.copy(alpha = opacity * 0.4f), Offset(center.x - radius, center.y - radius * 0.25f),
-                            Offset(center.x + radius, center.y + radius * 0.25f), maxOf(1f, radius * 0.08f))
+                        val bitmap = elementImages[element.id]
+                        if (bitmap != null) {
+                            val frameWidth = (size.width * 0.45f * scale).coerceAtLeast(1f)
+                            val frameHeight = frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)
+                            val destinationSize = androidx.compose.ui.unit.IntSize(frameWidth.toInt().coerceAtLeast(1), frameHeight.toInt().coerceAtLeast(1))
+                            val samples = number("Samples / Iterations", 8f).toInt().coerceIn(1, 64)
+                            val length = number("Blur Length", 24f) * number("Blur Amount Multiplier", 1f) * scale
+                            val angle = number("Blur Direction / Angle", 0f) * PI.toFloat() / 180f
+                            val trails = number("Trails / Echo", 0f).toInt().coerceIn(0, 32)
+                            val fade = number("Trail Opacity / Fade", 0.75f).coerceIn(0f, 1f)
+                            for (sample in samples downTo 1) {
+                                val t = sample.toFloat() / samples
+                                val dx = cos(angle) * length * t
+                                val dy = sin(angle) * length * t
+                                val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f + dx).toInt(), (center.y - frameHeight / 2f + dy).toInt())
+                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t * 0.55f))
+                            }
+                            repeat(trails) { index ->
+                                val t = (index + 1f) / (trails + 1f)
+                                val dx = -cos(angle) * length * t
+                                val dy = -sin(angle) * length * t
+                                val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f + dx).toInt(), (center.y - frameHeight / 2f + dy).toInt())
+                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t))
+                            }
+                            val centerOffset = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f).toInt(), (center.y - frameHeight / 2f).toInt())
+                            drawImage(bitmap, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity)
+                        }
                     }
                     StudioElementType.SHAPE -> {
                         val w = (number("Width", 300f).dp.toPx() * scale).coerceAtLeast(0f)

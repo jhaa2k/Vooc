@@ -1327,7 +1327,7 @@ object VideoExportEngine {
                             textAlias("Color Over Life End", "#00FFFFFF", "Color To", textValue("Color", "#FFFFFFFF"))
                         ), reactivity.colorMultiplier)
                     }.getOrDefault(colorTo)
-                    val customParticle = imageCache[textValue("Texture / Image", textValue("Custom Image"))]
+                    val customParticle = imageCache[textValue("Texture / Image").ifBlank { textValue("Custom Image") }]
                     val mirrorX = (element.value("Mirror X") as? ElementValue.Bool)?.value == true
                     val mirrorY = (element.value("Mirror Y") as? ElementValue.Bool)?.value == true
                     val velocityAngle = (element.value("Velocity Angle") as? ElementValue.Bool)?.value == true

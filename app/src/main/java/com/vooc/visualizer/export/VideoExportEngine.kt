@@ -842,8 +842,11 @@ object VideoExportEngine {
                     val totalWidth = min(width * 0.86f * scaleX, width.toFloat())
                     val slot = totalWidth / count
                     val barWidth = (number("Bar Width", 8f) * width / 1080f).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
-                    val maxHeight = (number("Max Height", height * 0.35f) * width / 1080f * scaleY).coerceIn(1f, height * 0.95f)
-                    val minHeight = (number("Min Height", 0f) * width / 1080f).coerceIn(0f, maxHeight)
+                    val heightScale = number("Height Scale", 1f).coerceIn(0f, 10f)
+                    val maxHeightScale = number("Max Height Scale", 1f).coerceIn(0f, 1f)
+                    val maxHeight = (number("Max Height", height * 0.35f) * width / 1080f * scaleY * heightScale * maxHeightScale).coerceIn(1f, height * 0.95f)
+                    val minHeightScale = number("Min Height Scale", 0f).coerceIn(0f, 1f)
+                    val minHeight = maxOf(number("Min Height", 0f) * width / 1080f, maxHeight * minHeightScale).coerceIn(0f, maxHeight)
                     val design = textValue("Bar Design", "Rounded Rect")
                     val alignment = textValue("Alignment", "Bottom")
                     val mirrorMode = textValue("Mirror Mode", "Off")
@@ -855,7 +858,7 @@ object VideoExportEngine {
                     val colorA = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Bar Color A", "#FF56D8FF")), reactivity.colorMultiplier) }.getOrDefault(color)
                     val colorB = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF")), reactivity.colorMultiplier) }.getOrDefault(color)
                     val capColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(strokeColor)
-                    val peakColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Peak Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(strokeColor)
+                    val peakColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Peak Indicator Color", textValue("Peak Color", "#FFFFFFFF"))), reactivity.colorMultiplier) }.getOrDefault(strokeColor)
                     val colorMode = if ((element.value("Gradient Fill") as? ElementValue.Bool)?.value == true) "Gradient" else textValue("Color Mode", "Alternating")
                     val capMode = textValue("Top/Bottom Cap", "None")
                     val capPlacement = textValue("Cap Placement", "Top")
@@ -864,7 +867,7 @@ object VideoExportEngine {
                     val customBitmap = imageCache[textValue("Custom Bar Image", "")]
                     val corner = when (design) {
                         "Capsule / Pill" -> barWidth / 2f
-                        "Rounded Rect" -> barWidth * 0.22f
+                        "Rounded Rect" -> (number("Corner Radius", 4f) * width / 1080f).coerceIn(0f, barWidth / 2f)
                         else -> 0f
                     }
                     val dash = when (textValue("Stroke Style", "Solid")) {

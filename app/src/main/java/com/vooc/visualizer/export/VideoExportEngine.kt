@@ -608,11 +608,93 @@ object VideoExportEngine {
             canvas.rotate(rotation, cx, cy)
             when (element.type) {
                 StudioElementType.TEXT -> {
-                    paint.textSize = (number("Font Size", min(width, height) * 0.06f) * scale).coerceAtLeast(6f)
-                    paint.typeface = Typeface.create("sans-serif", Typeface.BOLD)
-                    paint.textAlign = Paint.Align.CENTER
-                    canvas.drawText(textValue("Text", element.tag).take(120), cx, cy, paint)
-                    paint.textAlign = Paint.Align.LEFT
+                    val caseMode = textValue("Case", "Original")
+                    val rawText = textValue("Text", element.tag).take(2000)
+                    val displayText = when (caseMode) {
+                        "Uppercase" -> rawText.uppercase()
+                        "Lowercase" -> rawText.lowercase()
+                        "Capitalize" -> rawText.split(" ").joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
+                        else -> rawText
+                    }
+                    val fontStyle = when (textValue("Font Style", "Bold")) {
+                        "Regular" -> Typeface.NORMAL
+                        "Medium", "SemiBold", "Bold" -> Typeface.BOLD
+                        "Italic" -> Typeface.ITALIC
+                        "Bold Italic" -> Typeface.BOLD_ITALIC
+                        else -> Typeface.BOLD
+                    }
+                    val family = textValue("Font Family", "sans-serif").ifBlank { "sans-serif" }
+                    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+                        color = color
+                        alpha = alpha
+                        textSize = (number("Font Size", 48f) * width / 1080f * scale).coerceAtLeast(6f)
+                        typeface = Typeface.create(family, fontStyle)
+                        textAlign = when (textValue("Alignment", "Center")) {
+                            "Left" -> Paint.Align.LEFT
+                            "Right" -> Paint.Align.RIGHT
+                            else -> Paint.Align.CENTER
+                        }
+                        letterSpacing = number("Letter Spacing", 0f) / 100f
+                        isUnderlineText = (element.value("Underline") as? ElementValue.Bool)?.value == true
+                    }
+                    val maxTextWidth = number("Max Width", 1000f) * width / 1080f
+                    val wrapText = (element.value("Wrap Text") as? ElementValue.Bool)?.value != false
+                    val textLines = if (!wrapText) listOf(displayText) else buildList {
+                        displayText.split("\n").forEach { paragraph ->
+                            var line = ""
+                            paragraph.split(Regex("\\s+")).forEach { word ->
+                                val candidate = if (line.isEmpty()) word else "$line $word"
+                                if (line.isNotEmpty() && textPaint.measureText(candidate) > maxTextWidth) {
+                                    add(line)
+                                    line = word
+                                } else line = candidate
+                            }
+                            add(line)
+                        }
+                    }.ifEmpty { listOf("") }
+                    if ((element.value("Auto-Scale") as? ElementValue.Bool)?.value == true) {
+                        val widest = textLines.maxOfOrNull { textPaint.measureText(it) } ?: 0f
+                        if (widest > maxTextWidth && widest > 0f) textPaint.textScaleX = maxTextWidth / widest
+                    }
+                    val lineHeight = textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
+                    val firstBaseline = cy - (textLines.size - 1) * lineHeight * 0.5f
+                    val textX = when (textValue("Alignment", "Center")) {
+                        "Left" -> cx - maxTextWidth * 0.5f
+                        "Right" -> cx + maxTextWidth * 0.5f
+                        else -> cx
+                    }
+                    val shadowEnabled = (element.value("Shadow Enabled") as? ElementValue.Bool)?.value == true
+                    if (shadowEnabled) {
+                        val shadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                        textPaint.setShadowLayer(
+                            number("Shadow Blur", 4f) * width / 1080f,
+                            number("Shadow Offset X", 2f) * width / 1080f,
+                            number("Shadow Offset Y", 2f) * width / 1080f,
+                            shadowColor
+                        )
+                    }
+                    val strokeEnabled = (element.value("Stroke Enabled") as? ElementValue.Bool)?.value == true
+                    val strokeWidth = number("Stroke Thickness", 0f) * width / 1080f
+                    if (strokeEnabled && strokeWidth > 0f) {
+                        val strokePaint = Paint(textPaint).apply {
+                            color = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                            style = Paint.Style.STROKE
+                            strokeJoin = Paint.Join.ROUND
+                            this.strokeWidth = strokeWidth
+                            clearShadowLayer()
+                        }
+                        textLines.forEachIndexed { index, line -> canvas.drawText(line, textX, firstBaseline + index * lineHeight, strokePaint) }
+                    }
+                    val gradientStart = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient Start", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                    val gradientEnd = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient End", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                    if (gradientStart != gradientEnd) {
+                        val widest = textLines.maxOfOrNull { textPaint.measureText(it) } ?: textPaint.textSize
+                        textPaint.shader = LinearGradient(cx - widest / 2f, cy, cx + widest / 2f, cy, gradientStart, gradientEnd, Shader.TileMode.CLAMP)
+                    }
+                    textLines.forEachIndexed { index, line -> canvas.drawText(line, textX, firstBaseline + index * lineHeight, textPaint) }
+                    textPaint.clearShadowLayer()
+                    textPaint.shader = null
+                    textPaint.style = Paint.Style.FILL
                 }
                 StudioElementType.BARS_SEGMENTS -> {
                     val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)

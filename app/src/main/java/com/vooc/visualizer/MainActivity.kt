@@ -2863,7 +2863,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                     }
                     StudioElementType.BACKGROUND -> Unit
-                    StudioElementType.AUDIO_PROVIDER -> Unit
+                    StudioElementType.AUDIO_PROVIDER,
+                    StudioElementType.MIRROR_EFFECT,
+                    StudioElementType.CUSTOM_SHADER,
+                    StudioElementType.COMPOSITION -> Unit
                 }
             }
         }

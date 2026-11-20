@@ -112,30 +112,26 @@ class ElementSystemTest {
 
     @Test
     fun everyMeasureWhatOptionHasAWorkingDeterministicMotionResponse() {
-        val input = mapOf(
-            "runtimeSeconds" to 1.23f,
-            "trackPositionSeconds" to 1.37f,
-            "playing" to true,
-            "beatPulse" to 0.8f,
-            "bass" to 0.55f,
-            "treble" to 0.75f,
-            "bpm" to 120f,
-            "seed" to 123L,
-            "playingSeconds" to 1.23f
-        )
+        val runtime = 1.23f
+        val track = 1.37f
+        val beat = 0.8f
+        val bass = 0.55f
+        val treble = 0.75f
+        val bpm = 120f
+        val seed = 123L
         assertEquals(22, MeasureWhatEngine.options.size)
         MeasureWhatEngine.options.filter { it != "Nothing" }.forEach { mode ->
             val first = MeasureWhatEngine.evaluate(
-                mode, input.getValue("runtimeSeconds"), input.getValue("trackPositionSeconds"),
-                input.getValue("playing"), input.getValue("beatPulse"), input.getValue("bass"),
-                input.getValue("treble"), input.getValue("bpm"), input.getValue("seed"),
-                input.getValue("playingSeconds")
+                mode, runtime, track,
+                true, beat, bass,
+                treble, bpm, seed,
+                runtime
             )
             val second = MeasureWhatEngine.evaluate(
-                mode, input.getValue("runtimeSeconds"), input.getValue("trackPositionSeconds"),
-                input.getValue("playing"), input.getValue("beatPulse"), input.getValue("bass"),
-                input.getValue("treble"), input.getValue("bpm"), input.getValue("seed"),
-                input.getValue("playingSeconds")
+                mode, runtime, track,
+                true, beat, bass,
+                treble, bpm, seed,
+                runtime
             )
             assertEquals("$mode should be deterministic", first, second)
             assertTrue("$mode should produce a response", first != MeasureMotion())

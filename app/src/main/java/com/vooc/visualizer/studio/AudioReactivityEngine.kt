@@ -1,6 +1,5 @@
 package com.vooc.visualizer.studio
 
-import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.sqrt
@@ -52,7 +51,7 @@ object AudioReactivityEngine {
         if (safe.invert) normalized = 1f - normalized
         normalized = when (curve.uppercase()) {
             "SQUARE" -> normalized * normalized
-            "SQUARE ROOT", "SQRT" -> sqrt(normalized)
+            "SQUARE ROOT", "SQUARE_ROOT", "SQRT" -> sqrt(normalized)
             "CUBIC" -> normalized * normalized * normalized
             "EXPONENTIAL" -> (exp(normalized * 4f) - 1f) / (exp(4f) - 1f)
             "LOGARITHMIC" -> ln(1f + normalized * 9f) / ln(10f)
@@ -95,5 +94,25 @@ object AudioReactivityEngine {
         }
         val clamp = (properties["Audio Reactivity Clamp Output"] as? ElementValue.Bool)?.value ?: true
         return map(sources.value(source), config(properties), curve, threshold, clamp)
+    }
+}
+
+
+/** Per-layer temporal envelope; call once per rendered frame for stable attack/release. */
+class AudioReactivityEnvelope {
+    private var value = 0f
+    private var primed = false
+
+    fun reset() { value = 0f; primed = false }
+
+    fun update(target: Float, deltaSeconds: Float, attackSeconds: Float, releaseSeconds: Float): Float {
+        val safeTarget = target.takeIf { it.isFinite() } ?: 0f
+        val dt = (deltaSeconds.takeIf { it.isFinite() } ?: (1f / 60f)).coerceIn(0.001f, 0.25f)
+        val duration = if (safeTarget > value) attackSeconds else releaseSeconds
+        val safeDuration = duration.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+        val alpha = if (!primed || safeDuration <= 0f) 1f else 1f - exp(-dt / safeDuration)
+        value += (safeTarget - value) * alpha.coerceIn(0f, 1f)
+        primed = true
+        return value
     }
 }

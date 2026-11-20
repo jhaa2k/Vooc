@@ -1081,7 +1081,6 @@ object VideoExportEngine {
                                 val bitmapPaint = Paint(paint).apply {
                                     style = Paint.Style.FILL
                                     pathEffect = null
-                                    alpha = alpha
                                     colorFilter = null
                                     maskFilter = null
                                 }

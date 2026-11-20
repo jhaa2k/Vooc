@@ -981,6 +981,12 @@ object VideoExportEngine {
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
                         val amount = number("Split Amount", number("Split Amount / Distance", 4f)) * number("Split Multiplier", 1f) * width / 1080f
                         val angle = (number("Angle / Direction", 0f) + seconds * number("Speed / Frequency", 0f)) * PI.toFloat() / 180f
+                        val focus = element.value("Center / Focus Point") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                        val falloff = number("Falloff / Radial Split", 0f).coerceAtLeast(0f)
+                        val radialScale = 1f + falloff * kotlin.math.sqrt(
+                            (focus.x.toFloat() - 0.5f) * (focus.x.toFloat() - 0.5f) +
+                                (focus.y.toFloat() - 0.5f) * (focus.y.toFloat() - 0.5f)
+                        )
                         val channelColors = listOf("Split Color 0", "Split Color 1", "Split Color 2").mapIndexed { index, key ->
                             runCatching { android.graphics.Color.parseColor(textValue(key, listOf("#FFFF0000", "#FF00FF00", "#FF0000FF")[index])) }.getOrDefault(listOf(android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE)[index])
                         }
@@ -991,11 +997,11 @@ object VideoExportEngine {
                         )
                         channelColors.forEachIndexed { index, tint ->
                             val base = channelOffsets[index]
-                            val dx = (base.first + cos(angle) * amount * (index - 1)) * scale * width / 1080f
-                            val dy = (base.second + sin(angle) * amount * (index - 1)) * scale * width / 1080f
+                            val dx = (base.first * scale + cos(angle) * amount * (index - 1)) * radialScale * width / 1080f
+                            val dy = (base.second * scale + sin(angle) * amount * (index - 1)) * radialScale * width / 1080f
                             val channelPaint = Paint(paint).apply {
                                 this.alpha = (alpha * 0.72f).toInt().coerceIn(0, 255)
-                                colorFilter = android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.SRC_ATOP)
+                                colorFilter = android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.SCREEN)
                             }
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
                                 cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), channelPaint)

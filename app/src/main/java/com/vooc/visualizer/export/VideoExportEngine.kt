@@ -310,7 +310,7 @@ object VideoExportEngine {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                     BitmapFactory.decodeStream(stream)?.let { source ->
                         if (element.type == StudioElementType.MIRROR_EFFECT) {
-                            val processed = MirrorEffectProcessor.process(source, element, width, height)
+                            val processed = MirrorEffectProcessor.process(source, element)
                             imageCache["${uriText}#${element.id}"] = processed
                             imageCache[uriText] = source
                         } else if (element.type == StudioElementType.BACKGROUND) {
@@ -1665,6 +1665,34 @@ object VideoExportEngine {
                     paint.color = color
                     paint.alpha = alpha
                     paint.style = Paint.Style.FILL
+                }
+                StudioElementType.MIRROR_EFFECT -> {
+                    val uriText = (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
+                    val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
+                    if (image != null) {
+                        val imageScale = element.value("Scale") as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
+                        val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)
+                        val imageScaleY = (if ((element.value("Scale Is Uniform") as? ElementValue.Bool)?.value == true) imageScaleX else imageScale.y.toFloat()).coerceIn(0f, 10f)
+                        val frameWidth = (width * 0.45f * scale * imageScaleX).coerceAtLeast(1f)
+                        val frameHeight = (frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)) *
+                            (imageScaleY / imageScaleX.coerceAtLeast(0.001f))
+                        val mirrorBlend = when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> android.graphics.PorterDuff.Mode.ADD
+                            "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                            "Multiply" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                            "Overlay" -> android.graphics.PorterDuff.Mode.OVERLAY
+                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                        }
+                        val mirrorPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                            alpha = alpha
+                            xfermode = if (mirrorBlend == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(mirrorBlend)
+                        }
+                        canvas.drawBitmap(
+                            image, null,
+                            RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f),
+                            mirrorPaint
+                        )
+                    }
                 }
                 StudioElementType.IMAGE -> {
                     val uriText = listOf("Import Image", "Custom Image", "Image Source / File", "Target Image")

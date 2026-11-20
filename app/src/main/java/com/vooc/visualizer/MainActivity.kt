@@ -1110,10 +1110,12 @@ private fun VoocStudio(
                         val timelineLength = maxOf(duration, project.document.durationMs, 30_000L).coerceAtLeast(1L)
                         Text("PLAYHEAD  ${position / 1000f}s  /  ${timelineLength / 1000f}s",
                             color = Muted, style = MaterialTheme.typography.labelSmall)
-                        Slider(
+                        ThinSlider(
+                            label = "TIMELINE PLAYHEAD",
                             value = position.coerceIn(0L, timelineLength).toFloat(),
-                            onValueChange = { player.seekTo(it.toLong()) },
-                            valueRange = 0f..timelineLength.toFloat()
+                            valueRange = 0f..timelineLength.toFloat(),
+                            defaultValue = 0f,
+                            onValueChange = { player.seekTo(it.toLong()) }
                         )
                         OptionDropdown("ANIMATED PROPERTY", timelineProperty,
                             listOf("X", "Y", "SCALE", "ROTATION", "OPACITY")) { timelineProperty = it }
@@ -3178,6 +3180,7 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
             label = "PLAYBACK SEEK",
             value = seek.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
             valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+            defaultValue = 0f,
             onValueChange = { seek = it },
             onValueChangeFinished = { player.seekTo(seek.toLong()) },
         )
@@ -3194,6 +3197,7 @@ private fun PlayerScreen(player: Player, trackName: String, playing: Boolean, po
                 label = "PLAYBACK SPEED",
                 value = speed,
                 valueRange = 0.5f..2f,
+                defaultValue = 1f,
                 steps = 5,
                 onValueChange = { speed = it; player.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it, 1f)) },
             )

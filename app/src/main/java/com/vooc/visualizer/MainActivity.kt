@@ -1961,6 +1961,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             textAlign = when (textValue("Alignment", "Center")) {
                                 "Left" -> android.graphics.Paint.Align.LEFT
                                 "Right" -> android.graphics.Paint.Align.RIGHT
+                                "Justified" -> android.graphics.Paint.Align.LEFT
                                 else -> android.graphics.Paint.Align.CENTER
                             }
                             typeface = baseTypeface
@@ -1992,6 +1993,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val textX = when (textValue("Alignment", "Center")) {
                             "Left" -> center.x - maxTextWidth * 0.5f
                             "Right" -> center.x + maxTextWidth * 0.5f
+                            "Justified" -> center.x - maxTextWidth * 0.5f
                             else -> center.x
                         }
                         if (strokeEnabled && strokeWidth > 0f) {
@@ -2003,7 +2005,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 clearShadowLayer()
                             }
                             textLines.forEachIndexed { index, line ->
-                                native.drawText(line, textX, firstBaseline + index * lineHeight, outlinePaint)
+                                if (textValue("Alignment", "Center") == "Justified" && index < textLines.lastIndex) {
+                                    val words = line.trim().split(Regex("\\\\s+")).filter { it.isNotEmpty() }
+                                    if (words.size > 1) {
+                                        val naturalWidth = words.sumOf { outlinePaint.measureText(it).toDouble() }.toFloat()
+                                        val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)
+                                        var x = textX
+                                        words.forEach { word -> native.drawText(word, x, firstBaseline + index * lineHeight, outlinePaint); x += outlinePaint.measureText(word) + gap }
+                                    } else native.drawText(line, textX, firstBaseline + index * lineHeight, outlinePaint)
+                                } else native.drawText(line, textX, firstBaseline + index * lineHeight, outlinePaint)
                             }
                         }
                         val gradientStart = runCatching {
@@ -2021,7 +2031,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             )
                         }
                         textLines.forEachIndexed { index, line ->
-                            native.drawText(line, textX, firstBaseline + index * lineHeight, textPaint)
+                            if (textValue("Alignment", "Center") == "Justified" && index < textLines.lastIndex) {
+                                val words = line.trim().split(Regex("\\\\s+")).filter { it.isNotEmpty() }
+                                if (words.size > 1) {
+                                    val naturalWidth = words.sumOf { textPaint.measureText(it).toDouble() }.toFloat()
+                                    val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)
+                                    var x = textX
+                                    words.forEach { word -> native.drawText(word, x, firstBaseline + index * lineHeight, textPaint); x += textPaint.measureText(word) + gap }
+                                } else native.drawText(line, textX, firstBaseline + index * lineHeight, textPaint)
+                            } else native.drawText(line, textX, firstBaseline + index * lineHeight, textPaint)
                         }
                         textPaint.clearShadowLayer()
                         textPaint.shader = null

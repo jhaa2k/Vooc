@@ -1110,7 +1110,9 @@ object VideoExportEngine {
                             if (peakEnabled && peakStyle != "None") {
                                 paint.color = peakColor
                                 paint.alpha = alpha
-                                val py = baseline - peaks[index].coerceIn(0f, 1f) * activeMaxHeight
+                                val peakLevel = peaks[index].coerceIn(0f, 1f)
+                                val peakTravel = peakLevel * activeMaxHeight * if (mirrorY) 0.5f else 1f
+                                val py = if (alignment == "Top" && !customPathMode) baseline + peakTravel else baseline - peakTravel
                                 when (peakStyle) {
                                     "Dot" -> {
                                         paint.style = Paint.Style.FILL

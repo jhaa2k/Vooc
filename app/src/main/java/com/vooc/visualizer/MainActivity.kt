@@ -103,6 +103,7 @@ import com.vooc.visualizer.playback.VoocAudioEngine
 import com.vooc.visualizer.playback.VoocPlaybackService
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.LayerAddMenuCatalog
+import com.vooc.visualizer.studio.LegacyLayerAdapter
 import com.vooc.visualizer.studio.ElementPropertyCatalog
 import com.vooc.visualizer.studio.ElementDocument
 import com.vooc.visualizer.studio.ElementValue

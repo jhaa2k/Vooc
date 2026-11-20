@@ -1076,6 +1076,12 @@ object VideoExportEngine {
                                 }
                             }
                             if (barSoftnessRadius > 0f) {
+                                val softnessBands = listOf(
+                                    2f to 0.035f,
+                                    1.5f to 0.06f,
+                                    1f to 0.10f,
+                                    0.5f to 0.16f
+                                )
                                 val softnessPath = if (design == "Circle / Dot") {
                                     android.graphics.Path().apply {
                                         addCircle(
@@ -1086,17 +1092,15 @@ object VideoExportEngine {
                                         )
                                     }
                                 } else path
-                                val softnessAlpha = alpha
                                 val softnessPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                                     this.color = shapeFill
-                                    this.alpha = softnessAlpha
-                                    style = Paint.Style.FILL
-                                    maskFilter = android.graphics.BlurMaskFilter(
-                                        barSoftnessRadius,
-                                        android.graphics.BlurMaskFilter.Blur.NORMAL
-                                    )
+                                    style = Paint.Style.STROKE
                                 }
-                                canvas.drawPath(softnessPath, softnessPaint)
+                                softnessBands.forEach { (widthFactor, alphaFactor) ->
+                                    softnessPaint.alpha = (alpha * alphaFactor).toInt().coerceIn(0, 255)
+                                    softnessPaint.strokeWidth = (barSoftnessRadius * widthFactor).coerceAtLeast(0.5f)
+                                    canvas.drawPath(softnessPath, softnessPaint)
+                                }
                             }
                             paint.color = if (outline) strokeColor else shapeFill
                             paint.alpha = alpha

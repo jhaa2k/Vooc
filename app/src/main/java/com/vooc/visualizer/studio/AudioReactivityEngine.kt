@@ -4,6 +4,48 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.sqrt
 import kotlin.math.roundToInt
+import kotlin.math.pow
+
+/**
+ * Converts raw spectrum bins into the common bar input used by preview and export.
+ * Frequency remapping is performed before amplitude shaping so the same saved
+ * controls produce the same bar distribution in both render paths.
+ */
+fun processBarSpectrum(
+    samples: FloatArray,
+    amplitudeScale: Float = 1f,
+    gamma: Float = 1f,
+    amplitudeMode: String = "Magnitude",
+    threshold: Float = 0f,
+    offset: Float = 0f,
+    mappingCurve: Float = 1f,
+    mappingBias: Float = 0f,
+    bandOffset: Int = 0
+): FloatArray {
+    if (samples.isEmpty()) return floatArrayOf(0f)
+    val count = samples.size
+    val safeScale = amplitudeScale.takeIf { it.isFinite() }?.coerceIn(0f, 16f) ?: 1f
+    val safeGamma = gamma.takeIf { it.isFinite() }?.coerceIn(0.1f, 4f) ?: 1f
+    val safeCurve = mappingCurve.takeIf { it.isFinite() }?.coerceIn(0.1f, 8f) ?: 1f
+    val safeBias = mappingBias.takeIf { it.isFinite() }?.coerceIn(-1f, 1f) ?: 0f
+    val safeThreshold = threshold.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+    val safeOffset = offset.takeIf { it.isFinite() }?.coerceIn(-1f, 1f) ?: 0f
+    return FloatArray(count) { index ->
+        val position = if (count <= 1) 0f else index.toFloat() / (count - 1)
+        val biased = (position + safeBias * position * (1f - position) * 2f).coerceIn(0f, 1f)
+        val mapped = biased.toDouble().pow(safeCurve.toDouble()).toFloat()
+        val mappedIndex = ((mapped * (count - 1)).roundToInt() + bandOffset).let { ((it % count) + count) % count }
+        var value = (samples[mappedIndex].takeIf { it.isFinite() } ?: 0f).coerceAtLeast(0f) * safeScale
+        value = when (amplitudeMode) {
+            "Power" -> value * value
+            "Decibel" -> ((20f * ln(value.coerceAtLeast(0.000001f)) / ln(10f) + 72f) / 72f).coerceIn(0f, 1f)
+            else -> value
+        }
+        value = (value / (1f + value)).coerceAtLeast(0f)
+        value = if (value < safeThreshold) 0f else value
+        (value.toDouble().pow(safeGamma.toDouble()).toFloat() + safeOffset).coerceIn(0f, 1f)
+    }
+}
 
 /** Audio measurements shared by the live preview and offline export renderers. */
 data class AudioReactivitySources(

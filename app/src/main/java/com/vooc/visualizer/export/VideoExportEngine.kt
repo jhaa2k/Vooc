@@ -925,6 +925,9 @@ object VideoExportEngine {
                     canvas.save()
                     if (orientation == "Horizontal" || textValue("Shape Path", "Horizontal Line") == "Vertical Line") canvas.rotate(90f, cx, cy)
                     repeat(count) { index ->
+                        val layoutRandom = kotlin.math.abs(kotlin.math.sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
+                        val widthRandom = number("Bar Width Random", 0f).coerceIn(0f, 1f)
+                        val barWidth = (number("Bar Width", 8f) * width / 1080f * (1f + (layoutRandom * 2f - 1f) * widthRandom)).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
                         val sourceIndex = if (mirrorX) minOf(index, count - 1 - index) else index
                         var level = levels[sourceIndex].coerceIn(0f, 1f)
                         if ((element.value("Flip Input") as? ElementValue.Bool)?.value == true) level = 1f - level
@@ -937,7 +940,9 @@ object VideoExportEngine {
                         val beforePoint = if (customPathMode) pathPoint((pathT - 0.01f).coerceAtLeast(0f)) else currentPathPoint
                         val afterPoint = if (customPathMode) pathPoint((pathT + 0.01f).coerceAtMost(1f)) else currentPathPoint
                         val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
-                        val x = if (radialLayout || !customPathMode) (if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset) else currentPathPoint.first - barWidth / 2f + barOffset
+                        val spacingRandom = number("Bar Spacing Random", 0f).coerceIn(0f, 1f)
+                        val spacingJitter = (layoutRandom * 2f - 1f) * slot * 0.45f * spacingRandom
+                        val x = if (radialLayout || !customPathMode) (if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + spacingJitter + barOffset) else currentPathPoint.first - barWidth / 2f + barOffset
                         val baseline = if (radialLayout) cy - radialInnerRadius else if (customPathMode) currentPathPoint.second else when (alignment) {
                             "Top" -> cy - height * 0.38f
                             "Center" -> cy

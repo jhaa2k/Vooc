@@ -2448,6 +2448,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val spacingRandom = number("Bar Spacing Random", 0f).coerceIn(0f, 1f)
                             val barWidth = (requestedWidth * (1f + (layoutRandom * 2f - 1f) * widthRandom)).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
                             val spacingJitter = (layoutRandom * 2f - 1f) * slot * 0.45f * spacingRandom
+                            val verticalSymmetry = verticalMirror || centerSymmetry
                             val drawHeight = if (verticalSymmetry) barHeight / 2f else barHeight
                             val customPathMode = textValue("Shape Path", "Horizontal Line") == "Custom Path"
                             val customPoints = if (customPathMode) textValue("Custom Path Points", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5")
@@ -2472,7 +2473,6 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val afterPoint = if (customPathMode) pathPoint((index.toFloat() / (count - 1).coerceAtLeast(1) + 0.01f).coerceAtMost(1f)) else point
                             val customAngle = if (customPathMode) Math.toDegrees(kotlin.math.atan2((afterPoint.second - beforePoint.second).toDouble(), (afterPoint.first - beforePoint.first).toDouble())).toFloat() else 0f
                             val x = if (customPathMode) point.first - barWidth / 2f + barOffset else center.x - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + spacingJitter + barOffset
-                            val verticalSymmetry = verticalMirror || centerSymmetry
                             val alternateDirection = props["Alternate Bar Direction"] == ElementValue.Bool(true) &&
                                 !customPathMode && !verticalSymmetry
                             val alternateFromTop = alternateDirection && index % 2 == 1

@@ -1170,14 +1170,25 @@ object VideoExportEngine {
                                 "Copy" -> android.graphics.PorterDuff.Mode.SRC
                                 else -> layerBlend
                             }
-                            if (contentBlend != android.graphics.PorterDuff.Mode.SRC_OVER) {
-                                xfermode = android.graphics.PorterDuffXfermode(contentBlend)
+                            xfermode = if (contentBlend == android.graphics.PorterDuff.Mode.SRC_OVER) {
+                                null
+                            } else {
+                                android.graphics.PorterDuffXfermode(contentBlend)
                             }
                         }
                         val original = imageCache[uriText]
                         val showUnblurredUnder = (element.value("Show Unblurred Content Under") as? ElementValue.Bool)?.value == true
                         val showUnblurredOver = (element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true
-                        val unblurredPaint = Paint(imagePaint).apply { colorFilter = null }
+                        // The unblurred source uses the layer's general blend mode, not the
+                        // processed image's independent content blend mode (matches live preview).
+                        val unblurredPaint = Paint(imagePaint).apply {
+                            colorFilter = null
+                            xfermode = if (layerBlend == android.graphics.PorterDuff.Mode.SRC_OVER) {
+                                null
+                            } else {
+                                android.graphics.PorterDuffXfermode(layerBlend)
+                            }
+                        }
                         canvas.save()
                         canvas.clipPath(clip)
                         if (showUnblurredUnder && original != null) {

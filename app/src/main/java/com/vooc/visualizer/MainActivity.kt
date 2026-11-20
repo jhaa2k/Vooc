@@ -1707,10 +1707,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
     }
     val elementOriginalImages by produceState(
         initialValue = emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>(),
-        key1 = elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.map { element -> element.id to element.properties }
+        key1 = elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BACKGROUND || it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.map { element -> element.id to element.properties }
     ) {
         value = withContext(Dispatchers.IO) {
-            elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.mapNotNull { element ->
+            elements.filter { it.type == StudioElementType.IMAGE || it.type == StudioElementType.BACKGROUND || it.type == StudioElementType.BLUR_EFFECT || it.type == StudioElementType.MOTION_BLUR_EFFECT || it.type == StudioElementType.RGB_SPLIT }.mapNotNull { element ->
                 val uriText = if (element.type == StudioElementType.IMAGE) {
                     (element.value("Import Image") as? ElementValue.Text)?.value.orEmpty()
                         .ifBlank {
@@ -1718,6 +1718,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
                             }.orEmpty()
                         }
+                } else if (element.type == StudioElementType.BACKGROUND) {
+                    (element.value("Image File / Source") as? ElementValue.Text)?.value.orEmpty()
                 } else (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
                 if (uriText.isBlank()) null else runCatching {
                     context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
@@ -1738,14 +1740,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                             val decoded = BitmapFactory.decodeStream(stream) ?: return@use null
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
-                            val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) && maskUri.isNotBlank()) {
+                            val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.BACKGROUND || element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) && maskUri.isNotBlank()) {
                                 context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
                             } else null
                             val processed = when (element.type) {
                                 StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)
                                 StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
                                 StudioElementType.MOTION_BLUR_EFFECT, StudioElementType.RGB_SPLIT -> processImageForPreview(decoded, element, maskBitmap)
-                                StudioElementType.BACKGROUND -> BackgroundImageProcessor.process(decoded, element)
+                                StudioElementType.BACKGROUND -> BackgroundImageProcessor.process(decoded, element, maskBitmap)
                                 else -> decoded
                             }
                             val image = processed.asImageBitmap()

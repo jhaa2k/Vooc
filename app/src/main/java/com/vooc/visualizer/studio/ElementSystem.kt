@@ -76,6 +76,13 @@ data class ElementPropertySpec(
     }
 }
 
+/**
+ * Replace an element without changing its stack position. Property edits must never
+ * reorder the composition, otherwise changing one control changes layer compositing.
+ */
+fun List<ElementDocument>.replacePreservingOrder(updated: ElementDocument): List<ElementDocument> =
+    map { current -> if (current.id == updated.id) updated else current }
+
 data class MeasurementMapping(
     val source: String = "Overall Audio Level",
     val inputMin: Float = 0f,

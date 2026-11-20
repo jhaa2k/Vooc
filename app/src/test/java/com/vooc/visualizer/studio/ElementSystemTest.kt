@@ -45,6 +45,26 @@ class ElementSystemTest {
     }
 
     @Test
+    fun everyVisualLayerExposesTheSharedAudioReactivityControlSet() {
+        val required = setOf(
+            "Audio Reactivity Enabled", "Audio Reactivity Source", "Audio Reactivity Apply To",
+            "Audio Reactivity Input Min", "Audio Reactivity Input Max",
+            "Audio Reactivity Output Min", "Audio Reactivity Output Max",
+            "Audio Reactivity Multiplier", "Audio Reactivity Offset",
+            "Audio Reactivity Smoothing", "Audio Reactivity Attack",
+            "Audio Reactivity Release", "Audio Reactivity Response Curve",
+            "Audio Reactivity Invert", "Audio Reactivity Clamp Output",
+            "Audio Reactivity Beat Trigger", "Audio Reactivity Beat Amount",
+            "Audio Reactivity Frequency Band Start", "Audio Reactivity Frequency Band End",
+            "Audio Reactivity Threshold"
+        )
+        StudioElementType.entries.filter { it != StudioElementType.AUDIO_PROVIDER }.forEach { type ->
+            val names = ElementPropertyCatalog.forElement(type).map { it.name }.toSet()
+            assertTrue("$type missing shared audio-reactivity controls: ${required - names}", names.containsAll(required))
+        }
+    }
+
+    @Test
     fun propertyValuesAreTypeCheckedAndClamped() {
         val element = ElementPropertyCatalog.create(StudioElementType.BARS_SEGMENTS, "bars-1")
         val bounded = element.withValue("Bar Count", ElementValue.Number(5000.0))

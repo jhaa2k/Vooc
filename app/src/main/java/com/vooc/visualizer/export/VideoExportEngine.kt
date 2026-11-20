@@ -852,20 +852,30 @@ object VideoExportEngine {
                         else -> cx
                     }
                     fun drawTextLine(targetPaint: Paint, line: String, baseline: Float, index: Int) {
-                        if (textValue("Alignment", "Center") == "Justified" && index < textLines.lastIndex) {
+                        if (textValue("Alignment", "Center") == "Justified" && index < visibleLines.lastIndex) {
                             val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
                             if (words.size > 1) {
                                 val naturalWidth = words.sumOf { targetPaint.measureText(it).toDouble() }.toFloat()
                                 val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)
-                                var x = textX
-                                words.forEach { word ->
-                                    canvas.drawText(word, x, baseline, targetPaint)
-                                    x += targetPaint.measureText(word) + gap
+                                if (isRtl) {
+                                    var x = textX + maxTextWidth
+                                    words.asReversed().forEach { word ->
+                                        val wordWidth = targetPaint.measureText(word)
+                                        x -= wordWidth
+                                        canvas.drawTextRun(word, 0, word.length, 0, word.length, x, baseline, true, targetPaint)
+                                        x -= gap
+                                    }
+                                } else {
+                                    var x = textX
+                                    words.forEach { word ->
+                                        canvas.drawTextRun(word, 0, word.length, 0, word.length, x, baseline, false, targetPaint)
+                                        x += targetPaint.measureText(word) + gap
+                                    }
                                 }
                                 return
                             }
                         }
-                        canvas.drawText(line, textX, baseline, targetPaint)
+                        canvas.drawTextRun(line, 0, line.length, 0, line.length, textX, baseline, isRtl, targetPaint)
                     }
                     val shadowEnabled = (element.value("Shadow Enabled") as? ElementValue.Bool)?.value == true
                     if (shadowEnabled) {

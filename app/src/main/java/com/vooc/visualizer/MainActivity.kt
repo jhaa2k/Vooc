@@ -3248,8 +3248,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)
                             val imageScaleY = (if (props["Scale Is Uniform"] == ElementValue.Bool(true)) imageScaleX else imageScale.y.toFloat()).coerceIn(0f, 10f)
                             val frameWidth = (size.width * 0.45f * scale * imageScaleX).coerceAtLeast(1f)
-                            val frameHeight = (frameWidth * bitmap.height.toFloat() / bitmap.width.coerceAtLeast(1)) *
-                                (imageScaleY / imageScaleX.coerceAtLeast(0.001f))
+                            val frameHeight = (size.height * 0.45f * scale * imageScaleY).coerceAtLeast(1f)
                             val blend = when (textValue("Blend Mode Content", "Alpha")) {
                                 "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
                                 "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen

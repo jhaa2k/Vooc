@@ -82,7 +82,8 @@ class ElementSystemTest {
             assertEquals("Expected exactly one $name entry", 1, names.count { it == name })
         }
         assertTrue(LayerAddMenuCatalog.elementTypes.contains(StudioElementType.BARS_SEGMENTS))
-        assertFalse(LayerAddMenuCatalog.elementTypes.contains(StudioElementType.AUDIO_PROVIDER))
+        assertTrue(LayerAddMenuCatalog.elementTypes.contains(StudioElementType.AUDIO_PROVIDER))
+        assertEquals(1, LayerAddMenuCatalog.elementTypes.count { it == StudioElementType.AUDIO_PROVIDER })
     }
 
     @Test

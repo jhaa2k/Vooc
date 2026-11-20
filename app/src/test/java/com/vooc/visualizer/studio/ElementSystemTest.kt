@@ -393,7 +393,7 @@ class ElementSystemTest {
     fun imageLayerExposesTransformMaskColorAndAnimationControls() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).associateBy { it.name }
         val required = setOf(
-            "Custom Image", "Image Source / File", "Fit Mode (Scale Type)",
+            "Import Image", "Fit Mode (Scale Type)",
             "Keep Aspect Ratio And Crop To Fit", "Keep Aspect Ratio", "Shape",
             "Crop Left", "Crop Top", "Crop Right", "Crop Bottom", "Corner Radius",
             "Mask / Shape", "Edge Blur", "Color Overlay", "Opacity / Alpha",

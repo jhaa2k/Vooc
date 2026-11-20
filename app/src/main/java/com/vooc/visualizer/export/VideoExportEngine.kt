@@ -1229,13 +1229,25 @@ object VideoExportEngine {
                     paint.pathEffect = null
                 }
                 StudioElementType.PARTICLES -> {
-                    val count = number("Count Limit", number("Particle Count", 128f)).toInt().coerceIn(1, 10000)
-                    val lifetime = number("Lifetime", number("Life Span", 3f)).coerceIn(0.01f, 3600f)
+                    fun numberAlias(primary: String, primaryDefault: Float, legacy: String, legacyDefault: Float = primaryDefault): Float {
+                        val preferred = number(primary, primaryDefault)
+                        val fallback = number(legacy, legacyDefault)
+                        return if (preferred != primaryDefault) preferred else fallback
+                    }
+                    fun textAlias(primary: String, primaryDefault: String, legacy: String, legacyDefault: String = primaryDefault): String {
+                        val preferred = textValue(primary, primaryDefault)
+                        val fallback = textValue(legacy, legacyDefault)
+                        return if (preferred != primaryDefault) preferred else fallback
+                    }
+                    val requestedCount = number("Particle Count", 256f).toInt().coerceIn(1, 10000)
+                    val countLimit = number("Count Limit", 128f).toInt().coerceIn(1, 10000)
+                    val count = minOf(requestedCount, countLimit)
+                    val lifetime = numberAlias("Life Span", 3f, "Lifetime").coerceIn(0.01f, 3600f)
                     val emissionRate = number("Emission Rate", 0f).coerceAtLeast(0f)
                         val spawnInterval = if (emissionRate > 0f) 1f / emissionRate.coerceAtLeast(0.001f) else number("Spawn Time", 0.02f).coerceIn(0f, 10f)
                     val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * width * 0.25f
                     val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * height * 0.25f
-                    val spawnArea = textValue("Particle Emitter Shape", textValue("Spawn Area", "Point"))
+                    val spawnArea = textAlias("Particle Emitter Shape", "Point", "Spawn Area")
                     val emitterPosition = element.value("Emitter Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                     val emitterX = cx + (emitterPosition.x.toFloat() - 0.5f) * width
                     val emitterY = cy + (emitterPosition.y.toFloat() - 0.5f) * height
@@ -1249,11 +1261,11 @@ object VideoExportEngine {
                     val emitterLoop = (element.value("Emitter Loop") as? ElementValue.Bool)?.value != false
                     val particleMass = number("Particle Mass", 1f).coerceAtLeast(0.001f)
                     val particleDamping = number("Particle Damping", 0f).coerceIn(0f, 1f)
-                    val angularVelocity = number("Particle Angular Velocity", number("Rotation Speed", 0f))
+                    val angularVelocity = numberAlias("Particle Angular Velocity", 0f, "Rotation Speed")
                     val angularVelocityRandom = number("Particle Angular Velocity Random", 0f).coerceAtLeast(0f)
                     val relativeToCenter = (element.value("Vector Relative To Center") as? ElementValue.Bool)?.value == true
                     val randomVector = (element.value("Use Random Vector Instead") as? ElementValue.Bool)?.value == true
-                    val baseAngle = Math.toRadians(number("Vector Angle", number("Direction / Angle", -90f)).toDouble()).toFloat()
+                    val baseAngle = Math.toRadians(numberAlias("Vector Angle", -90f, "Direction / Angle").toDouble()).toFloat()
                     val spreadAngle = (number("Spread", 360f) + number("Direction Random", 0f)).coerceIn(0f, 720f) * PI.toFloat() / 180f
                     val gravity = element.value("Gravity") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
                     val forcePosition = element.value("Force Field Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
@@ -1270,9 +1282,9 @@ object VideoExportEngine {
                         "Peak" -> audioLevel
                         else -> 0f
                     }.coerceIn(0f, 1f)
-                    val baseSpeed = number("Speed", number("Start Velocity", 80f)) +
+                    val baseSpeed = numberAlias("Speed", 80f, "Start Velocity") +
                         measuredSpeed * (number("Measure Overall Speed A (X Amount)", 0f) + number("Measure Overall Speed B (Y Amount)", 0f))
-                    val speedRandom = number("Speed Random", number("Velocity Random", 0f)).coerceIn(0f, 1f)
+                    val speedRandom = numberAlias("Speed Random", 0f, "Velocity Random").coerceIn(0f, 1f)
                         val endVelocity = number("End Velocity", number("Speed", number("Start Velocity", 80f)))
                         val friction = number("Friction / Drag", 0f).coerceIn(0f, 100f) / 100f
                         val turbulence = number("Turbulence / Noise", 0f).coerceAtLeast(0f)
@@ -1289,7 +1301,7 @@ object VideoExportEngine {
                         val additiveBlend = props["Particle Additive Blend"] == ElementValue.Bool(true)
                     val startSize = number("Start Size", 8f).coerceAtLeast(0f) * width / 1080f
                     val endSize = number("End Size", 2f).coerceAtLeast(0f) * width / 1080f
-                    val endRandom = number("End Size Random", number("Particle Size Random", 0f)).coerceIn(0f, 1f)
+                    val endRandom = numberAlias("End Size Random", 0f, "Particle Size Random").coerceIn(0f, 1f)
                     val fadeTime = number("Fade In And Out Time", 0.25f).coerceIn(0f, lifetime * 0.5f)
                     val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f) * width / 1080f
                     val particleScale = number("Particle Scale", 100f).coerceAtLeast(0f) / 100f * scale
@@ -1307,12 +1319,12 @@ object VideoExportEngine {
                     val alphaOverLifeMode = textValue("Alpha Over Life", "Fade In Out")
                     val colorOverLifeStart = runCatching {
                         audioReactivityColor(android.graphics.Color.parseColor(
-                            textValue("Color Over Life Start", textValue("Color From", textValue("Color", "#FFFFFFFF")))
+                            textAlias("Color Over Life Start", "#FFFFFFFF", "Color From", textValue("Color", "#FFFFFFFF"))
                         ), reactivity.colorMultiplier)
                     }.getOrDefault(colorFrom)
                     val colorOverLifeEnd = runCatching {
                         audioReactivityColor(android.graphics.Color.parseColor(
-                            textValue("Color Over Life End", textValue("Color To", textValue("Color", "#FFFFFFFF")))
+                            textAlias("Color Over Life End", "#00FFFFFF", "Color To", textValue("Color", "#FFFFFFFF"))
                         ), reactivity.colorMultiplier)
                     }.getOrDefault(colorTo)
                     val customParticle = imageCache[textValue("Texture / Image", textValue("Custom Image"))]

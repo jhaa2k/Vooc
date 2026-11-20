@@ -975,13 +975,26 @@ object VideoExportEngine {
                                 if (capPlacement != "Bottom") cap(yTop)
                                 if (capPlacement != "Top") cap(yBottom)
                             }
-                            if (peakEnabled) {
+                            val peakStyle = textValue("Peak Indicator Style", "Line")
+                            if (peakEnabled && peakStyle != "None") {
                                 paint.color = peakColor
                                 paint.alpha = alpha
-                                paint.strokeWidth = peakWidth
-                                paint.style = Paint.Style.STROKE
-                                val py = baseline - peaks[index] * maxHeight
-                                canvas.drawLine(x - peakWidth, py, x + barWidth + peakWidth, py, paint)
+                                val py = baseline - peaks[index].coerceIn(0f, 1f) * maxHeight
+                                when (peakStyle) {
+                                    "Dot" -> {
+                                        paint.style = Paint.Style.FILL
+                                        canvas.drawCircle(x + barWidth / 2f, py, (peakWidth * 1.5f).coerceAtLeast(1f), paint)
+                                    }
+                                    "Bar" -> {
+                                        paint.style = Paint.Style.FILL
+                                        canvas.drawRect(x, py - peakWidth, x + barWidth, py + peakWidth, paint)
+                                    }
+                                    else -> {
+                                        paint.strokeWidth = peakWidth
+                                        paint.style = Paint.Style.STROKE
+                                        canvas.drawLine(x - peakWidth, py, x + barWidth + peakWidth, py, paint)
+                                    }
+                                }
                                 paint.style = Paint.Style.FILL
                             }
                         }

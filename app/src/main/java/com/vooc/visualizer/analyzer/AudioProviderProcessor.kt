@@ -108,12 +108,19 @@ class AudioProviderProcessor {
             reset()
             return AudioProviderFrame(FloatArray(cfg.sampleOutCount), 0f, frame.timeSec, frame.sampleRate)
         }
-        val channel = when (cfg.channelMode) {
-            ProviderChannelMode.LEFT -> ChannelSelect.LEFT
-            ProviderChannelMode.RIGHT -> ChannelSelect.RIGHT
-            ProviderChannelMode.MONO_MIX, ProviderChannelMode.STEREO_AVERAGE -> ChannelSelect.MIX
+        val source = when (cfg.channelMode) {
+            ProviderChannelMode.MONO_MIX -> frame.rawMagnitude
+            ProviderChannelMode.LEFT -> frame.channel(ChannelSelect.LEFT).spectrum
+            ProviderChannelMode.RIGHT -> frame.channel(ChannelSelect.RIGHT).spectrum
+            ProviderChannelMode.STEREO_AVERAGE -> {
+                val left = frame.channel(ChannelSelect.LEFT).spectrum
+                val right = frame.channel(ChannelSelect.RIGHT).spectrum
+                if (left.isEmpty() || right.isEmpty()) frame.rawMagnitude
+                else FloatArray(min(left.size, right.size)) { index ->
+                    (left[index] + right[index]) * 0.5f
+                }
+            }
         }
-        val source = if (channel == ChannelSelect.MIX) frame.rawMagnitude else frame.channel(channel).spectrum
         if (source.isEmpty()) return AudioProviderFrame(FloatArray(cfg.sampleOutCount), 0f, frame.timeSec, frame.sampleRate)
 
         val dt = if (lastTimeSec.isNaN() || frame.timeSec <= lastTimeSec) 1f / 60f
@@ -306,8 +313,8 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
 fun AudioProviderConfig.applyTo(base: AnalyzerConfig): AnalyzerConfig {
     val cfg = validated()
     val channelMode = when (cfg.channelMode) {
-        ProviderChannelMode.LEFT, ProviderChannelMode.RIGHT -> ChannelMode.STEREO_SPLIT
-        ProviderChannelMode.MONO_MIX, ProviderChannelMode.STEREO_AVERAGE -> ChannelMode.MONO
+        ProviderChannelMode.LEFT, ProviderChannelMode.RIGHT, ProviderChannelMode.STEREO_AVERAGE -> ChannelMode.STEREO_SPLIT
+        ProviderChannelMode.MONO_MIX -> ChannelMode.MONO
     }
     val beat = base.beat.copy(
         sensitivity = (cfg.beatSensitivity / 8f).coerceIn(0f, 1f),

@@ -9,6 +9,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
+enum class ProviderAnalysisMode { SPECTRUM, BEAT, SPECTRUM_AND_BEAT }
+enum class ProviderChannelMode { MONO_MIX, LEFT, RIGHT, STEREO_AVERAGE }
+
 /**
  * Per-provider spectrum shaping. It consumes an already analysed frame and never captures system audio.
  * The processor is stateful only for temporal smoothing and beat-onset tracking; call reset() on seek/track change.
@@ -35,7 +38,15 @@ data class AudioProviderConfig(
     val beatRangeBarLast: Int = 70,
     val beatRangeValueLower: Float = 0f,
     val beatRangeValueHigher: Float = 50f,
-    val fftSize: Int = 2048
+    val fftSize: Int = 2048,
+    val providerEnabled: Boolean = true,
+    val analysisMode: ProviderAnalysisMode = ProviderAnalysisMode.SPECTRUM_AND_BEAT,
+    val channelMode: ProviderChannelMode = ProviderChannelMode.MONO_MIX,
+    val windowFunction: WindowFunction = WindowFunction.HANN,
+    val beatDetectionEnabled: Boolean = true,
+    val beatSensitivity: Float = 1f,
+    val beatThreshold: Float = 0.65f,
+    val beatRelease: Float = 0.25f
 ) {
     fun validated(nyquist: Float = 96000f): AudioProviderConfig {
         val maxHz = nyquist.coerceAtLeast(2f)
@@ -59,7 +70,10 @@ data class AudioProviderConfig(
             beatRangeBarLast = beatRangeBarLast.coerceAtLeast(0),
             beatRangeValueLower = beatRangeValueLower.finiteClamp(0f, 100f),
             beatRangeValueHigher = beatRangeValueHigher.finiteClamp(0f, 100f),
-            fftSize = fftSize.takeIf { it in setOf(256, 512, 1024, 2048, 4096, 8192) } ?: 2048
+            fftSize = fftSize.takeIf { it in setOf(256, 512, 1024, 2048, 4096, 8192) } ?: 2048,
+            beatSensitivity = beatSensitivity.finiteClamp(0f, 8f),
+            beatThreshold = beatThreshold.finiteClamp(0f, 1f),
+            beatRelease = beatRelease.finiteClamp(0f, 5f)
         )
     }
 
@@ -90,7 +104,16 @@ class AudioProviderProcessor {
 
     fun process(frame: AnalysisFrame, requested: AudioProviderConfig): AudioProviderFrame {
         val cfg = requested.validated(frame.sampleRate / 2f)
-        val source = frame.rawMagnitude
+        if (!cfg.providerEnabled) {
+            reset()
+            return AudioProviderFrame(FloatArray(cfg.sampleOutCount), 0f, frame.timeSec, frame.sampleRate)
+        }
+        val channel = when (cfg.channelMode) {
+            ProviderChannelMode.LEFT -> ChannelSelect.LEFT
+            ProviderChannelMode.RIGHT -> ChannelSelect.RIGHT
+            ProviderChannelMode.MONO_MIX, ProviderChannelMode.STEREO_AVERAGE -> ChannelSelect.MIX
+        }
+        val source = if (channel == ChannelSelect.MIX) frame.rawMagnitude else frame.channel(channel).spectrum
         if (source.isEmpty()) return AudioProviderFrame(FloatArray(cfg.sampleOutCount), 0f, frame.timeSec, frame.sampleRate)
 
         val dt = if (lastTimeSec.isNaN() || frame.timeSec <= lastTimeSec) 1f / 60f
@@ -141,7 +164,9 @@ class AudioProviderProcessor {
         }
         primed = true
 
-        val outputSamples = FloatArray(count) { (smoothed[it] * cfg.outputMultiplier).coerceIn(0f, 32f) }
+        val outputSamples = if (cfg.analysisMode != ProviderAnalysisMode.BEAT) {
+            FloatArray(count) { (smoothed[it] * cfg.outputMultiplier).coerceIn(0f, 32f) }
+        } else FloatArray(count)
 
         val first = cfg.beatRangeBarFirst.coerceIn(0, count - 1)
         val last = cfg.beatRangeBarLast.coerceIn(first, count - 1)
@@ -152,9 +177,12 @@ class AudioProviderProcessor {
         val upper = max(lower + 1e-4f, cfg.beatRangeValueHigher)
         val normalizedLevel = ((level - lower) / (upper - lower)).coerceIn(0f, 1f)
         // A range crossing alone is not a musical beat: the analyzer onset detector must confirm it.
-        val target = if (frame.beat.beat) max(normalizedLevel, frame.beat.pulse) else 0f
+        val target = if (cfg.analysisMode != ProviderAnalysisMode.SPECTRUM && cfg.beatDetectionEnabled && frame.beat.beat) {
+            max(normalizedLevel, frame.beat.pulse)
+        } else 0f
         val beatAlpha = cfg.beatSmooth
         beatValue = beatAlpha * beatValue + (1f - beatAlpha) * target
+        if (cfg.analysisMode == ProviderAnalysisMode.SPECTRUM || !cfg.beatDetectionEnabled) beatValue = 0f
 
         return AudioProviderFrame(outputSamples, beatValue.coerceIn(0f, 1f), frame.timeSec, frame.sampleRate)
     }
@@ -219,6 +247,7 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
         is ElementValue.Number -> v.value != 0.0
         else -> fallback
     }
+    fun text(name: String, fallback: String) = (value(name) as? ElementValue.Text)?.value ?: fallback
     return AudioProviderConfig(
         sampleOutCount = integer("Sample Out Count", 128),
         mirrorSamples = boolean("Mirror Samples", false),
@@ -239,6 +268,28 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
         beatRangeBarLast = number("Beat Range Bar Last", 127.0).let { if (it in 0.0..1.0) (it * (integer("Sample Out Count", 128) - 1)).toInt() else it.toInt() },
         beatRangeValueLower = number("Beat Range Value Lower", 0.08).toFloat(),
         beatRangeValueHigher = number("Beat Range Value Higher", 0.8).toFloat(),
+        providerEnabled = boolean("Provider Enabled", true),
+        analysisMode = when (text("Analysis Mode", "Spectrum + Beat")) {
+            "Spectrum" -> ProviderAnalysisMode.SPECTRUM
+            "Beat" -> ProviderAnalysisMode.BEAT
+            else -> ProviderAnalysisMode.SPECTRUM_AND_BEAT
+        },
+        channelMode = when (text("Channel Mode", "Mono Mix")) {
+            "Left" -> ProviderChannelMode.LEFT
+            "Right" -> ProviderChannelMode.RIGHT
+            "Stereo Average" -> ProviderChannelMode.STEREO_AVERAGE
+            else -> ProviderChannelMode.MONO_MIX
+        },
+        windowFunction = when (text("Window Function", "Hann")) {
+            "Rectangular" -> WindowFunction.RECTANGULAR
+            "Hamming" -> WindowFunction.HAMMING
+            "Blackman" -> WindowFunction.BLACKMAN
+            else -> WindowFunction.HANN
+        },
+        beatDetectionEnabled = boolean("Beat Detection Enabled", true),
+        beatSensitivity = number("Beat Sensitivity", 1.0).toFloat(),
+        beatThreshold = number("Beat Threshold", 0.65).toFloat(),
+        beatRelease = number("Beat Release", 0.25).toFloat(),
         fftSize = run {
             val raw = when (val fft = value("Fft Size")) {
                 is ElementValue.Text -> fft.value.toIntOrNull() ?: 2048
@@ -251,6 +302,18 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
     )
 }
 
-/** Apply the provider's FFT size while preserving all other analyzer settings. */
-fun AudioProviderConfig.applyTo(base: AnalyzerConfig): AnalyzerConfig =
-    base.copy(fftSize = FftSize.fromSize(validated().fftSize))
+/** Apply provider DSP settings while preserving unrelated analyzer configuration. */
+fun AudioProviderConfig.applyTo(base: AnalyzerConfig): AnalyzerConfig {
+    val cfg = validated()
+    val channelMode = when (cfg.channelMode) {
+        ProviderChannelMode.LEFT, ProviderChannelMode.RIGHT -> ChannelMode.STEREO_SPLIT
+        ProviderChannelMode.MONO_MIX, ProviderChannelMode.STEREO_AVERAGE -> ChannelMode.MONO
+    }
+    val beat = base.beat.copy(
+        sensitivity = (cfg.beatSensitivity / 8f).coerceIn(0f, 1f),
+        threshold = (1f + cfg.beatThreshold * 4f).coerceIn(1f, 5f),
+        cooldownMs = (cfg.beatRelease * 1000f).toInt().coerceIn(50, 500)
+    )
+    return base.copy(fftSize = FftSize.fromSize(cfg.fftSize), window = cfg.windowFunction,
+        channelMode = channelMode, beat = beat)
+}

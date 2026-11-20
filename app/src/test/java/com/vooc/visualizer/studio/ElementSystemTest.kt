@@ -215,6 +215,24 @@ class ElementSystemTest {
     }
 
     @Test
+    fun textLayerExposesAdvancedTypographyLayoutAndEffectsControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.TEXT).associateBy { it.name }
+        val required = setOf(
+            "Font Asset", "Font Fallback", "Measure Font Size",
+            "Measure Font Size (Measure What)", "Vertical Alignment", "Text Direction",
+            "Maximum Lines", "Overflow Mode", "Paragraph Spacing", "Line Height Mode",
+            "Fixed Line Height", "Text Background Enabled", "Text Background Color",
+            "Text Background Padding X", "Text Background Padding Y",
+            "Text Background Corner Radius", "Text Gradient Type", "Text Gradient Angle",
+            "Text Gradient Midpoint", "Stroke Join", "Shadow Spread", "Shadow Distance",
+            "Shadow Angle"
+        )
+        assertTrue("Missing advanced text controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(listOf("Top", "Middle", "Bottom"), specs.getValue("Vertical Alignment").options)
+        assertEquals(listOf("Visible", "Clip", "Ellipsis", "Scale Down"), specs.getValue("Overflow Mode").options)
+    }
+
+    @Test
     fun motionBlurExposesMaskAndContentAppearanceControls() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.MOTION_BLUR_EFFECT).associateBy { it.name }
         val required = setOf(

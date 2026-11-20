@@ -1371,7 +1371,10 @@ object VideoExportEngine {
                     paint.style = Paint.Style.FILL
                 }
                 StudioElementType.BACKGROUND -> Unit
-                StudioElementType.AUDIO_PROVIDER -> Unit
+                StudioElementType.AUDIO_PROVIDER,
+                StudioElementType.MIRROR_EFFECT,
+                StudioElementType.CUSTOM_SHADER,
+                StudioElementType.COMPOSITION -> Unit
             }
             canvas.restore()
         }

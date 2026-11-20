@@ -1879,16 +1879,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val strokeColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Stroke Color", colorText))) }.getOrDefault(elementColor)
                         val colorA = runCatching { Color(android.graphics.Color.parseColor(textValue("Bar Color A", "#FF56D8FF"))) }.getOrDefault(elementColor)
                         val colorB = runCatching { Color(android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF"))) }.getOrDefault(elementColor)
-                        val peakColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Peak Color", "#FFFFFFFF"))) }.getOrDefault(strokeColor)
+                        val peakColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Peak Indicator Color", textValue("Peak Color", "#FFFFFFFF")))) }.getOrDefault(strokeColor)
                         val capColor = runCatching { Color(android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF"))) }.getOrDefault(strokeColor)
                         val colorMode = if (props["Gradient Fill"] == ElementValue.Bool(true)) "Gradient" else textValue("Color Mode", "Alternating")
                         val capMode = textValue("Top/Bottom Cap", "None")
                         val capPlacement = textValue("Cap Placement", "Top")
                         val capSize = number("Cap Size", 4f).dp.toPx().coerceAtLeast(1f)
+                        val capThickness = number("Cap Thickness", 3f).dp.toPx().coerceAtLeast(0.5f)
                         val customImage = elementImages[element.id]
                         val corner = when (design) {
                             "Capsule / Pill" -> barWidth / 2f
-                            "Rounded Rect" -> (barWidth * 0.22f).coerceAtLeast(1f)
+                            "Rounded Rect" -> number("Corner Radius", 4f).dp.toPx().coerceIn(0f, barWidth / 2f)
                             else -> 0f
                         }
                         val dashEffect = when (textValue("Stroke Style", "Solid")) {
@@ -1936,6 +1937,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
                                 "By Amplitude" -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colorA, colorB), top, top + height.coerceAtLeast(1f))
                                 "Alternating" -> androidx.compose.ui.graphics.SolidColor(if (index % 2 == 0) colorA else colorB)
+                                "Per Bar" -> androidx.compose.ui.graphics.SolidColor(runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor))
                                 else -> androidx.compose.ui.graphics.SolidColor(elementColor)
                             }
                             if (outline) {
@@ -1968,38 +1970,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     val cx = left + width / 2f
                                     when (capMode) {
                                         "Circle" -> drawCircle(capColor.copy(alpha = opacity), capSize, Offset(cx, y))
-                                        "Square" -> drawRect(capColor.copy(alpha = opacity), Offset(cx - capSize, y - capSize), androidx.compose.ui.geometry.Size(capSize * 2f, capSize * 2f))
+                                        "Square" -> drawRect(capColor.copy(alpha = opacity), Offset(cx - capThickness / 2f, y - capSize), androidx.compose.ui.geometry.Size(capThickness, capSize * 2f))
                                         "Diamond" -> {
-                                            val capPath = Path().apply { moveTo(cx, y - capSize); lineTo(cx + capSize, y); lineTo(cx, y + capSize); lineTo(cx - capSize, y); close() }
+                                            val capPath = Path().apply { moveTo(cx, y - capSize); lineTo(cx + capThickness / 2f, y); lineTo(cx, y + capSize); lineTo(cx - capThickness / 2f, y); close() }
                                             drawPath(capPath, capColor.copy(alpha = opacity))
                                         }
                                     }
                                 }
                                 if (capPlacement != "Bottom") capAt(capYTop)
                                 if (capPlacement != "Top") capAt(capYBottom)
-                            }
-                            if (peakEnabled) {
-                                val peakY = top - peakValue * maxHeight
-                                val indicator = textValue("Peak Indicator Style", "Line")
-                                when (indicator) {
-                                    "Dot" -> drawCircle(
-                                        peakColor.copy(alpha = opacity),
-                                        (peakWidth * 1.5f).coerceAtLeast(1f),
-                                        Offset(left + width / 2f, peakY)
-                                    )
-                                    "Bar" -> drawRect(
-                                        peakColor.copy(alpha = opacity),
-                                        Offset(left, peakY - peakWidth),
-                                        androidx.compose.ui.geometry.Size(width, peakWidth * 2f)
-                                    )
-                                    "Line" -> drawLine(
-                                        peakColor.copy(alpha = opacity),
-                                        Offset(left - peakWidth, peakY),
-                                        Offset(left + width + peakWidth, peakY),
-                                        peakWidth
-                                    )
-                                    else -> Unit
-                                }
                             }
                         }
                         val segmentsPerBar = number("Segments Per Bar", 1f).toInt().coerceIn(1, 64)
@@ -2023,6 +2002,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val height = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(size.height * 0.95f) else drawHeight
                             val colorForBar = when (colorMode) {
                                 "Alternating" -> if (index % 2 == 0) colorA else colorB
+                                "Per Bar" -> runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor)
                                 "Gradient", "By Amplitude" -> Color(
                                     colorA.red + (colorB.red - colorA.red) * level,
                                     colorA.green + (colorB.green - colorA.green) * level,
@@ -2041,7 +2021,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         drawBarShape(x, mirrorTop, barWidth, segmentHeight, colorForBar, 0f, index)
                                     }
                                 }
-                                if (peakEnabled) drawBarShape(x, top, barWidth, 1f, colorForBar, peaks[sourceIndex], index)
+                                val peakStyle = textValue("Peak Indicator Style", "Line")
+                                if (peakEnabled && peakStyle != "None") {
+                                    val peakY = top - peaks[sourceIndex].coerceIn(0f, 1f) * maxHeight
+                                    when (peakStyle) {
+                                        "Dot" -> drawCircle(peakColor.copy(alpha = opacity), (peakWidth * 1.5f).coerceAtLeast(1f), Offset(x + barWidth / 2f, peakY))
+                                        "Bar" -> drawRect(peakColor.copy(alpha = opacity), Offset(x, peakY - peakWidth), androidx.compose.ui.geometry.Size(barWidth, peakWidth * 2f))
+                                        "Line" -> drawLine(peakColor.copy(alpha = opacity), Offset(x - peakWidth, peakY), Offset(x + barWidth + peakWidth, peakY), peakWidth)
+                                    }
+                                }
                             }
                         }
                         }

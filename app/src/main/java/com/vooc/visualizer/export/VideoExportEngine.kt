@@ -46,6 +46,7 @@ import com.vooc.visualizer.studio.MeasureWhatEngine
 import com.vooc.visualizer.studio.AudioReactivityRuntime
 import com.vooc.visualizer.studio.audioReactivitySources
 import com.vooc.visualizer.studio.audioReactivityColor
+import com.vooc.visualizer.studio.processBarSpectrum
 import com.vooc.visualizer.studio.audioReactivityTransform
 
 /** Encodes H.264 video and muxes a compatible AAC source track into one MP4 timeline. */
@@ -770,11 +771,17 @@ object VideoExportEngine {
                 StudioElementType.BARS_SEGMENTS -> {
                     val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)
                     val source = providerSamples?.takeIf { it.isNotEmpty() } ?: floatArrayOf(audioLevel)
-                    val gain = number("Amplitude Scale", 1f).coerceIn(0f, 16f)
-                    val gamma = number("Amplitude Gamma", 1f).coerceIn(0.1f, 4f)
-                    val input = FloatArray(source.size) { i ->
-                        (source[i].coerceAtLeast(0f) * gain).coerceAtLeast(0f).let { (it / (1f + it)).toDouble().pow(gamma.toDouble()).toFloat().coerceIn(0f, 1f) }
-                    }
+                    val input = processBarSpectrum(
+                        samples = source,
+                        amplitudeScale = number("Amplitude Scale", 1f),
+                        gamma = number("Amplitude Gamma", 1f),
+                        amplitudeMode = textValue("Amplitude Mode", "Magnitude"),
+                        threshold = number("Amplitude Threshold", 0f),
+                        offset = number("Amplitude Offset", 0f),
+                        mappingCurve = number("Frequency Mapping Curve", 1f),
+                        mappingBias = number("Frequency Mapping Bias", 0f),
+                        bandOffset = number("Frequency Band Offset", 0f).toInt()
+                    )
                     val previous = barLastUpdateMs.put(element.id, timeMs) ?: (timeMs - 1000L / project.fps.coerceIn(15, 60))
                     val delta = ((timeMs - previous).coerceIn(1L, 100L) / 1000f)
                     val runtime = barRuntimes.getOrPut(element.id) { SpectrumBarsRuntime() }

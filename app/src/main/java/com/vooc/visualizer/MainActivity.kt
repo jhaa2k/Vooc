@@ -1459,6 +1459,24 @@ private fun ElementStudioEditor(
                                             }
                                         }
                                     }
+                                } else if (spec.name == "Font File") {
+                                    Column(Modifier.fillMaxWidth()) {
+                                        Text(
+                                            if (current.isBlank()) "NO FONT FILE SELECTED" else "CUSTOM FONT IMPORTED",
+                                            color = if (current.isBlank()) Muted else Lime,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TextButton(onClick = { onPickFont(spec.name) }) {
+                                                Text(if (current.isBlank()) "IMPORT FONT" else "REPLACE FONT", color = Lime)
+                                            }
+                                            if (current.isNotBlank()) {
+                                                TextButton(onClick = { onChange(selected.withValue(spec.name, ElementValue.Text(""))) }) {
+                                                    Text("REMOVE", color = Muted)
+                                                }
+                                            }
+                                        }
+                                    }
                                 } else {
                                     CompactTextInput(spec.name.uppercase(), current) {
                                         val nextValue = if (spec.type == ElementValueType.COLOR) ElementValue.Integer(it.toLongOrNull() ?: 0L) else ElementValue.Text(it)

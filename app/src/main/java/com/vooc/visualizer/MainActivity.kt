@@ -2153,7 +2153,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                     }
                     StudioElementType.PARTICLES -> {
-                        val count = number("Count Limit", number("Particle Count", 128f)).toInt().coerceIn(1, 1000)
+                        val count = number("Count Limit", number("Particle Count", 128f)).toInt().coerceIn(1, 10000)
                         val lifetime = number("Lifetime", number("Life Span", 3f)).coerceIn(0.01f, 3600f)
                         val spawnInterval = number("Spawn Time", 0.02f).coerceIn(0f, 10f)
                         val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * size.width * 0.25f
@@ -2162,6 +2162,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val relativeToCenter = props["Vector Relative To Center"] == ElementValue.Bool(true)
                         val randomVector = props["Use Random Vector Instead"] == ElementValue.Bool(true)
                         val baseAngle = Math.toRadians(number("Vector Angle", number("Direction / Angle", -90f)).toDouble()).toFloat()
+                        val spreadAngle = (number("Spread", 360f) + number("Direction Random", 0f)).coerceIn(0f, 720f) * PI.toFloat() / 180f
                         val gravity = props["Gravity"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
                         val forcePosition = props["Force Field Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                         val forceMode = textValue("Force Field", "None")
@@ -2223,8 +2224,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val radialAngle = kotlin.math.atan2(spawnY - center.y, spawnX - center.x)
                             val angle = when {
                                 randomVector -> randomA * 2f * PI.toFloat()
-                                relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f
-                                else -> baseAngle
+                                relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle
+                                else -> baseAngle + (randomA - 0.5f) * spreadAngle
                             }
                             val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom)
                             var vx = cos(angle) * velocity
@@ -2248,8 +2249,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)
                             val depthScale = (1f + number("End Size ZFactor", 0f) * depth / 1000f).coerceAtLeast(0.05f)
                             val endVariation = 1f + (randomC * 2f - 1f) * endRandom
-                            val sizeT = (startSize + (endSize * endVariation - startSize) * lifeT).coerceAtLeast(0f)
                             val fadeInScale = if (fadeTime > 0f) (age / fadeTime).coerceIn(0f, 1f) else 1f
+                            val fadeInSize = number("Fade In Size", 1f).coerceIn(0f, 10f)
+                            val sizeT = ((startSize + (endSize * endVariation - startSize) * lifeT) *
+                                (1f + (fadeInScale - 1f) * fadeInSize)).coerceAtLeast(0f)
                             val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
                             val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
                             val alpha = (opacity * fadeInScale * fadeOut * nearFade).coerceIn(0f, 1f)

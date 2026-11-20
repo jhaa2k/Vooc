@@ -698,7 +698,6 @@ object VideoExportEngine {
                 StudioElementType.TEXT -> {
                     val caseMode = textValue("Case", "Original")
                     val rawText = textValue("Text", element.tag).take(2000)
-                    val rawText = textValue("Text", element.tag).take(2000)
                     val displayText = when (caseMode) {
                         "Uppercase" -> rawText.uppercase()
                         "Lowercase" -> rawText.lowercase()
@@ -752,7 +751,7 @@ object VideoExportEngine {
                     }
                     val maximumLines = number("Maximum Lines", 0f).toInt().coerceAtLeast(0)
                     val visibleLines = (if (maximumLines > 0) textLines.take(maximumLines) else textLines).toMutableList()
-                    if (textValue("Overflow Mode", "Visible") == "Ellipsis" && visibleLines.size < textLines.size && visibleLines.isNotEmpty()) visibleLines[visibleLines.lastIndex] = android.text.TextUtils.ellipsize(visibleLines.last(), textPaint, maxTextWidth, android.text.TextUtils.TruncateAt.END).toString()
+                    if (textValue("Overflow Mode", "Visible") == "Ellipsis" && visibleLines.size < textLines.size && visibleLines.isNotEmpty()) visibleLines[visibleLines.lastIndex] = android.text.TextUtils.ellipsize(visibleLines.last(), android.text.TextPaint(textPaint), maxTextWidth, android.text.TextUtils.TruncateAt.END).toString()
                     val lineHeight = if (textValue("Line Height Mode", "Multiplier") == "Fixed" && number("Fixed Line Height", 0f) > 0f) number("Fixed Line Height", 0f) * width / 1080f else textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
                     val paragraphSpacing = number("Paragraph Spacing", 0f) * width / 1080f
                     val textBlockHeight = (visibleLines.size - 1) * (lineHeight + paragraphSpacing)
@@ -802,7 +801,7 @@ object VideoExportEngine {
                         }
                         textLines.forEachIndexed { index, line -> drawTextLine(strokePaint, line, firstBaseline + index * (lineHeight + paragraphSpacing), index) }
                     }
-                    if (element.value("Text Background Enabled") == ElementValue.Bool(true)) { val bg = runCatching { android.graphics.Color.parseColor(textValue("Text Background Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT); val px = number("Text Background Padding X", 0f) * width / 1080f; val py = number("Text Background Padding Y", 0f) * width / 1080f; val top = firstBaseline - textPaint.textSize * 0.8f - py; val bottom = firstBaseline + (visibleLines.size - 1) * (lineHeight + paragraphSpacing) + textPaint.textSize * 0.25f + py; val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg }; canvas.drawRoundRect(cx - maxTextWidth * 0.5f - px, top, cx + maxTextWidth * 0.5f + px, bottom, number("Text Background Corner Radius", 0f) * width / 1080f, number("Text Background Corner Radius", 0f) * width / 1080f, bgPaint) }
+                    if (element.value("Text Background Enabled") == ElementValue.Bool(true)) { val bg = runCatching { android.graphics.Color.parseColor(textValue("Text Background Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT); val px = number("Text Background Padding X", 0f) * width / 1080f; val py = number("Text Background Padding Y", 0f) * width / 1080f; val top = firstBaseline - textPaint.textSize * 0.8f - py; val bottom = firstBaseline + (visibleLines.size - 1) * (lineHeight + paragraphSpacing) + textPaint.textSize * 0.25f + py; val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = bg }; canvas.drawRoundRect(cx - maxTextWidth * 0.5f - px, top, cx + maxTextWidth * 0.5f + px, bottom, number("Text Background Corner Radius", 0f) * width / 1080f, number("Text Background Corner Radius", 0f) * width / 1080f, bgPaint) }
                     val gradientStart = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient Start", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                     val gradientEnd = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient End", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                     if (gradientStart != gradientEnd) {

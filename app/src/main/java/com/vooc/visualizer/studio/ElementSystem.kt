@@ -170,6 +170,23 @@ data class ElementDocument(
     }
 }
 
+/**
+ * Single source of truth for the Add Layer menu.
+ * Legacy LayerKind remains available only for spectrum-style variants; common layer
+ * types are created through StudioElementType so Image/Text/Shape/Background/Particles
+ * cannot appear twice.
+ */
+object LayerAddMenuCatalog {
+    val spectrumStyles: List<LayerKind> = LayerKind.entries.filter { kind ->
+        kind !in setOf(
+            LayerKind.BARS, LayerKind.PARTICLES, LayerKind.SHAPE,
+            LayerKind.TEXT, LayerKind.IMAGE, LayerKind.BACKGROUND
+        )
+    }
+    val elementTypes: List<StudioElementType> =
+        StudioElementType.entries.filter { it != StudioElementType.AUDIO_PROVIDER }
+}
+
 object ElementPropertyCatalog {
     private fun text(name: String, category: String, value: String, options: List<String> = emptyList()) =
         ElementPropertySpec(name, category, if (options.isEmpty()) ElementValueType.TEXT else ElementValueType.ENUM,

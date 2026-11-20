@@ -1775,10 +1775,41 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                             color = elementColor.toArgb()
                             textSize = textSize
-                            textAlign = android.graphics.Paint.Align.CENTER
+                            textAlign = when (textValue("Alignment", "Center")) {
+                                "Left" -> android.graphics.Paint.Align.LEFT
+                                "Right" -> android.graphics.Paint.Align.RIGHT
+                                else -> android.graphics.Paint.Align.CENTER
+                            }
                             typeface = baseTypeface
+                            letterSpacing = number("Letter Spacing", 0f) / 100f
                             isUnderlineText = props["Underline"] == ElementValue.Bool(true)
                             if (shadowEnabled) setShadowLayer(shadowBlur, shadowX, shadowY, shadowColor)
+                        }
+                        val maxTextWidth = number("Max Width", 1000f).dp.toPx().coerceAtLeast(1f)
+                        val wrapText = props["Wrap Text"] != ElementValue.Bool(false)
+                        val textLines = if (!wrapText) listOf(displayText) else buildList {
+                            displayText.split("\\n").forEach { paragraph ->
+                                var line = ""
+                                paragraph.split(Regex("\\s+")).forEach { word ->
+                                    val candidate = if (line.isEmpty()) word else "$line $word"
+                                    if (line.isNotEmpty() && textPaint.measureText(candidate) > maxTextWidth) {
+                                        add(line)
+                                        line = word
+                                    } else line = candidate
+                                }
+                                add(line)
+                            }
+                        }.ifEmpty { listOf("") }
+                        if (props["Auto-Scale"] == ElementValue.Bool(true)) {
+                            val widest = textLines.maxOfOrNull { textPaint.measureText(it) } ?: 0f
+                            if (widest > maxTextWidth) textPaint.textScaleX = maxTextWidth / widest
+                        }
+                        val lineHeight = textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
+                        val firstBaseline = center.y - (textLines.size - 1) * lineHeight * 0.5f
+                        val textX = when (textValue("Alignment", "Center")) {
+                            "Left" -> center.x - maxTextWidth * 0.5f
+                            "Right" -> center.x + maxTextWidth * 0.5f
+                            else -> center.x
                         }
                         if (strokeEnabled && strokeWidth > 0f) {
                             val outlinePaint = android.graphics.Paint(textPaint).apply {
@@ -1788,9 +1819,13 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 strokeWidth = strokeWidth
                                 clearShadowLayer()
                             }
-                            native.drawText(displayText, center.x, center.y, outlinePaint)
+                            textLines.forEachIndexed { index, line ->
+                                native.drawText(line, textX, firstBaseline + index * lineHeight, outlinePaint)
+                            }
                         }
-                        native.drawText(displayText, center.x, center.y, textPaint)
+                        textLines.forEachIndexed { index, line ->
+                            native.drawText(line, textX, firstBaseline + index * lineHeight, textPaint)
+                        }
                         textPaint.clearShadowLayer()
                     }
                     StudioElementType.BARS_SEGMENTS -> {

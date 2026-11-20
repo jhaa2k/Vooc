@@ -269,6 +269,22 @@ object VideoExportEngine {
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         val imageCache = mutableMapOf<String, Bitmap>()
+        val fontCache = mutableMapOf<String, Typeface>()
+        project.document.elements.filter { element ->
+            element.type == StudioElementType.TEXT &&
+                (element.value("Font Asset") as? ElementValue.Text)?.value == "Imported Font"
+        }.forEach { element ->
+            val uriText = (element.value("Font File") as? ElementValue.Text)?.value.orEmpty()
+            if (uriText.isNotBlank()) runCatching {
+                val fontFile = java.io.File(context.cacheDir, "vooc-export-font-" + uriText.hashCode() + ".font")
+                if (!fontFile.exists() || fontFile.length() == 0L) {
+                    resolver.openInputStream(Uri.parse(uriText))?.use { input ->
+                        fontFile.outputStream().use { outputStream -> input.copyTo(outputStream) }
+                    } ?: throw IllegalStateException("Unable to open imported font.")
+                }
+                Typeface.createFromFile(fontFile)
+            }.getOrNull()?.let { fontCache[element.id] = it }
+        }
         val barRuntimes = mutableMapOf<String, SpectrumBarsRuntime>()
         val barLastUpdateMs = mutableMapOf<String, Long>()
         val audioReactivityRuntimes = mutableMapOf<String, AudioReactivityRuntime>()
@@ -340,7 +356,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerSamplesByIndexByFrame.map { frames -> frames.getOrElse(submittedFrames) { FloatArray(0) } }, channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, analysisSampleRate, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
+                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, fontCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerSamplesByIndexByFrame.map { frames -> frames.getOrElse(submittedFrames) { FloatArray(0) } }, channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, analysisSampleRate, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -575,7 +591,7 @@ object VideoExportEngine {
         return blurred
     }
 
-    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerSamplesByIndex: List<FloatArray>?, channelSamples: Map<ChannelSelect, FloatArray>, analysisSampleRate: Int, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
+    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, fontFaces: Map<String, Typeface>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerSamplesByIndex: List<FloatArray>?, channelSamples: Map<ChannelSelect, FloatArray>, analysisSampleRate: Int, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
         val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         canvas.save()
         canvas.clipRect(0, 0, width, height)

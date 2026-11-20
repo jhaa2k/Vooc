@@ -2166,7 +2166,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             "Side" -> frame?.channel(ChannelSelect.SIDE)?.spectrum
                             else -> frame?.channel(ChannelSelect.MIX)?.spectrum
                         }
-                        val sourceSamples: FloatArray = if (selectedChannel == "Mixed" && !customFrequencyRange) {
+                        val useProviderSmoothing = props["Use Audio Provider Smoothing"] != ElementValue.Bool(false)
+                        val sourceSamples: FloatArray = if (selectedChannel == "Mixed" && !customFrequencyRange && useProviderSmoothing) {
                             providerFrame?.samples ?: frame?.spectrum ?: FloatArray(64)
                         } else selectedSpectrum ?: frame?.spectrum ?: FloatArray(64)
                         val rawSamples = if (customFrequencyRange && frame != null) SpectrumMapper.cropFrequencyRange(

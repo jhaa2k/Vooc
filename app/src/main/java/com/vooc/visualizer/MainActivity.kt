@@ -2502,6 +2502,16 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }
                             val overlay = runCatching { Color(android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF"))) }.getOrDefault(Color.Transparent)
                             val imageAlpha = (opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
+                            val layerBlend = when (textValue("Blend Mode", "Alpha")) {
+                                "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
+                                "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                                "Multiply", "Subtractive" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                                "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
+                                "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
+                                "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Difference
+                                "Copy" -> androidx.compose.ui.graphics.BlendMode.Src
+                                else -> androidx.compose.ui.graphics.BlendMode.SrcOver
+                            }
                             val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
                             val imageColorMatrix = ColorMatrix().apply {
                                 setToSaturation(saturation)
@@ -2554,7 +2564,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
                                     dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
                                     alpha = imageAlpha,
-                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix)
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix),
+                                    blendMode = layerBlend
                                 )
                             }
                         }

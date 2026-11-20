@@ -1,5 +1,8 @@
 package com.vooc.visualizer.playback
 
+import android.content.Intent
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -25,6 +28,21 @@ class VoocPlaybackService : MediaSessionService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+
+    /**
+     * Swiping the app away must not leave a hidden service behind: keep running only while audio is
+     * actually playing (user-visible media notification); otherwise stop so Android can reclaim the process.
+     */
+    @androidx.annotation.OptIn(UnstableApi::class)
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        val player = mediaSession?.player
+        if (player == null || !player.playWhenReady || player.mediaItemCount == 0 ||
+            player.playbackState == Player.STATE_ENDED
+        ) {
+            stopSelf()
+        }
+    }
 
     override fun onDestroy() {
         mediaSession?.run {

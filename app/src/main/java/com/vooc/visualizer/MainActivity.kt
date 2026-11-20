@@ -143,13 +143,53 @@ private fun processBlurEffectForPreview(source: android.graphics.Bitmap, element
         is ElementValue.Integer -> value.value.toFloat()
         else -> fallback
     }
+    fun text(name: String, fallback: String): String = (element.value(name) as? ElementValue.Text)?.value ?: fallback
+    fun vector(name: String): ElementValue.Vector2 =
+        element.value(name) as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
     val radius = (number("Blur Radius", 2f) * number("Blur Multiplier", 4.1f)).coerceIn(0f, 512f)
-    if (radius <= 0.1f) return source
-    val reduction = (1f / (1f + radius / 3f)).coerceIn(0.05f, 1f)
-    val reduced = android.graphics.Bitmap.createScaledBitmap(source, (source.width * reduction).toInt().coerceAtLeast(1), (source.height * reduction).toInt().coerceAtLeast(1), true)
-    val blurred = android.graphics.Bitmap.createScaledBitmap(reduced, source.width, source.height, true)
-    if (reduced !== source) reduced.recycle()
-    return blurred
+    val blurred = if (radius <= 0.1f) source else {
+        val reduction = (1f / (1f + radius / 3f)).coerceIn(0.05f, 1f)
+        val reduced = android.graphics.Bitmap.createScaledBitmap(source,
+            (source.width * reduction).toInt().coerceAtLeast(1),
+            (source.height * reduction).toInt().coerceAtLeast(1), true)
+        val result = android.graphics.Bitmap.createScaledBitmap(reduced, source.width, source.height, true)
+        if (reduced !== source) reduced.recycle()
+        result
+    }
+    val output = android.graphics.Bitmap.createBitmap(source.width, source.height, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(output)
+    val mode = when (text("Blend Mode Content", "Alpha")) {
+        "Add" -> android.graphics.PorterDuff.Mode.ADD
+        "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+        "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+        "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+        "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+        "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+        "Copy" -> android.graphics.PorterDuff.Mode.SRC
+        else -> android.graphics.PorterDuff.Mode.SRC_OVER
+    }
+    for (index in 1..3) {
+        val scale = vector("${index}layer Scale")
+        val sx = scale.x.toFloat().coerceIn(0f, 10f)
+        val sy = scale.y.toFloat().coerceIn(0f, 10f)
+        if (sx <= 0f || sy <= 0f) continue
+        val color = runCatching { android.graphics.Color.parseColor(text("${index}layer Color", "#FFFFFFFF")) }
+            .getOrDefault(android.graphics.Color.WHITE)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
+            if (color != android.graphics.Color.WHITE) {
+                colorFilter = android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.MULTIPLY)
+            }
+            if (mode != android.graphics.PorterDuff.Mode.SRC_OVER) xfermode = android.graphics.PorterDuffXfermode(mode)
+        }
+        val halfW = source.width * sx / 2f
+        val halfH = source.height * sy / 2f
+        canvas.drawBitmap(blurred, null, android.graphics.RectF(
+            source.width / 2f - halfW, source.height / 2f - halfH,
+            source.width / 2f + halfW, source.height / 2f + halfH
+        ), paint)
+    }
+    if (blurred !== source) blurred.recycle()
+    return output
 }
 
 private fun processImageForPreview(source: android.graphics.Bitmap, element: ElementDocument, maskSource: android.graphics.Bitmap? = null): android.graphics.Bitmap {

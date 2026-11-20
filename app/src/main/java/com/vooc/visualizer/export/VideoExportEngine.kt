@@ -849,6 +849,9 @@ object VideoExportEngine {
                     val minHeight = maxOf(number("Min Height", 0f) * width / 1080f, maxHeight * minHeightScale).coerceIn(0f, maxHeight)
                     val design = textValue("Bar Design", "Rounded Rect")
                     val orientation = textValue("Orientation", "Vertical")
+                    val radialLayout = orientation == "Radial" || textValue("Shape Path", "Horizontal Line") == "Circle"
+                    val radialInnerRadius = (min(width, height) * 0.16f + number("Bar Offset", 0f) * width / 1080f).coerceIn(0f, min(width, height) * 0.42f)
+                    val radialMaxHeight = min(maxHeight, min(width, height) * 0.42f)
                     val alignment = textValue("Alignment", "Bottom")
                     val mirrorMode = textValue("Mirror Mode", "Off")
                     val mirrorX = orientation == "Mirror" || mirrorMode == "Horizontal" || mirrorMode == "Both" || (element.value("Mirror") as? ElementValue.Bool)?.value == true
@@ -893,9 +896,10 @@ object VideoExportEngine {
                         val sourceIndex = if (mirrorX) minOf(index, count - 1 - index) else index
                         var level = levels[sourceIndex].coerceIn(0f, 1f)
                         if ((element.value("Flip Input") as? ElementValue.Bool)?.value == true) level = 1f - level
-                        val barHeight = (minHeight + level * maxHeight).coerceIn(0f, height * 0.95f)
-                        val x = cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
-                        val baseline = when (alignment) {
+                        val activeMaxHeight = if (radialLayout) radialMaxHeight else maxHeight
+                        val barHeight = (minHeight + level * activeMaxHeight).coerceIn(0f, height * 0.95f)
+                        val x = if (radialLayout) cx - barWidth / 2f else cx - totalWidth / 2f + index * slot + (slot - barWidth) / 2f + barOffset
+                        val baseline = if (radialLayout) cy - radialInnerRadius else when (alignment) {
                             "Top" -> cy - height * 0.38f
                             "Center" -> cy
                             "Stretch" -> cy + height * 0.44f
@@ -903,7 +907,7 @@ object VideoExportEngine {
                         }
                         val drawHeight = if (mirrorY) barHeight / 2f else barHeight
                         val h = if (alignment == "Stretch") (drawHeight * 1.25f).coerceAtMost(height * 0.95f) else drawHeight
-                        val top = if (mirrorY) baseline - h else if (alignment == "Center") baseline - barHeight / 2f else if (alignment == "Top") baseline else baseline - h
+                        val top = if (radialLayout) baseline - h else if (mirrorY) baseline - h else if (alignment == "Center") baseline - barHeight / 2f else if (alignment == "Top") baseline else baseline - h
                         val bottom = top + h
                         val gradientT = if (textValue("Gradient Direction", "Vertical") == "Horizontal") index.toFloat() / (count - 1).coerceAtLeast(1) else level
                         val fill = when (colorMode) {
@@ -1005,6 +1009,7 @@ object VideoExportEngine {
                             }
                         }
                         canvas.save()
+                        if (radialLayout) canvas.rotate(index * (360f / count), cx, cy)
                         canvas.rotate(number("Bar Rotation", 0f), x + barWidth / 2f, baseline)
                         drawShape(top, bottom)
                         if (mirrorY) drawShape(baseline, baseline + h)

@@ -193,8 +193,7 @@ object LayerAddMenuCatalog {
             LayerKind.TEXT, LayerKind.IMAGE, LayerKind.BACKGROUND
         )
     }
-    val elementTypes: List<StudioElementType> =
-        StudioElementType.entries.filter { it != StudioElementType.AUDIO_PROVIDER }
+    val elementTypes: List<StudioElementType> = StudioElementType.entries
 }
 
 object ElementPropertyCatalog {

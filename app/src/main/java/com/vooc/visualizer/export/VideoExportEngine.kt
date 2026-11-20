@@ -785,9 +785,9 @@ object VideoExportEngine {
                         val topCrop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * image.height).toInt()
                         val rightCrop = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * image.width).toInt()
                         val bottomCrop = (number("Crop Bottom", 0f).coerceIn(0f, 0.95f) * image.height).toInt()
-                        val src = RectF(leftCrop.toFloat(), topCrop.toFloat(),
-                            (image.width - rightCrop).coerceAtLeast(leftCrop + 1).toFloat(),
-                            (image.height - bottomCrop).coerceAtLeast(topCrop + 1).toFloat())
+                        val src = android.graphics.Rect(leftCrop, topCrop,
+                            (image.width - rightCrop).coerceAtLeast(leftCrop + 1),
+                            (image.height - bottomCrop).coerceAtLeast(topCrop + 1))
                         val ratio = src.width() / src.height().coerceAtLeast(1f)
                         val frameRatio = frameWidth / frameHeight.coerceAtLeast(1f)
                         val dst = when {
@@ -813,7 +813,7 @@ object VideoExportEngine {
                         }
                         val overlay = runCatching { android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF")) }.getOrDefault(android.graphics.Color.TRANSPARENT)
                         val imagePaint = Paint(paint).apply {
-                            alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt()
+                            this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
                             colorFilter = if (android.graphics.Color.alpha(overlay) > 0) android.graphics.PorterDuffColorFilter(overlay, android.graphics.PorterDuff.Mode.SRC_ATOP) else null
                         }
                         canvas.save()
@@ -842,7 +842,7 @@ object VideoExportEngine {
                             val dx = (base.first + cos(angle) * amount * (index - 1)) * scale * width / 1080f
                             val dy = (base.second + sin(angle) * amount * (index - 1)) * scale * width / 1080f
                             val channelPaint = Paint(paint).apply {
-                                alpha = (alpha * 0.72f).toInt()
+                                this.alpha = (alpha * 0.72f).toInt().coerceIn(0, 255)
                                 colorFilter = android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.SRC_ATOP)
                             }
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
@@ -872,7 +872,7 @@ object VideoExportEngine {
                             val t = sample.toFloat() / samples
                             val dx = cos(angle) * length * t
                             val dy = sin(angle) * length * t
-                            val p = Paint(paint).apply { alpha = (alpha * fade * (1f - t * 0.55f)).toInt() }
+                            val p = Paint(paint).apply { this.alpha = (alpha * fade * (1f - t * 0.55f)).toInt().coerceIn(0, 255) }
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
                                 cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), p)
                         }
@@ -880,7 +880,7 @@ object VideoExportEngine {
                             val t = (index + 1f) / (trails + 1f)
                             val dx = -cos(angle) * length * t
                             val dy = -sin(angle) * length * t
-                            val p = Paint(paint).apply { alpha = (alpha * fade * (1f - t)).toInt() }
+                            val p = Paint(paint).apply { this.alpha = (alpha * fade * (1f - t)).toInt().coerceIn(0, 255) }
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
                                 cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), p)
                         }

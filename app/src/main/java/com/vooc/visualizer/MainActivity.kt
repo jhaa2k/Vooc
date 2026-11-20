@@ -3126,11 +3126,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 "Dotted" -> floatArrayOf(strokeWidth, strokeWidth * 1.8f)
                                 else -> customDash.takeIf { it.size >= 2 }
                             }
-                            val pathEffect = dash?.let { androidx.compose.ui.graphics.PathEffect.dashPathEffect(it) }
+                            val pathEffect = dash?.let { androidx.compose.ui.graphics.PathEffect.dashPathEffect(it, number("Stroke Dash Offset", 0f).dp.toPx()) }
                             val strokeColor = runCatching {
                                 Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")))
                             }.getOrDefault(Color.White).copy(alpha = opacity)
-                            drawPath(shapePath, strokeColor, style = Stroke(width = strokeWidth, pathEffect = pathEffect, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
+                            val strokeAlignment = textValue("Stroke Alignment", "Center")
+                            val resolvedStrokeWidth = if (strokeAlignment == "Center") strokeWidth else strokeWidth * 2f
+                            val drawStroke: DrawScope.() -> Unit = {
+                                drawPath(shapePath, strokeColor, style = Stroke(width = resolvedStrokeWidth, pathEffect = pathEffect, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
+                            }
+                            when (strokeAlignment) {
+                                "Inside" -> clipPath(shapePath) { drawStroke() }
+                                "Outside" -> clipPath(shapePath, androidx.compose.ui.graphics.ClipOp.Difference) { drawStroke() }
+                                else -> drawStroke()
+                            }
                         }
                     }
                     StudioElementType.BACKGROUND -> Unit

@@ -34,7 +34,10 @@ class SpectrumBarsRuntime {
         reactionDelayMs: Float = 0f,
         accumulatedDelayMs: Float = 0f,
         attackSmoothing: Float = damping,
-        releaseSmoothing: Float = damping
+        releaseSmoothing: Float = damping,
+        peakHoldEnabled: Boolean = true,
+        peakResetThreshold: Float = 0f,
+        peakFallDelay: Float = 0f
     ): Frame {
         val n = count.coerceIn(1, 512)
         if (envelope.size != n) {
@@ -55,8 +58,9 @@ class SpectrumBarsRuntime {
         } else {
             history.clear()
         }
-        val holdSeconds = 0.08f + peakHold.coerceIn(0f, 1f) * 0.9f
+        val holdSeconds = if (peakHoldEnabled) 0.08f + peakHold.coerceIn(0f, 1f) * 0.9f + peakFallDelay.coerceIn(0f, 10f) else 0f
         val fallPerSecond = 0.15f + peakFallSpeed.coerceIn(0f, 1f) * 3.5f
+        val resetThreshold = peakResetThreshold.coerceIn(0f, 1f)
         for (i in 0 until n) {
             val t = if (n == 1) 0.5f else i.toFloat() / (n - 1)
             val delaySeconds = reactionSeconds + accumulatedSeconds * t
@@ -76,7 +80,10 @@ class SpectrumBarsRuntime {
             val tau = 0.008f + response.coerceIn(0f, 1f) * 0.32f
             val coefficient = exp(-dt / tau)
             envelope[i] = if (!wasPrimed) target else coefficient * envelope[i] + (1f - coefficient) * target
-            if (envelope[i] >= peaks[i]) {
+            if (!peakHoldEnabled || envelope[i] <= resetThreshold) {
+                peaks[i] = envelope[i]
+                peakTimers[i] = 0f
+            } else if (envelope[i] >= peaks[i]) {
                 peaks[i] = envelope[i]
                 peakTimers[i] = holdSeconds
             } else if (peakTimers[i] > 0f) {

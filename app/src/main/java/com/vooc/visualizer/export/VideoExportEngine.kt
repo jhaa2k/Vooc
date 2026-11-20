@@ -639,6 +639,7 @@ object VideoExportEngine {
                     val relativeToCenter = (element.value("Vector Relative To Center") as? ElementValue.Bool)?.value == true
                     val randomVector = (element.value("Use Random Vector Instead") as? ElementValue.Bool)?.value == true
                     val baseAngle = Math.toRadians(number("Vector Angle", number("Direction / Angle", -90f)).toDouble()).toFloat()
+                    val spreadAngle = (number("Spread", 360f) + number("Direction Random", 0f)).coerceIn(0f, 720f) * PI.toFloat() / 180f
                     val gravity = element.value("Gravity") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
                     val forcePosition = element.value("Force Field Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                     val forceMode = textValue("Force Field", "None")
@@ -701,8 +702,8 @@ object VideoExportEngine {
                         val radialAngle = kotlin.math.atan2(spawnY - cy, spawnX - cx)
                         val angle = when {
                             randomVector -> randomA * 2f * PI.toFloat()
-                            relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f
-                            else -> baseAngle
+                            relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle
+                            else -> baseAngle + (randomA - 0.5f) * spreadAngle
                         }
                         val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom)
                         var vx = cos(angle) * velocity
@@ -731,7 +732,7 @@ object VideoExportEngine {
                             (1f + (fadeInScale - 1f) * number("Fade In Size", 1f).coerceIn(0f, 10f))
                         val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
                         val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
-                        val particleAlpha = (alpha * fadeInScale * fadeOut * nearFade).coerceIn(0, 255)
+                        val particleAlpha = (alpha * fadeInScale * fadeOut * nearFade).toInt().coerceIn(0, 255)
                         val colorT = lifeT.coerceIn(0f, 1f)
                         val particleColor = android.graphics.Color.argb(
                             (particleAlpha * (android.graphics.Color.alpha(colorFrom) / 255f)).toInt(),

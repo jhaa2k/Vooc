@@ -698,6 +698,7 @@ object VideoExportEngine {
                 StudioElementType.TEXT -> {
                     val caseMode = textValue("Case", "Original")
                     val rawText = textValue("Text", element.tag).take(2000)
+                    val rawText = textValue("Text", element.tag).take(2000)
                     val displayText = when (caseMode) {
                         "Uppercase" -> rawText.uppercase()
                         "Lowercase" -> rawText.lowercase()
@@ -712,8 +713,9 @@ object VideoExportEngine {
                         else -> Typeface.BOLD
                     }
                     val family = textValue("Font Family", "Poppins").ifBlank { "Poppins" }
+                    val fallbackFamily = when (textValue("Font Fallback", "Sans Serif")) { "Serif" -> "serif"; "Monospace" -> "monospace"; "Cursive" -> "cursive"; else -> "sans-serif" }
                     val resolvedTypeface = if (family.equals("Poppins", ignoreCase = true)) {
-                        poppinsTypeface?.let { Typeface.create(it, fontStyle) } ?: Typeface.create("sans-serif", fontStyle)
+                        poppinsTypeface?.let { Typeface.create(it, fontStyle) } ?: Typeface.create(fallbackFamily, fontStyle)
                     } else Typeface.create(family, fontStyle)
                     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
                         this.color = color
@@ -748,8 +750,14 @@ object VideoExportEngine {
                         val widest = textLines.maxOfOrNull { textPaint.measureText(it) } ?: 0f
                         if (widest > maxTextWidth && widest > 0f) textPaint.textScaleX = maxTextWidth / widest
                     }
-                    val lineHeight = textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
-                    val firstBaseline = cy - (textLines.size - 1) * lineHeight * 0.5f
+                    val maximumLines = number("Maximum Lines", 0f).toInt().coerceAtLeast(0)
+                    val visibleLines = if (maximumLines > 0) textLines.take(maximumLines) else textLines
+                    if (textValue("Overflow Mode", "Visible") == "Ellipsis" && visibleLines.size < textLines.size && visibleLines.isNotEmpty()) visibleLines[visibleLines.lastIndex] = android.text.TextUtils.ellipsize(visibleLines.last(), textPaint, maxTextWidth, android.text.TextUtils.TruncateAt.END).toString()
+                    val lineHeight = if (textValue("Line Height Mode", "Multiplier") == "Fixed" && number("Fixed Line Height", 0f) > 0f) number("Fixed Line Height", 0f) * width / 1080f else textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
+                    val paragraphSpacing = number("Paragraph Spacing", 0f) * width / 1080f
+                    val textBlockHeight = (visibleLines.size - 1) * (lineHeight + paragraphSpacing)
+                    val firstBaseline = when (textValue("Vertical Alignment", "Middle")) { "Top" -> cy - textBlockHeight * 0.5f + textPaint.textSize * 0.5f; "Bottom" -> cy + textBlockHeight * 0.5f - textPaint.textSize * 0.5f; else -> cy - textBlockHeight * 0.5f }
+                    if (textValue("Overflow Mode", "Visible") == "Scale Down") { val widest = visibleLines.maxOfOrNull { textPaint.measureText(it) } ?: 0f; if (widest > maxTextWidth && widest > 0f) textPaint.textScaleX *= maxTextWidth / widest }
                     val textX = when (textValue("Alignment", "Center")) {
                         "Left" -> cx - maxTextWidth * 0.5f
                         "Right" -> cx + maxTextWidth * 0.5f
@@ -776,9 +784,9 @@ object VideoExportEngine {
                     if (shadowEnabled) {
                         val shadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
                         textPaint.setShadowLayer(
-                            number("Shadow Blur", 4f) * width / 1080f,
-                            number("Shadow Offset X", 2f) * width / 1080f,
-                            number("Shadow Offset Y", 2f) * width / 1080f,
+                            (number("Shadow Blur", 4f) + number("Shadow Spread", 0f)) * width / 1080f,
+                            (number("Shadow Offset X", 2f) + kotlin.math.cos(Math.toRadians(number("Shadow Angle", 45f).toDouble())).toFloat() * number("Shadow Distance", 3f)) * width / 1080f,
+                            (number("Shadow Offset Y", 2f) + kotlin.math.sin(Math.toRadians(number("Shadow Angle", 45f).toDouble())).toFloat() * number("Shadow Distance", 3f)) * width / 1080f,
                             shadowColor
                         )
                     }
@@ -788,19 +796,21 @@ object VideoExportEngine {
                         val strokePaint = Paint(textPaint).apply {
                             this.color = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
                             style = Paint.Style.STROKE
-                            strokeJoin = Paint.Join.ROUND
+                            strokeJoin = when (textValue("Stroke Join", "Round")) { "Miter" -> Paint.Join.MITER; "Bevel" -> Paint.Join.BEVEL; else -> Paint.Join.ROUND }
                             this.strokeWidth = strokeWidth
                             clearShadowLayer()
                         }
-                        textLines.forEachIndexed { index, line -> drawTextLine(strokePaint, line, firstBaseline + index * lineHeight, index) }
+                        textLines.forEachIndexed { index, line -> drawTextLine(strokePaint, line, firstBaseline + index * (lineHeight + paragraphSpacing), index) }
                     }
+                    if (element.value("Text Background Enabled") == ElementValue.Bool(true)) { val bg = runCatching { android.graphics.Color.parseColor(textValue("Text Background Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT); val px = number("Text Background Padding X", 0f) * width / 1080f; val py = number("Text Background Padding Y", 0f) * width / 1080f; val top = firstBaseline - textPaint.textSize * 0.8f - py; val bottom = firstBaseline + (visibleLines.size - 1) * (lineHeight + paragraphSpacing) + textPaint.textSize * 0.25f + py; val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg }; canvas.drawRoundRect(cx - maxTextWidth * 0.5f - px, top, cx + maxTextWidth * 0.5f + px, bottom, number("Text Background Corner Radius", 0f) * width / 1080f, number("Text Background Corner Radius", 0f) * width / 1080f, bgPaint) }
                     val gradientStart = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient Start", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                     val gradientEnd = runCatching { android.graphics.Color.parseColor(textValue("Text Gradient End", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                     if (gradientStart != gradientEnd) {
-                        val widest = textLines.maxOfOrNull { textPaint.measureText(it) } ?: textPaint.textSize
-                        textPaint.shader = LinearGradient(cx - widest / 2f, cy, cx + widest / 2f, cy, gradientStart, gradientEnd, Shader.TileMode.CLAMP)
+                        val widest = visibleLines.maxOfOrNull { textPaint.measureText(it) } ?: textPaint.textSize
+                        val angle = Math.toRadians(number("Text Gradient Angle", 0f).toDouble()); val dx = kotlin.math.cos(angle).toFloat() * widest * 0.5f; val dy = kotlin.math.sin(angle).toFloat() * widest * 0.5f
+                        if (textValue("Text Gradient Type", "Linear") == "Radial") textPaint.shader = android.graphics.RadialGradient(cx, cy, widest.coerceAtLeast(1f) * 0.5f, gradientStart, gradientEnd, Shader.TileMode.CLAMP) else textPaint.shader = LinearGradient(cx - dx, cy - dy, cx + dx, cy + dy, intArrayOf(gradientStart, android.graphics.ColorUtils.blendARGB(gradientStart, gradientEnd, number("Text Gradient Midpoint", 0.5f)), gradientEnd), floatArrayOf(0f, number("Text Gradient Midpoint", 0.5f).coerceIn(0.001f, 0.999f), 1f), Shader.TileMode.CLAMP)
                     }
-                    textLines.forEachIndexed { index, line -> drawTextLine(textPaint, line, firstBaseline + index * lineHeight, index) }
+                    visibleLines.forEachIndexed { index, line -> drawTextLine(textPaint, line, firstBaseline + index * (lineHeight + paragraphSpacing), index) }
                     textPaint.clearShadowLayer()
                     textPaint.shader = null
                     textPaint.style = Paint.Style.FILL

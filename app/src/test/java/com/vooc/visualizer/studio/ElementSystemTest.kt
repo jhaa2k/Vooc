@@ -42,6 +42,17 @@ class ElementSystemTest {
         assertTrue("Invalid enum defaults: " + invalidEnumDefaults.joinToString("; "), invalidEnumDefaults.isEmpty())
     }
     @Test
+    fun editingAnElementPreservesItsCompositionStackPosition() {
+        val first = ElementPropertyCatalog.create(StudioElementType.IMAGE, "first")
+        val middle = ElementPropertyCatalog.create(StudioElementType.TEXT, "middle")
+        val last = ElementPropertyCatalog.create(StudioElementType.SHAPE, "last")
+        val changed = middle.withValue("Text", ElementValue.Text("Updated"))
+        val result = listOf(first, middle, last).replacePreservingOrder(changed)
+        assertEquals(listOf("first", "middle", "last"), result.map { it.id })
+        assertEquals(ElementValue.Text("Updated"), result[1].value("Text"))
+    }
+
+    @Test
     fun catalogContainsAllSpecificationElementTypes() {
         assertEquals(
             setOf("Audio Provider", "Image", "Background", "Rgb Split", "Blur Effect", "Bars/Segments", "Particles", "Text", "Motion Blur Effect", "Shape", "Mirror Effect", "Custom Shader", "Composition"),

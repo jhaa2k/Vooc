@@ -1679,7 +1679,7 @@ object VideoExportEngine {
                             else -> addRoundRect(rect, number("Corner Radius", 0f) * width / 1080f, number("Corner Radius", 0f) * width / 1080f, android.graphics.Path.Direction.CW)
                         }
                     }
-                    val fillPaint = Paint(paint).apply {
+                    val shapeFillPaint = Paint(paint).apply {
                         style = Paint.Style.FILL
                         alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
                         if (element.value("Gradient Fill") == ElementValue.Bool(true)) {
@@ -1697,13 +1697,13 @@ object VideoExportEngine {
                                 else android.graphics.LinearGradient(gx - dx, gy - dy, gx + dx, gy + dy, startColor, endColor, tile)
                         }
                     }
-                    canvas.drawPath(shapePath, fillPaint)
-                    fillPaint.shader = null
+                    canvas.drawPath(shapePath, shapeFillPaint)
+                    shapeFillPaint.shader = null
                     val strokeWidth = number("Stroke / Border Width", 0f) * width / 1080f
                     if (strokeWidth > 0f || shapeType == "Line") {
-                        val strokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
-                        val strokePaint = Paint(paint).apply {
-                            color = if (shapeType == "Line") fill else strokeColor
+                        val shapeStrokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
+                        val shapeStrokePaint = Paint(paint).apply {
+                            color = if (shapeType == "Line") fill else shapeStrokeColor
                             alpha = (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
                             style = Paint.Style.STROKE
                             this.strokeWidth = strokeWidth.coerceAtLeast(if (shapeType == "Line") 1f else 0f)
@@ -1714,7 +1714,7 @@ object VideoExportEngine {
                             val intervals = when (textValue("Stroke Style", "Solid")) { "Dashed" -> floatArrayOf(this.strokeWidth * 4f, this.strokeWidth * 2f); "Dotted" -> floatArrayOf(this.strokeWidth, this.strokeWidth * 1.8f); else -> pattern.takeIf { it.size >= 2 } }
                             if (intervals != null) pathEffect = android.graphics.DashPathEffect(intervals, number("Stroke Dash Offset", 0f) * width / 1080f)
                         }
-                        canvas.drawPath(shapePath, strokePaint)
+                        canvas.drawPath(shapePath, shapeStrokePaint)
                     }
                     paint.color = color
                     paint.alpha = alpha

@@ -2153,15 +2153,136 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                     }
                     StudioElementType.PARTICLES -> {
-                        val count = number("Count Limit", 64f).toInt().coerceIn(1, 300)
-                        val particleScale = number("Particle Scale", 100f) / 100f * scale
+                        val count = number("Count Limit", number("Particle Count", 128f)).toInt().coerceIn(1, 1000)
+                        val lifetime = number("Lifetime", number("Life Span", 3f)).coerceIn(0.01f, 3600f)
+                        val spawnInterval = number("Spawn Time", 0.02f).coerceIn(0f, 10f)
+                        val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * size.width * 0.25f
+                        val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * size.height * 0.25f
+                        val spawnArea = textValue("Spawn Area", "Point")
+                        val relativeToCenter = props["Vector Relative To Center"] == ElementValue.Bool(true)
+                        val randomVector = props["Use Random Vector Instead"] == ElementValue.Bool(true)
+                        val baseAngle = Math.toRadians(number("Vector Angle", number("Direction / Angle", -90f)).toDouble()).toFloat()
+                        val gravity = props["Gravity"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
+                        val forcePosition = props["Force Field Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                        val forceMode = textValue("Force Field", "None")
+                        val forceStrength = number("Force Field Strength", 0f)
+                        val speedSource = when (textValue("Measure Overall Speed (Measure What)", "Nothing")) {
+                            "Beat" -> providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f
+                            "Bass" -> bass
+                            "Treble" -> treble
+                            "RMS", "Overall Audio Level" -> frame?.rms ?: 0f
+                            "Peak" -> frame?.peak ?: 0f
+                            else -> 0f
+                        }.coerceIn(0f, 1f)
+                        val baseSpeed = number("Speed", number("Start Velocity", 80f)) +
+                            speedSource * (number("Measure Overall Speed A (X Amount)", 0f) + number("Measure Overall Speed B (Y Amount)", 0f))
+                        val speedRandom = number("Speed Random", number("Velocity Random", 0f)).coerceIn(0f, 1f)
+                        val startSize = number("Start Size", 8f).coerceAtLeast(0f)
+                        val endSize = number("End Size", 2f).coerceAtLeast(0f)
+                        val endRandom = number("End Size Random", number("Particle Size Random", 0f)).coerceIn(0f, 1f)
+                        val fadeTime = number("Fade In And Out Time", 0.25f).coerceIn(0f, lifetime * 0.5f)
+                        val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f)
+                        val particleScale = number("Particle Scale", 100f).coerceAtLeast(0f) / 100f * scale
+                        val aspect = number("Size Aspect Ratio", 1f).coerceIn(0.01f, 20f)
+                        val perspectiveDepth = number("Perspective Depth", 0f).coerceAtLeast(0f)
+                        val perspectiveFov = number("Perspective Fov", 60f).coerceIn(1f, 179f)
+                        val nearFadeDistance = number("Near Camera Fade Out Distance", 0f).coerceAtLeast(0f)
+                        val sineFrequency = number("Side Sine Wave Freq", 0f)
+                        val sineFrequencyRandom = number("Side Sine Wave Freq Random", 0f).coerceIn(0f, 1f)
+                        val sineMagnitude = number("Side Sine Wave Mag", 0f)
+                        val sineMagnitudeRandom = number("Side Sine Wave Mag Random", 0f).coerceIn(0f, 1f)
+                        val colorFrom = runCatching { Color(android.graphics.Color.parseColor(textValue("Color From", textValue("Color", colorText)))) }.getOrDefault(elementColor)
                         val colorTo = runCatching { Color(android.graphics.Color.parseColor(textValue("Color To", colorText))) }.getOrDefault(elementColor)
+                        val customParticle = elementImages[element.id]
+                        val mirrorX = props["Mirror X"] == ElementValue.Bool(true)
+                        val mirrorY = props["Mirror Y"] == ElementValue.Bool(true)
+                        val velocityAngle = props["Velocity Angle"] == ElementValue.Bool(true)
+                        val gravityX = gravity.x.toFloat()
+                        val gravityY = gravity.y.toFloat()
                         repeat(count) { index ->
-                            val angle = index * 2f * PI.toFloat() / count + playbackSeconds * 0.35f
-                            val radius = size.minDimension * (0.06f + (index % 11) * 0.018f) * particleScale
-                            drawCircle(if (index % 2 == 0) elementColor else colorTo.copy(alpha = opacity),
-                                (2f + number("Start Size", 8f) * 0.08f).dp.toPx(),
-                                Offset(center.x + cos(angle) * radius, center.y + sin(angle) * radius))
+                            val seed = index + 1f
+                            val randomA = kotlin.math.abs(sin(seed * 12.9898f) * 43758.5453f) % 1f
+                            val randomB = kotlin.math.abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
+                            val randomC = kotlin.math.abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
+                            val age = ((playbackSeconds + index * spawnInterval) % lifetime).coerceIn(0f, lifetime)
+                            val lifeT = (age / lifetime).coerceIn(0f, 1f)
+                            val spawnX = when (spawnArea) {
+                                "Rectangle" -> center.x + (randomA * 2f - 1f) * spawnWidth
+                                "Circle" -> center.x + cos(randomA * 2f * PI.toFloat()) * spawnWidth * randomB
+                                "Line" -> center.x + (randomA * 2f - 1f) * spawnWidth
+                                "Edge" -> center.x + (if (randomA < 0.5f) -spawnWidth else spawnWidth)
+                                else -> center.x
+                            }
+                            val spawnY = when (spawnArea) {
+                                "Rectangle" -> center.y + (randomB * 2f - 1f) * spawnHeight
+                                "Circle" -> center.y + sin(randomA * 2f * PI.toFloat()) * spawnHeight * randomB
+                                "Line" -> center.y
+                                "Edge" -> center.y + (randomB * 2f - 1f) * spawnHeight
+                                else -> center.y
+                            }
+                            val radialAngle = kotlin.math.atan2(spawnY - center.y, spawnX - center.x)
+                            val angle = when {
+                                randomVector -> randomA * 2f * PI.toFloat()
+                                relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f
+                                else -> baseAngle
+                            }
+                            val velocity = baseSpeed * (1f + (randomC * 2f - 1f) * speedRandom)
+                            var vx = cos(angle) * velocity
+                            var vy = sin(angle) * velocity
+                            val fieldX = center.x + forcePosition.x.toFloat() * size.width - center.x
+                            val fieldY = center.y + forcePosition.y.toFloat() * size.height - center.y
+                            val dx = fieldX - spawnX
+                            val dy = fieldY - spawnY
+                            val distance = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+                            when (forceMode) {
+                                "Attract", "Radial" -> { vx += dx / distance * forceStrength * age; vy += dy / distance * forceStrength * age }
+                                "Repel" -> { vx -= dx / distance * forceStrength * age; vy -= dy / distance * forceStrength * age }
+                                "Directional" -> { vx += cos(baseAngle) * forceStrength * age; vy += sin(baseAngle) * forceStrength * age }
+                            }
+                            val frequency = sineFrequency * (1f + randomB * sineFrequencyRandom)
+                            val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
+                                sineMagnitude * (1f + randomA * sineMagnitudeRandom)
+                            var px = spawnX + vx * age * 0.01f + gravityX * age * age * 0.005f + wave
+                            var py = spawnY + vy * age * 0.01f + gravityY * age * age * 0.005f
+                            val depth = randomB * perspectiveDepth
+                            val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)
+                            val depthScale = (1f + number("End Size ZFactor", 0f) * depth / 1000f).coerceAtLeast(0.05f)
+                            val endVariation = 1f + (randomC * 2f - 1f) * endRandom
+                            val sizeT = (startSize + (endSize * endVariation - startSize) * lifeT).coerceAtLeast(0f)
+                            val fadeInScale = if (fadeTime > 0f) (age / fadeTime).coerceIn(0f, 1f) else 1f
+                            val fadeOut = if (fadeTime > 0f) ((lifetime - age) / fadeTime).coerceIn(0f, 1f) else 1f
+                            val nearFade = if (nearFadeDistance > 0f) (1f - depth / nearFadeDistance).coerceIn(0f, 1f) else 1f
+                            val alpha = (opacity * fadeInScale * fadeOut * nearFade).coerceIn(0f, 1f)
+                            val particleColor = Color(
+                                colorFrom.red + (colorTo.red - colorFrom.red) * lifeT,
+                                colorFrom.green + (colorTo.green - colorFrom.green) * lifeT,
+                                colorFrom.blue + (colorTo.blue - colorFrom.blue) * lifeT,
+                                alpha
+                            )
+                            val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).dp.toPx().coerceAtLeast(0.5f)
+                            val particleHeight = (sizeT * particleScale * perspective * depthScale).dp.toPx().coerceAtLeast(0.5f)
+                            val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Rotation Speed", 0f) * age
+                            val trailX = vx * trailLength * 0.001f
+                            val trailY = vy * trailLength * 0.001f
+                            fun drawParticleAt(x: Float, y: Float) {
+                                if (trailLength > 0f) {
+                                    drawLine(particleColor.copy(alpha = alpha * 0.5f), Offset(x - trailX, y - trailY), Offset(x, y),
+                                        (particleHeight * 0.35f).coerceAtLeast(0.5f), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                }
+                                if (customParticle != null) {
+                                    rotate(visualAngle, Offset(x, y)) {
+                                        drawImage(customParticle,
+                                            dstOffset = androidx.compose.ui.unit.IntOffset((x - particleWidth / 2f).toInt(), (y - particleHeight / 2f).toInt()),
+                                            dstSize = androidx.compose.ui.unit.IntSize(particleWidth.toInt().coerceAtLeast(1), particleHeight.toInt().coerceAtLeast(1)))
+                                    }
+                                } else {
+                                    drawCircle(particleColor, particleWidth.coerceAtLeast(1f) * 0.5f, Offset(x, y))
+                                }
+                            }
+                            if (mirrorX) drawParticleAt(size.width - px, py)
+                            if (mirrorY) drawParticleAt(px, size.height - py)
+                            if (mirrorX && mirrorY) drawParticleAt(size.width - px, size.height - py)
+                            drawParticleAt(px, py)
                         }
                     }
                     StudioElementType.IMAGE -> {

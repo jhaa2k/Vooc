@@ -97,7 +97,7 @@ data class MeasurementMapping(
             "CUBIC" -> direction * direction * direction
             else -> direction
         }
-        return (outputMin + curved * (outputMax - outputMin)) * multiplier + offset
+        return outputMin + curved * (outputMax - outputMin) * multiplier + offset
     }
 
     fun validated(): MeasurementMapping {

@@ -2336,7 +2336,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                                 var level = levels[sourceIndex].coerceIn(0f, 1f)
                                 if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
-                                val barHeight = (minHeight + level * radialMax).coerceIn(0f, radialMax)
+                                val layoutRandom = kotlin.math.abs(sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
+                                val heightRandom = number("Bar Height Random", 0f).coerceIn(0f, 1f)
+                                val barHeight = ((minHeight + level * radialMax) * (1f + (layoutRandom * 2f - 1f) * heightRandom)).coerceIn(0f, radialMax)
                                 val angle = index * (360f / count) + number("Bar Rotation", 0f)
                                 val radialColor = when (colorMode) {
                                     "Alternating" -> if (index % 2 == 0) colorA else colorB
@@ -2413,7 +2415,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val sourceIndex = if (horizontalMirror) minOf(index, count - 1 - index) else index
                             var level = levels[sourceIndex].coerceIn(0f, 1f)
                             if (props["Flip Input"] == ElementValue.Bool(true)) level = 1f - level
-                            val barHeight = (minHeight + level * maxHeight).coerceIn(0f, size.height * 0.95f)
+                            val layoutRandom = kotlin.math.abs(sin((index + 1f) * 12.9898f) * 43758.5453f) % 1f
+                            val heightRandom = number("Bar Height Random", 0f).coerceIn(0f, 1f)
+                            val barHeight = ((minHeight + level * maxHeight) * (1f + (layoutRandom * 2f - 1f) * heightRandom)).coerceIn(0f, size.height * 0.95f)
                             val drawHeight = if (centerSymmetry) barHeight / 2f else barHeight
                             val customPathMode = textValue("Shape Path", "Horizontal Line") == "Custom Path"
                             val customPoints = if (customPathMode) textValue("Custom Path Points", "0,0.5;0.25,0.25;0.5,0.75;0.75,0.25;1,0.5")

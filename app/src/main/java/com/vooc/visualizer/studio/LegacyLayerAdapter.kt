@@ -84,7 +84,7 @@ object LegacyLayerAdapter {
             }
             StudioElementType.PARTICLES -> integer("Particle Count", layer.particleCount.coerceIn(1, 4096))
             StudioElementType.TEXT -> text("Text", layer.textContent)
-            StudioElementType.IMAGE -> text("Image Source / File", layer.imageUri)
+            StudioElementType.IMAGE -> text("Import Image", layer.imageUri)
             StudioElementType.BACKGROUND -> text("Image File / Source", layer.imageUri)
             else -> Unit
         }

@@ -240,7 +240,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val backgroundAppearance = listOf(
@@ -294,7 +296,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val shapeAppearance = listOf(
@@ -378,7 +382,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val imageAppearance = listOf(
@@ -454,7 +460,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val rgbAppearance = listOf(
@@ -507,7 +515,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val blurAppearance = listOf(
@@ -661,7 +671,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val particlesAppearance = listOf(
@@ -734,7 +746,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val textAppearance = listOf(
@@ -799,7 +813,9 @@ object ElementPropertyCatalog {
             ElementValue.Vector2(1.0, 1.0), 0.0, 10.0),
         text("Measure Scale (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
         number("Rotation", "General", 0.0, -3600.0, 3600.0),
-        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
+        text("Measure Rot (Measure What)", "General", "Nothing", MeasureWhatEngine.options),
+        number("Opacity", "General", 100.0, 0.0, 100.0),
+        text("Measure Opacity (Measure What)", "General", "Nothing", MeasureWhatEngine.options)
     )
 
     private val motionBlurAppearance = listOf(

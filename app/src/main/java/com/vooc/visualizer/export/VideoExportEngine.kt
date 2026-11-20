@@ -12,12 +12,15 @@ import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.studio.ElementPropertyCatalog
 import com.vooc.visualizer.studio.ElementValue
 import com.vooc.visualizer.studio.StudioElementType
+import android.media.Image
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -27,7 +30,10 @@ import android.graphics.LinearGradient
 import android.graphics.Shader
 import android.graphics.DashPathEffect
 import android.graphics.Typeface
+import java.io.File
+import java.io.IOException
 import java.nio.ByteBuffer
+import java.util.concurrent.CancellationException
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -39,16 +45,104 @@ import com.vooc.visualizer.studio.StudioProject
 import com.vooc.visualizer.studio.LayerKind
 import com.vooc.visualizer.studio.MeasureWhatEngine
 
-/** Encodes H.264 video and muxes a compatible AAC source track into one MP4 timeline. */
+/**
+ * Encodes H.264 video and muxes AAC audio into one MP4 timeline. AAC sources are passed through untouched;
+ * MP3/WAV/FLAC/OGG/OPUS sources are transcoded to AAC first so every common music file exports with sound.
+ */
 object VideoExportEngine {
     data class Result(val frames: Int, val durationMs: Long, val audioMuxed: Boolean)
 
-    fun export(context: Context, resolver: ContentResolver, project: StudioProject, destination: Uri, onProgress: (Float) -> Unit = {}): Result {
-        val width = (project.width.coerceIn(320, 3840) / 2) * 2
-        val height = (project.height.coerceIn(320, 3840) / 2) * 2
+    /**
+     * Renders the project to [destination]. Cancellation: when [isCancelled] turns true the export stops with a
+     * [CancellationException]. On any failure or cancellation the partial output file is deleted.
+     */
+    fun export(
+        context: Context,
+        resolver: ContentResolver,
+        project: StudioProject,
+        destination: Uri,
+        onProgress: (Float) -> Unit = {},
+        isCancelled: () -> Boolean = { false }
+    ): Result {
+        val tempFiles = mutableListOf<File>()
+        var success = false
+        try {
+            val result = exportInternal(context, resolver, project, destination, onProgress, isCancelled, tempFiles)
+            success = true
+            return result
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not write the video file (is device storage full?): ${error.message ?: "I/O error"}", error)
+        } finally {
+            tempFiles.forEach { runCatching { it.delete() } }
+            if (!success) runCatching { DocumentsContract.deleteDocument(resolver, destination) }
+        }
+    }
+
+    private fun audioMime(resolver: ContentResolver, uri: Uri): String? {
+        val probe = MediaExtractor()
+        return try {
+            val afd = resolver.openAssetFileDescriptor(uri, "r") ?: return null
+            afd.use { probe.setDataSource(it.fileDescriptor, it.startOffset, it.length) }
+            (0 until probe.trackCount)
+                .mapNotNull { probe.getTrackFormat(it).getString(MediaFormat.KEY_MIME) }
+                .firstOrNull { it.startsWith("audio/") }
+        } catch (error: Exception) {
+            null
+        } finally {
+            probe.release()
+        }
+    }
+
+    /** Picks an H.264 encoder that really supports this size/rate/bitrate; falls back to 16-aligned sizes. */
+    private fun findEncoderFormat(width: Int, height: Int, fps: Int, bitrate: Int): Pair<MediaFormat, String>? {
+        val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+        val sizes = listOf(width to height, (width / 16 * 16) to (height / 16 * 16)).distinct()
+        for ((w, h) in sizes) {
+            if (w < 16 || h < 16) continue
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h).apply {
+                // Flexible YUV is the only 4:2:0 layout every Android H.264 encoder is required to accept.
+                setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
+                setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
+                setInteger(MediaFormat.KEY_FRAME_RATE, fps)
+                setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
+            }
+            val name = codecs.findEncoderForFormat(format)
+            if (name != null) return format to name
+        }
+        return null
+    }
+
+    private fun exportInternal(
+        context: Context,
+        resolver: ContentResolver,
+        project: StudioProject,
+        destination: Uri,
+        onProgress: (Float) -> Unit,
+        isCancelled: () -> Boolean,
+        tempFiles: MutableList<File>
+    ): Result {
+        val requestedWidth = (project.width.coerceIn(320, 3840) / 2) * 2
+        val requestedHeight = (project.height.coerceIn(320, 3840) / 2) * 2
         val fps = project.fps.coerceIn(15, 60)
+        val videoBitrate = project.document.export.videoBitrate.coerceIn(1_000_000, 24_000_000)
+        val (videoFormat, encoderName) = findEncoderFormat(requestedWidth, requestedHeight, fps, videoBitrate)
+            ?: throw IllegalStateException("This device's H.264 encoder cannot encode ${requestedWidth}x$requestedHeight at $fps fps. Choose a lower resolution or frame rate.")
+        val width = videoFormat.getInteger(MediaFormat.KEY_WIDTH)
+        val height = videoFormat.getInteger(MediaFormat.KEY_HEIGHT)
+        val trimStartUs = project.document.trimStartMs.coerceAtLeast(0L) * 1000L
         val audioUri = project.document.audioUri.takeIf { project.document.export.includeAudio && it.isNotBlank() }?.let(Uri::parse)
-        val extractor = audioUri?.let { uri ->
+        // Non-AAC music (MP3, WAV, FLAC, OGG, ...) is transcoded to a temporary AAC file that is then muxed.
+        var audioSourceUri: Uri? = audioUri
+        if (audioUri != null && audioMime(resolver, audioUri) != "audio/mp4a-latm") {
+            val transcoded = File(context.cacheDir, "export-audio-${System.nanoTime()}.m4a")
+            tempFiles += transcoded
+            AudioTranscoder.transcodeToAacM4a(
+                context, audioUri, transcoded,
+                project.document.export.audioBitrate, trimStartUs + 301_000_000L, isCancelled
+            )
+            audioSourceUri = Uri.fromFile(transcoded)
+        }
+        val extractor = audioSourceUri?.let { uri ->
             val afd = resolver.openAssetFileDescriptor(uri, "r") ?: throw IllegalStateException("Cannot open selected music.")
             MediaExtractor().apply { setDataSource(afd.fileDescriptor, afd.startOffset, afd.length) }
                 .also { afd.close() }
@@ -74,7 +168,6 @@ object VideoExportEngine {
             }
             extractor.selectTrack(sourceAudioTrack)
         }
-        val trimStartUs = project.document.trimStartMs.coerceAtLeast(0L) * 1000L
         val sourceDurationUs = audioFormat?.let { if (it.containsKey(MediaFormat.KEY_DURATION)) it.getLong(MediaFormat.KEY_DURATION) else 0L } ?: 0L
         val sourceDurationMs = ((sourceDurationUs - trimStartUs).coerceAtLeast(0L)) / 1000L
         val trimDuration = project.document.trimEndMs.takeIf { it > project.document.trimStartMs }?.minus(project.document.trimStartMs)
@@ -135,8 +228,9 @@ object VideoExportEngine {
                             }
                         }
                     }
-                    true
+                    !isCancelled()
                 }
+                if (isCancelled()) throw CancellationException("Export cancelled")
                 var last = 0f
                 for (i in audioEnvelope.indices) {
                     if (weights[i] > 0) last = (energy[i] / weights[i]).toFloat()
@@ -164,9 +258,10 @@ object VideoExportEngine {
         }
         val output = resolver.openFileDescriptor(destination, "w") ?: throw IllegalStateException("Cannot open destination file.")
         val muxer = MediaMuxer(output.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        val encoder = MediaCodec.createByCodecName(encoderName)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+        val rowPixels = IntArray(width)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         val imageCache = mutableMapOf<String, Bitmap>()
         val barRuntimes = mutableMapOf<String, SpectrumBarsRuntime>()
@@ -193,32 +288,27 @@ object VideoExportEngine {
         var muxerStarted = false
         var audioDone = extractor == null
         var submittedFrames = 0
+        var videoSamples = 0
         try {
             if (extractor != null) {
                 audioTrack = muxer.addTrack(audioFormat!!)
                 extractor.seekTo(trimStartUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             }
-            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
-                setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar)
-                setInteger(MediaFormat.KEY_BIT_RATE, project.document.export.videoBitrate.coerceIn(1_000_000, 24_000_000))
-                setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-                setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
-            }
-            encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            encoder.configure(videoFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             encoder.start()
             var inputEnded = false
             var outputEnded = false
             while (!outputEnded) {
+                if (isCancelled()) throw CancellationException("Export cancelled")
                 if (!inputEnded) {
                     val inputIndex = encoder.dequeueInputBuffer(10_000)
                     if (inputIndex >= 0) {
-                        val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
                             drawFrame(canvas, paint, project, width, height, timeMs, imageCache, barRuntimes, barLastUpdateMs, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerBeatByFrame.getOrElse(submittedFrames) { 0f })
-                            input.clear()
-                            writeYuv420(bitmap, input)
-                            encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
+                            val image = encoder.getInputImage(inputIndex) ?: throw IllegalStateException("H.264 input image unavailable.")
+                            writeImage(bitmap, image, rowPixels)
+                            encoder.queueInputBuffer(inputIndex, 0, width * height * 3 / 2, submittedFrames * 1_000_000L / fps, 0)
                             submittedFrames++
                             onProgress(submittedFrames.toFloat() / frameCount * 0.94f)
                         } else {
@@ -235,10 +325,12 @@ object VideoExportEngine {
                     }
                     else -> if (outputIndex >= 0) {
                         val encoded = encoder.getOutputBuffer(outputIndex)
+                        if ((info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) info.size = 0
                         if (encoded != null && info.size > 0 && muxerStarted) {
                             encoded.position(info.offset)
                             encoded.limit(info.offset + info.size)
                             muxer.writeSampleData(videoTrack, encoded, info)
+                            videoSamples++
                         }
                         val eos = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                         encoder.releaseOutputBuffer(outputIndex, false)
@@ -254,6 +346,10 @@ object VideoExportEngine {
             if (extractor != null && !audioDone) {
                 copyAudioUntil(extractor, muxer, audioTrack, trimStartUs, durationMs * 1000L, true)
             }
+            muxer.stop()
+            muxerStarted = false
+            if (videoSamples == 0) throw IllegalStateException("The encoder produced no video frames.")
+            if (output.statSize == 0L) throw IllegalStateException("The exported file is empty. Check free storage and try again.")
             onProgress(1f)
             return Result(submittedFrames, durationMs, extractor != null)
         } finally {
@@ -698,36 +794,36 @@ object VideoExportEngine {
         canvas.restore()
     }
 
-    private fun writeYuv420(bitmap: Bitmap, output: ByteBuffer) {
+    /** Converts the ARGB frame to BT.601 YUV 4:2:0 directly into the encoder's own (stride-aware) input image. */
+    private fun writeImage(bitmap: Bitmap, image: Image, rowPixels: IntArray) {
         val width = bitmap.width
         val height = bitmap.height
-        val frameSize = width * height
-        val chromaSize = frameSize / 4
-        if (output.remaining() < frameSize + chromaSize * 2) throw IllegalStateException("Encoder input buffer is too small for this resolution.")
-        val yPlane = ByteArray(frameSize)
-        val uPlane = ByteArray(chromaSize)
-        val vPlane = ByteArray(chromaSize)
-        val rowPixels = IntArray(width)
-        var yi = 0
-        var ui = 0
-        var vi = 0
+        val planes = image.planes
+        val yBuffer = planes[0].buffer
+        val uBuffer = planes[1].buffer
+        val vBuffer = planes[2].buffer
+        val yRow = planes[0].rowStride
+        val yPixel = planes[0].pixelStride
+        val uRow = planes[1].rowStride
+        val uPixel = planes[1].pixelStride
+        val vRow = planes[2].rowStride
+        val vPixel = planes[2].pixelStride
         for (row in 0 until height) {
             bitmap.getPixels(rowPixels, 0, width, 0, row, width, 1)
+            val chromaRow = row shr 1
             for (col in 0 until width) {
                 val argb = rowPixels[col]
-                val r = argb shr 16 and 0xFF
-                val g = argb shr 8 and 0xFF
+                val r = (argb shr 16) and 0xFF
+                val g = (argb shr 8) and 0xFF
                 val b = argb and 0xFF
-                yPlane[yi++] = ((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).coerceIn(0, 255)).toByte()
-                if (row % 2 == 0 && col % 2 == 0) {
-                    uPlane[ui++] = ((((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
-                    vPlane[vi++] = ((((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte()
+                yBuffer.put(row * yRow + col * yPixel, ((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).coerceIn(0, 255)).toByte())
+                if ((row and 1) == 0 && (col and 1) == 0) {
+                    val chromaCol = col shr 1
+                    uBuffer.put(chromaRow * uRow + chromaCol * uPixel, ((((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte())
+                    vBuffer.put(chromaRow * vRow + chromaCol * vPixel, ((((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255)).toByte())
                 }
             }
         }
-        output.put(yPlane)
-        output.put(uPlane)
-        output.put(vPlane)
     }
 
     private fun evaluateLayer(project: StudioProject, layer: com.vooc.visualizer.studio.VisualLayer, timeMs: Long): com.vooc.visualizer.studio.VisualLayer {
@@ -755,4 +851,3 @@ object VideoExportEngine {
             opacity = value("OPACITY", layer.opacity).coerceIn(0f, 100f)
         )
     }
-}

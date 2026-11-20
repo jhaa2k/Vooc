@@ -309,9 +309,14 @@ object VideoExportEngine {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                     BitmapFactory.decodeStream(stream)?.let { source ->
                         if (element.type == StudioElementType.BACKGROUND) {
-                            val processed = BackgroundImageProcessor.process(source, element)
+                            val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                            val maskBitmap = if (maskUri.isNotBlank()) {
+                                resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                            } else null
+                            val processed = BackgroundImageProcessor.process(source, element, maskBitmap)
                             imageCache["${uriText}#${element.id}"] = processed
                             imageCache[uriText] = source
+                            maskBitmap?.recycle()
                         } else if (element.type == StudioElementType.IMAGE) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {

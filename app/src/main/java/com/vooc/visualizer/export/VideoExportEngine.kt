@@ -1330,7 +1330,7 @@ object VideoExportEngine {
                         val showUnder = (element.value("Show Unblurred Content Under") as? ElementValue.Bool)?.value == true
                         val showOver = (element.value("Show Unblurred Content") as? ElementValue.Bool)?.value == true
                         if (showUnder && original != null) canvas.drawBitmap(original, null, destination, paint)
-                        val effectPaint = Paint(paint).apply { alpha = (alpha * reactivity.effectStrengthMultiplier.coerceIn(0f, 1f)).toInt().coerceIn(0, 255) }
+                        val effectPaint = Paint(paint).apply { this.alpha = (this.alpha * reactivity.effectStrengthMultiplier.coerceIn(0f, 1f)).toInt().coerceIn(0, 255) }
                         canvas.drawBitmap(image, null, destination, effectPaint)
                         if (showOver && original != null) canvas.drawBitmap(original, null, destination, paint)
                     }

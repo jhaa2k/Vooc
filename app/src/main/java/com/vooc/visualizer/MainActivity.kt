@@ -535,12 +535,16 @@ private fun VoocStudio(
     var position by remember { mutableLongStateOf(0L) }
     var frame by remember { mutableStateOf<AnalysisFrame?>(null) }
     var providerFrame by remember { mutableStateOf<AudioProviderFrame?>(null) }
-    val providerProcessor = remember { AudioProviderProcessor() }
-    val providerElement = remember(project.document.elements) {
-        project.document.elements.firstOrNull { it.type == StudioElementType.AUDIO_PROVIDER && it.visible }
-            ?: ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-default")
+    var providerFrames by remember { mutableStateOf<List<AudioProviderFrame>>(emptyList()) }
+    val providerElements = remember(project.document.elements) {
+        project.document.elements.filter { it.type == StudioElementType.AUDIO_PROVIDER && it.visible }
+            .ifEmpty { listOf(ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-default")) }
     }
-    val providerConfig = remember(providerElement) { providerElement.toAudioProviderConfig() }
+    val providerConfigs = remember(providerElements) { providerElements.map { it.toAudioProviderConfig() } }
+    val providerProcessors = remember(providerElements.map { it.id }) {
+        providerElements.associate { it.id to AudioProviderProcessor() }
+    }
+    val providerConfig = providerConfigs.first()
     val needsStereoReactivity = project.document.elements.any { element ->
         val source = (element.properties["Audio Reactivity Source"] as? ElementValue.Text)?.value
         (element.properties["Audio Reactivity Enabled"] as? ElementValue.Bool)?.value == true &&
@@ -650,8 +654,8 @@ private fun VoocStudio(
         if (id != null) ProjectRepository.save(context, id, project)
         projectEntries = ProjectRepository.list(context)
     }
-    LaunchedEffect(player, analyzer, providerConfig, needsStereoReactivity) {
-        providerProcessor.reset()
+    LaunchedEffect(player, analyzer, providerConfigs, providerProcessors, needsStereoReactivity) {
+        providerProcessors.values.forEach { it.reset() }
         val baseProviderConfig = providerConfig.applyTo(analyzer.config)
         val providerAnalyzerConfig = if (needsStereoReactivity) baseProviderConfig.copy(channelMode = ChannelMode.STEREO_SPLIT) else baseProviderConfig
         if (providerAnalyzerConfig != analyzer.config) {
@@ -664,11 +668,15 @@ private fun VoocStudio(
             if (player.isPlaying) {
                 val currentPosition = player.currentPosition.coerceAtLeast(0L)
                 if (previousPosition >= 0L && (currentPosition < previousPosition || currentPosition - previousPosition > 350L)) {
-                    providerProcessor.reset()
+                    providerProcessors.values.forEach { it.reset() }
                 }
                 val analyzed = analyzer.analyzeLive(currentPosition / 1000.0)
                 frame = analyzed
-                providerFrame = providerProcessor.process(analyzed, providerConfig)
+                val processedProviders = providerElements.mapIndexed { index, element ->
+                    providerProcessors.getValue(element.id).process(analyzed, providerConfigs[index])
+                }
+                providerFrames = processedProviders
+                providerFrame = processedProviders.firstOrNull()
                 previousPosition = currentPosition
             } else {
                 previousPosition = -1L

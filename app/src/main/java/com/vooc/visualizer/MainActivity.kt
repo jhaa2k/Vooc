@@ -3132,7 +3132,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             }.getOrDefault(Color.White).copy(alpha = opacity)
                             val strokeAlignment = textValue("Stroke Alignment", "Center")
                             val resolvedStrokeWidth = if (strokeAlignment == "Center") strokeWidth else strokeWidth * 2f
-                            val drawStroke: DrawScope.() -> Unit = {
+                            val drawStroke: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit = {
                                 drawPath(shapePath, strokeColor, style = Stroke(width = resolvedStrokeWidth, pathEffect = pathEffect, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
                             }
                             when (strokeAlignment) {

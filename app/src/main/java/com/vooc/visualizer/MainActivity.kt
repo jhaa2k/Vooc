@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.nativeCanvas
@@ -2331,7 +2332,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 }
                             }
                             val overlay = runCatching { Color(android.graphics.Color.parseColor(textValue("Color Overlay", "#00FFFFFF"))) }.getOrDefault(Color.Transparent)
-                            val imageAlpha = (opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
+                            val imageAlpha = (opacity * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * number("Opacity Strength", 1f).coerceIn(0f, 1f) * number("Transparency Strength", 1f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
+                            val saturation = number("Saturation", 1f).coerceIn(0f, 2f)
+                            val imageColorMatrix = ColorMatrix().apply { setToSaturation(saturation) }
                             clipPath(clip) {
                                 drawImage(bitmap,
                                     srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
@@ -2339,7 +2342,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     dstOffset = androidx.compose.ui.unit.IntOffset(destination.left.toInt(), destination.top.toInt()),
                                     dstSize = androidx.compose.ui.unit.IntSize(destination.width.toInt().coerceAtLeast(1), destination.height.toInt().coerceAtLeast(1)),
                                     alpha = imageAlpha,
-                                    colorFilter = if (overlay.alpha > 0f) androidx.compose.ui.graphics.ColorFilter.tint(overlay, androidx.compose.ui.graphics.BlendMode.SrcAtop) else null
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix)
                                 )
                             }
                         }

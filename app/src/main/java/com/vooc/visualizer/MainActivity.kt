@@ -1910,10 +1910,20 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             val position = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.0, 0.0)
             val elementSamples = providerFrame?.samples ?: frame?.spectrum ?: FloatArray(0)
             val overallLevel = frame?.rms ?: 0f
+            val waveformLevel = frame?.waveform?.let { wave ->
+                if (wave.isEmpty()) overallLevel else kotlin.math.sqrt(
+                    wave.sumOf { sample -> sample.toDouble() * sample.toDouble() } / wave.size
+                ).toFloat()
+            } ?: overallLevel
             val reactivitySources = audioReactivitySources(
                 samples = elementSamples,
                 overall = overallLevel,
-                beat = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f
+                beat = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f,
+                peak = frame?.peak ?: overallLevel,
+                rms = frame?.rms ?: overallLevel,
+                waveform = waveformLevel,
+                left = frame?.channel(ChannelSelect.LEFT)?.rms ?: overallLevel,
+                right = frame?.channel(ChannelSelect.RIGHT)?.rms ?: overallLevel
             )
             val reactivityValue = audioReactivityRuntimes.getOrPut(element.id) { AudioReactivityRuntime() }
                 .update(props, reactivitySources, 1f / 60f)

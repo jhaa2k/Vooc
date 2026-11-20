@@ -514,7 +514,7 @@ private fun VoocStudio(
     val needsStereoReactivity = project.document.elements.any { element ->
         val source = (element.properties["Audio Reactivity Source"] as? ElementValue.Text)?.value
         (element.properties["Audio Reactivity Enabled"] as? ElementValue.Bool)?.value == true &&
-            source in setOf("Left Channel", "Right Channel")
+            (source == "Left Channel" || source == "Right Channel")
     }
     var analyzerConfig by remember { mutableStateOf(analyzer.config) }
     val context = androidx.compose.ui.platform.LocalContext.current

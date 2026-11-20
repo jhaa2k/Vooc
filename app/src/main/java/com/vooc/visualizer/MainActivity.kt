@@ -1860,9 +1860,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     android.graphics.Shader.TileMode.REPEAT,
                                     android.graphics.Shader.TileMode.REPEAT
                                 )
+                                val tileOffsetX = bgNumber("Background Image Offset X", 0f) * size.width / 1080f
+                                val tileOffsetY = bgNumber("Background Image Offset Y", 0f) * size.height / 1080f
                                 val matrix = android.graphics.Matrix().apply {
                                     setScale(tileScale, tileScale)
-                                    postTranslate(left, top)
+                                    postTranslate(tileOffsetX, tileOffsetY)
                                 }
                                 shader.setLocalMatrix(matrix)
                                 val tilePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG).apply {

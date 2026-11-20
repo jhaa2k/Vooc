@@ -173,6 +173,25 @@ class AnalyzerTest {
     }
 
     @Test
+    fun spectrumFrequencyCropSelectsExpectedBinsAndKeepsOriginalMagnitudes() {
+        val spectrum = FloatArray(100) { it / 100f }
+        val cropped = SpectrumMapper.cropFrequencyRange(spectrum, 10000, 1000f, 2000f)
+        assertEquals(20, cropped.size)
+        assertEquals(spectrum[20], cropped.first(), 0f)
+        assertEquals(spectrum[39], cropped.last(), 0f)
+    }
+
+    @Test
+    fun spectrumFrequencyCropClampsToNyquistAndHandlesEmptyInput() {
+        val spectrum = FloatArray(100) { it.toFloat() }
+        val cropped = SpectrumMapper.cropFrequencyRange(spectrum, 10000, 4900f, 24000f)
+        assertEquals(2, cropped.size)
+        assertEquals(98f, cropped.first(), 0f)
+        assertEquals(99f, cropped.last(), 0f)
+        assertTrue(SpectrumMapper.cropFrequencyRange(FloatArray(0), 10000, 100f, 1000f).isEmpty())
+    }
+
+    @Test
     fun invalidConfigIsRejected() {
         try {
             BandConfig(bands = BandConfig.logSpaced(32) + BandSpec("x", 20f, 30f))

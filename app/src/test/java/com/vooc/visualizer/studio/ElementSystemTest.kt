@@ -111,6 +111,27 @@ class ElementSystemTest {
     }
 
     @Test
+    fun motionBlurExposesMaskAndContentAppearanceControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.MOTION_BLUR_EFFECT).associateBy { it.name }
+        val required = setOf(
+            "Blend Mode Content", "Color", "Source Composition Index", "Mask Image",
+            "Mask Mode", "Mask Strength", "Show Unblurred Content",
+            "Show Unblurred Content Under", "Blur Amount / Strength", "Blur Length",
+            "Blur Direction / Angle", "Samples / Iterations", "Trails / Echo",
+            "Trail Opacity / Fade", "Center / Focus Point", "Radial Motion",
+            "Velocity Influence", "Motion Source", "Relative Motion Mode",
+            "Blur Amount Multiplier"
+        )
+        assertTrue("Missing Motion Blur controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(
+            listOf("Alpha Mask", "Luminance Mask", "Inverted Mask", "Normal Mask"),
+            specs.getValue("Mask Mode").options
+        )
+        assertEquals(0.0, specs.getValue("Mask Strength").min!!, 0.0)
+        assertEquals(1.0, specs.getValue("Mask Strength").max!!, 0.0)
+    }
+
+    @Test
     fun everyMeasureWhatOptionHasAWorkingDeterministicMotionResponse() {
         val runtime = 1.23f
         val track = 1.37f

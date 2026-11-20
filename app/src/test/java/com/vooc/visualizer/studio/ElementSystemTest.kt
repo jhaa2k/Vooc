@@ -76,6 +76,41 @@ class ElementSystemTest {
     }
 
     @Test
+    fun audioProviderExposesAnalysisAndBeatConfigurationControls() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).associateBy { it.name }
+        val required = setOf(
+            "Tag", "Provider Enabled", "Sample Provider", "Sample Out Count", "Mirror Samples",
+            "Repeat Samples", "Star And End Gap", "Smooth", "Pre Smooth", "Filter Radius",
+            "Filter Strength", "AWeight", "Output Multiplier", "Lower Hz", "Higher Hz",
+            "Hz Linear Factor", "Freq Shift", "Beat Smooth", "Beat Range Bar First",
+            "Beat Range Bar Last", "Beat Range Value Lower", "Beat Range Value Higher",
+            "Analysis Mode", "Channel Mode", "Window Function", "Beat Detection Enabled",
+            "Beat Sensitivity", "Beat Threshold", "Beat Release", "Fft Size"
+        )
+        assertTrue("Missing audio provider controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertEquals(listOf("256", "512", "1024", "2048", "4096", "8192"), specs.getValue("Fft Size").options)
+        assertEquals(listOf("Rectangular", "Hann", "Hamming", "Blackman"), specs.getValue("Window Function").options)
+    }
+
+    @Test
+    fun blurAndRgbSplitExposeTheirCompleteEffectControlGroups() {
+        val blur = ElementPropertyCatalog.forElement(StudioElementType.BLUR_EFFECT).map { it.name }.toSet()
+        val rgb = ElementPropertyCatalog.forElement(StudioElementType.RGB_SPLIT).map { it.name }.toSet()
+        assertTrue(blur.containsAll(setOf(
+            "Blur Radius", "Blur Multiplier", "1layer Scale", "2layer Scale", "3layer Scale",
+            "1layer Color", "2layer Color", "3layer Color", "Show Unblurred Content",
+            "Show Unblurred Content Under", "Opacity", "Measure Opacity (Measure What)"
+        )))
+        assertTrue(rgb.containsAll(setOf(
+            "Red Offset X", "Red Offset Y", "Green Offset X", "Green Offset Y",
+            "Blue Offset X", "Blue Offset Y", "Split Amount / Distance", "Angle / Direction",
+            "Center / Focus Point", "Falloff / Radial Split", "Speed / Frequency",
+            "Split Multiplier", "Split Color 0", "Split Color 1", "Split Color 2",
+            "Opacity", "Measure Opacity (Measure What)"
+        )))
+    }
+
+    @Test
     fun measurementMappingHandlesRangesCurvesAndInvalidInput() {
         val mapping = MeasurementMapping(
             inputMin = 0f, inputMax = 1f, outputMin = 10f, outputMax = 20f,

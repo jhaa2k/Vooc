@@ -2032,7 +2032,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         textLines.forEachIndexed { index, line ->
                             if (textValue("Alignment", "Center") == "Justified" && index < textLines.lastIndex) {
-                                val words = line.trim().split(Regex("\\\\s+")).filter { it.isNotEmpty() }
+                                val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
                                 if (words.size > 1) {
                                     val naturalWidth = words.sumOf { textPaint.measureText(it).toDouble() }.toFloat()
                                     val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)

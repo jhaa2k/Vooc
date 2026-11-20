@@ -206,7 +206,7 @@ object VideoExportEngine {
                             val blurred = processBlurEffectForExport(source, element)
                             imageCache["${uriText}#${element.id}"] = blurred
                             imageCache[uriText] = source
-                        } else if (element.type == StudioElementType.MOTION_BLUR_EFFECT) {
+                        } else if (element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {
                                 resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
@@ -1023,7 +1023,8 @@ object VideoExportEngine {
                     }
                 }
                 StudioElementType.RGB_SPLIT -> {
-                    val image = imageCache[textValue("Target Image")]
+                    val targetUri = textValue("Target Image")
+                    val image = imageCache["${targetUri}#${element.id}"] ?: imageCache[targetUri]
                     if (image != null) {
                         val frameWidth = width * 0.45f * scale
                         val frameHeight = frameWidth * image.height.toFloat() / image.width.coerceAtLeast(1)
@@ -1053,6 +1054,11 @@ object VideoExportEngine {
                             "Copy" -> android.graphics.PorterDuff.Mode.SRC
                             else -> android.graphics.PorterDuff.Mode.SRC_OVER
                         }
+                        val original = imageCache[targetUri]
+                        val showUnder = enabled("Show Unblurred Content Under")
+                        val showOver = enabled("Show Unblurred Content")
+                        val imageRect = RectF(cx - frameWidth / 2f, cy - frameHeight / 2f, cx + frameWidth / 2f, cy + frameHeight / 2f)
+                        if (showUnder && original != null) canvas.drawBitmap(original, null, imageRect, paint)
                         channelColors.forEachIndexed { index, tint ->
                             val base = channelOffsets[index]
                             val dx = (base.first * scale + cos(angle) * amount * (index - 1)) * radialScale * width / 1080f
@@ -1067,6 +1073,7 @@ object VideoExportEngine {
                             canvas.drawBitmap(image, null, RectF(cx - frameWidth / 2f + dx, cy - frameHeight / 2f + dy,
                                 cx + frameWidth / 2f + dx, cy + frameHeight / 2f + dy), channelPaint)
                         }
+                        if (showOver && original != null) canvas.drawBitmap(original, null, imageRect, paint)
                     }
                 }
                 StudioElementType.BLUR_EFFECT -> {

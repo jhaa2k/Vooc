@@ -2090,12 +2090,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val caseMode = textValue("Case", "Original")
                         val rawText = textValue("Text", label).take(2000)
                         val displayText = when (caseMode) {
-                            "Uppercase" -> label.uppercase()
-                            "Lowercase" -> label.lowercase()
-                            "Capitalize" -> label.split(" ").joinToString(" ") { word ->
+                            "Uppercase" -> rawText.uppercase()
+                            "Lowercase" -> rawText.lowercase()
+                            "Capitalize" -> rawText.split(" ").joinToString(" ") { word ->
                                 word.replaceFirstChar { char -> char.uppercase() }
                             }
-                            else -> label
+                            else -> rawText
+                        }
+                        val isRtl = when (textValue("Text Direction", "Auto")) {
+                            "Left To Right" -> false
+                            "Right To Left" -> true
+                            else -> android.text.TextDirectionHeuristics.FIRSTSTRONG_LTR.isRtl(displayText, 0, displayText.length)
                         }
                         val fontStyle = textValue("Font Style", "Bold")
                         val typefaceStyle = when (fontStyle) {
@@ -2107,13 +2112,24 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         val fontFamily = textValue("Font Family", "Poppins").ifBlank { "Poppins" }
                         val fallbackFamily = when (textValue("Font Fallback", "Sans Serif")) { "Serif" -> "serif"; "Monospace" -> "monospace"; "Cursive" -> "cursive"; else -> "sans-serif" }
-                        val baseTypeface = if (fontFamily.equals("Poppins", ignoreCase = true)) {
-                            poppinsTypeface?.let { android.graphics.Typeface.create(it, typefaceStyle) }
-                                ?: android.graphics.Typeface.create(fallbackFamily, typefaceStyle)
-                        } else {
-                            android.graphics.Typeface.create(fontFamily, typefaceStyle)
-                        }
-                        val resolvedTextSize = (number("Font Size", 48f) * scale).coerceAtLeast(6f).sp.toPx()
+                        val importedTypeface = if (textValue("Font Asset", "System Font") == "Imported Font") elementFonts[element.id] else null
+                        val baseTypeface = importedTypeface?.let { android.graphics.Typeface.create(it, typefaceStyle) }
+                            ?: if (fontFamily.equals("Poppins", ignoreCase = true)) {
+                                poppinsTypeface?.let { android.graphics.Typeface.create(it, typefaceStyle) }
+                                    ?: android.graphics.Typeface.create(fallbackFamily, typefaceStyle)
+                            } else {
+                                android.graphics.Typeface.create(fontFamily, typefaceStyle)
+                            }
+                        val measureFontMode = textValue("Measure Font Size (Measure What)", "Nothing")
+                        val measureFontMotion = motionFor("Measure Font Size (Measure What)")
+                        val measureFontResponse = if (measureFontMode == "Nothing") 0f else maxOf(
+                            kotlin.math.abs(measureFontMotion.scale - 1f) / 0.32f,
+                            kotlin.math.abs(measureFontMotion.rotation) / 8f,
+                            kotlin.math.abs(measureFontMotion.offsetX) / 0.05f,
+                            kotlin.math.abs(measureFontMotion.offsetY) / 0.05f
+                        ).coerceIn(0f, 1f)
+                        val resolvedTextSize = ((number("Font Size", 48f) +
+                            number("Measure Font Size", 0f) * measureFontResponse) * scale).coerceAtLeast(6f).sp.toPx()
                         val shadowEnabled = props["Shadow Enabled"] == ElementValue.Bool(true)
                         val shadowColor = runCatching {
                             android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000"))
@@ -2175,6 +2191,32 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             "Justified" -> center.x - maxTextWidth * 0.5f
                             else -> center.x
                         }
+                        fun drawTextLine(targetPaint: android.graphics.Paint, line: String, baseline: Float, index: Int) {
+                            if (textValue("Alignment", "Center") == "Justified" && index < visibleLines.lastIndex) {
+                                val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                                if (words.size > 1) {
+                                    val naturalWidth = words.sumOf { targetPaint.measureText(it).toDouble() }.toFloat()
+                                    val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)
+                                    if (isRtl) {
+                                        var x = textX + maxTextWidth
+                                        words.asReversed().forEach { word ->
+                                            val wordWidth = targetPaint.measureText(word)
+                                            x -= wordWidth
+                                            native.drawTextRun(word, 0, word.length, 0, word.length, x, baseline, true, targetPaint)
+                                            x -= gap
+                                        }
+                                    } else {
+                                        var x = textX
+                                        words.forEach { word ->
+                                            native.drawTextRun(word, 0, word.length, 0, word.length, x, baseline, false, targetPaint)
+                                            x += targetPaint.measureText(word) + gap
+                                        }
+                                    }
+                                    return
+                                }
+                            }
+                            native.drawTextRun(line, 0, line.length, 0, line.length, textX, baseline, isRtl, targetPaint)
+                        }
                         if (strokeEnabled && strokeWidth > 0f) {
                             val outlinePaint = android.graphics.Paint(textPaint).apply {
                                 color = strokeColor.toArgb()
@@ -2184,15 +2226,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 clearShadowLayer()
                             }
                             visibleLines.forEachIndexed { index, line ->
-                                if (textValue("Alignment", "Center") == "Justified" && index < textLines.lastIndex) {
-                                    val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-                                    if (words.size > 1) {
-                                        val naturalWidth = words.sumOf { outlinePaint.measureText(it).toDouble() }.toFloat()
-                                        val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)
-                                        var x = textX
-                                        words.forEach { word -> native.drawText(word, x, firstBaseline + index * (lineHeight + paragraphSpacing), outlinePaint); x += outlinePaint.measureText(word) + gap }
-                                    } else native.drawText(line, textX, firstBaseline + index * lineHeight, outlinePaint)
-                                } else native.drawText(line, textX, firstBaseline + index * lineHeight, outlinePaint)
+                                drawTextLine(outlinePaint, line, firstBaseline + index * (lineHeight + paragraphSpacing), index)
                             }
                         }
                         if (props["Text Background Enabled"] == ElementValue.Bool(true)) { val bg = runCatching { android.graphics.Color.parseColor(textValue("Text Background Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT); val px = number("Text Background Padding X", 0f).dp.toPx(); val py = number("Text Background Padding Y", 0f).dp.toPx(); val top = firstBaseline - textPaint.textSize * 0.8f - py; val bottom = firstBaseline + (visibleLines.size - 1) * (lineHeight + paragraphSpacing) + textPaint.textSize * 0.25f + py; val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = bg }; native.drawRoundRect(center.x - maxTextWidth * 0.5f - px, top, center.x + maxTextWidth * 0.5f + px, bottom, number("Text Background Corner Radius", 0f).dp.toPx(), number("Text Background Corner Radius", 0f).dp.toPx(), bgPaint) }
@@ -2208,16 +2242,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val dx = kotlin.math.cos(angle).toFloat() * widest * 0.5f; val dy = kotlin.math.sin(angle).toFloat() * widest * 0.5f
                             if (textValue("Text Gradient Type", "Linear") == "Radial") textPaint.shader = android.graphics.RadialGradient(center.x, center.y, widest.coerceAtLeast(1f) * 0.5f, gradientStart, gradientEnd, android.graphics.Shader.TileMode.CLAMP) else textPaint.shader = android.graphics.LinearGradient(center.x - dx, center.y - dy, center.x + dx, center.y + dy, intArrayOf(gradientStart, android.graphics.Color.argb((android.graphics.Color.alpha(gradientStart) + (android.graphics.Color.alpha(gradientEnd) - android.graphics.Color.alpha(gradientStart)) * number("Text Gradient Midpoint", 0.5f)).toInt(), (android.graphics.Color.red(gradientStart) + (android.graphics.Color.red(gradientEnd) - android.graphics.Color.red(gradientStart)) * number("Text Gradient Midpoint", 0.5f)).toInt(), (android.graphics.Color.green(gradientStart) + (android.graphics.Color.green(gradientEnd) - android.graphics.Color.green(gradientStart)) * number("Text Gradient Midpoint", 0.5f)).toInt(), (android.graphics.Color.blue(gradientStart) + (android.graphics.Color.blue(gradientEnd) - android.graphics.Color.blue(gradientStart)) * number("Text Gradient Midpoint", 0.5f)).toInt()), gradientEnd), floatArrayOf(0f, number("Text Gradient Midpoint", 0.5f).coerceIn(0.001f, 0.999f), 1f), android.graphics.Shader.TileMode.CLAMP)
                         }
-                        textLines.forEachIndexed { index, line ->
-                            if (textValue("Alignment", "Center") == "Justified" && index < textLines.lastIndex) {
-                                val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-                                if (words.size > 1) {
-                                    val naturalWidth = words.sumOf { textPaint.measureText(it).toDouble() }.toFloat()
-                                    val gap = ((maxTextWidth - naturalWidth) / (words.size - 1)).coerceAtLeast(0f)
-                                    var x = textX
-                                    words.forEach { word -> native.drawText(word, x, firstBaseline + index * lineHeight, textPaint); x += textPaint.measureText(word) + gap }
-                                } else native.drawText(line, textX, firstBaseline + index * lineHeight, textPaint)
-                            } else native.drawText(line, textX, firstBaseline + index * lineHeight, textPaint)
+                        visibleLines.forEachIndexed { index, line ->
+                            drawTextLine(textPaint, line, firstBaseline + index * (lineHeight + paragraphSpacing), index)
                         }
                         textPaint.clearShadowLayer()
                         textPaint.shader = null

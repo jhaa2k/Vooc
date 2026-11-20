@@ -1502,7 +1502,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 ?.average()?.toFloat() ?: (frame?.band(2) ?: 0f)
             val motion = MeasureWhatEngine.evaluate(
                 mode = layer.measureWhat,
-                runtimeSeconds = android.os.SystemClock.elapsedRealtime() / 1000f,
+                runtimeSeconds = phase,
                 trackPositionSeconds = (frame?.timeSec ?: 0.0).toFloat(),
                 playing = playing,
                 beatPulse = providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f,

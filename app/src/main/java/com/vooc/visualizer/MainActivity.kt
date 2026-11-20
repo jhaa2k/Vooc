@@ -3095,11 +3095,11 @@ private fun ThinSlider(
             .pointerInput(valueRange, safeDefault) {
                 val inset = 6.dp.toPx()
                 val usable = (size.width - inset * 2f).coerceAtLeast(1f)
-                val thumbX = inset + ((currentValue - valueRange.start) /
-                    (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)) * usable
                 val thumbHitRadius = 18.dp.toPx()
                 detectHorizontalDragGestures(
                     onDragStart = { down ->
+                        val thumbX = inset + ((currentValue - valueRange.start) /
+                            (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.00001f)) * usable
                         // Only the thumb starts a slider drag. Touches beside it remain ordinary
                         // scroll/tap gestures and can never change the numeric value.
                         draggingThumb = kotlin.math.abs(down.x - thumbX) <= thumbHitRadius

@@ -2257,6 +2257,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val extrusionDepth = number("Extrusion Depth", 5f).dp.toPx()
                         val glowEnabled = props["Glow / Shadow"] == ElementValue.Bool(true)
                         val glowAlpha = number("Glow Strength", 0.35f).coerceIn(0f, 1f)
+                        val barGlowRadius = number("Bar Glow Radius", 8f).dp.toPx().coerceIn(0f, 256.dp.toPx())
+                        val barGlowColorStrength = number("Bar Glow Color Strength", 1f).coerceIn(0f, 1f)
                         val peakEnabled = props["Peak / Cap"] == ElementValue.Bool(true)
                         val peakWidth = number("Peak Width", 2f).dp.toPx().coerceAtLeast(0.5f)
                         val barRotation = number("Bar Rotation", 0f)
@@ -2281,10 +2283,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     else -> { moveTo(left, top); lineTo(left + width, top); lineTo(left + width, top + height); lineTo(left, top + height); close() }
                                 }
                             }
-                            if (glowEnabled) {
-                                drawRoundRect(fill.copy(alpha = glowAlpha * 0.18f), Offset(left - capSize, top - capSize),
-                                    androidx.compose.ui.geometry.Size(width + capSize * 2f, height + capSize * 2f),
-                                    androidx.compose.ui.geometry.CornerRadius(corner + capSize))
+                            if (glowEnabled && barGlowRadius > 0f && barGlowColorStrength > 0f) {
+                                drawPath(path, fill.copy(alpha = glowAlpha * barGlowColorStrength * 0.2f),
+                                    style = Stroke(width = barGlowRadius * 2f + strokeWidth))
                             }
                             if (extrusion) {
                                 val shifted = Path().apply { addPath(path, Offset(extrusionDepth, extrusionDepth)) }

@@ -341,7 +341,7 @@ object ElementPropertyCatalog {
 
     private val shapeSpecific = listOf(
         text("Shape Type", "Shape", "Rectangle", listOf(
-            "Rectangle", "Circle/Oval", "Line", "Triangle", "Custom"
+            "Rectangle", "Circle/Oval", "Line", "Triangle", "Polygon", "Star", "Custom"
         )),
         number("Width", "Shape", 300.0, 0.0, 8192.0),
         number("Height", "Shape", 300.0, 0.0, 8192.0),

@@ -931,42 +931,72 @@ object ElementPropertyCatalog {
         number("Blur Amount Multiplier", "Motion Blur", 1.0, 0.0, 64.0)
     )
 
+    // Shared advanced controls are exposed on every visual layer so the first editor
+    // pass has a complete, consistent control surface before renderer-specific wiring.
+    private val sharedAdvanced = listOf(
+        bool("Audio Reactivity Enabled", "Audio Reactivity", false),
+        text("Audio Reactivity Source", "Audio Reactivity", "Overall Audio Level", listOf(
+            "Overall Audio Level", "Bass", "Mid", "Treble", "Beat", "Peak", "RMS",
+            "Waveform", "Spectrum Average", "Spectrum Maximum", "Left Channel", "Right Channel"
+        )),
+        text("Audio Reactivity Apply To", "Audio Reactivity", "All Properties", listOf(
+            "All Properties", "Position", "Scale", "Rotation", "Opacity", "Size", "Color", "Effect Strength"
+        )),
+        number("Audio Reactivity Input Min", "Audio Reactivity", 0.0, 0.0, 1.0),
+        number("Audio Reactivity Input Max", "Audio Reactivity", 1.0, 0.001, 1.0),
+        number("Audio Reactivity Output Min", "Audio Reactivity", 0.0, -10000.0, 10000.0),
+        number("Audio Reactivity Output Max", "Audio Reactivity", 1.0, -10000.0, 10000.0),
+        number("Audio Reactivity Multiplier", "Audio Reactivity", 1.0, -1000.0, 1000.0),
+        number("Audio Reactivity Offset", "Audio Reactivity", 0.0, -10000.0, 10000.0),
+        number("Audio Reactivity Smoothing", "Audio Reactivity", 0.0, 0.0, 1.0),
+        number("Audio Reactivity Attack", "Audio Reactivity", 0.12, 0.0, 1.0),
+        number("Audio Reactivity Release", "Audio Reactivity", 0.72, 0.0, 1.0),
+        text("Audio Reactivity Response Curve", "Audio Reactivity", "Linear", listOf("Linear", "Square", "Square Root", "Cubic", "Exponential", "Logarithmic")),
+        bool("Audio Reactivity Invert", "Audio Reactivity", false),
+        bool("Audio Reactivity Clamp Output", "Audio Reactivity", true),
+        bool("Audio Reactivity Beat Trigger", "Audio Reactivity", false),
+        number("Audio Reactivity Beat Amount", "Audio Reactivity", 1.0, -100.0, 100.0),
+        number("Audio Reactivity Frequency Band Start", "Audio Reactivity", 20.0, 0.0, 24000.0),
+        number("Audio Reactivity Frequency Band End", "Audio Reactivity", 18000.0, 1.0, 24000.0),
+        number("Audio Reactivity Threshold", "Audio Reactivity", 0.0, 0.0, 1.0)
+    )
+
     fun forElement(type: StudioElementType): List<ElementPropertySpec> {
         if (type == StudioElementType.AUDIO_PROVIDER) return provider
         if (type == StudioElementType.BLUR_EFFECT) {
-            return (blurGeneral + blurAppearance + blurEffect)
+            return (blurGeneral + blurAppearance + blurEffect + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.PARTICLES) {
-            return (particlesGeneral + particlesAppearance + particles)
+            return (particlesGeneral + particlesAppearance + particles + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.TEXT) {
-            return (textGeneral + textAppearance + textTypography)
+            return (textGeneral + textAppearance + textTypography + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.BACKGROUND) {
-            return (backgroundGeneral + backgroundAppearance + backgroundSpecific)
+            return (backgroundGeneral + backgroundAppearance + backgroundSpecific + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.IMAGE) {
-            return (imageGeneral + imageAppearance + imageSpecific)
+            return (imageGeneral + imageAppearance + imageSpecific + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.RGB_SPLIT) {
-            return (rgbGeneral + rgbAppearance + rgbSplit)
+            return (rgbGeneral + rgbAppearance + rgbSplit + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.MOTION_BLUR_EFFECT) {
-            return (motionBlurGeneral + motionBlurAppearance + motionBlur)
+            return (motionBlurGeneral + motionBlurAppearance + motionBlur + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.BARS_SEGMENTS) {
-            return (barsGeneral + barsAppearance + bars)
+            return (barsGeneral + barsAppearance + bars + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         if (type == StudioElementType.SHAPE) {
-            return (shapeGeneral + shapeAppearance + shapeSpecific)
+            return (shapeGeneral + shapeAppearance + shapeSpecific + sharedAdvanced)
                 .groupBy { it.name }.values.map { sameName -> sameName.last() }
         }
         val specific = when (type) {
@@ -981,7 +1011,7 @@ object ElementPropertyCatalog {
             StudioElementType.SHAPE -> shapeSpecific
             StudioElementType.AUDIO_PROVIDER -> emptyList()
         }
-        return (sharedGeneral + specific).groupBy { it.name }.values.map { sameName -> sameName.last() }
+        return (sharedGeneral + specific + sharedAdvanced).groupBy { it.name }.values.map { sameName -> sameName.last() }
     }
 
     fun create(type: StudioElementType, id: String, tag: String = type.displayName): ElementDocument {

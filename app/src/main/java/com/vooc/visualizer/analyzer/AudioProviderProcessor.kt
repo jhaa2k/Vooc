@@ -123,6 +123,12 @@ class AudioProviderProcessor {
         }
         if (source.isEmpty()) return AudioProviderFrame(FloatArray(cfg.sampleOutCount), 0f, frame.timeSec, frame.sampleRate)
 
+        // A seek or decoder timestamp jump starts a new audio stream segment. Do not
+        // carry temporal smoothing or beat release state across that boundary.
+        val elapsedSec = frame.timeSec - lastTimeSec
+        if (!lastTimeSec.isNaN() && (elapsedSec < -1e-6 || elapsedSec > 0.35)) {
+            reset()
+        }
         val dt = if (lastTimeSec.isNaN() || frame.timeSec <= lastTimeSec) 1f / 60f
             else (frame.timeSec - lastTimeSec).toFloat().coerceIn(0.001f, 0.25f)
         lastTimeSec = frame.timeSec

@@ -13,7 +13,15 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     val safeExtent = extent.takeIf { it.isFinite() && it > 0f } ?: 0f
     val safeBounce = bounce.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
     if (safeExtent <= 0f) return ParticleAxisState(0f, safeVelocity)
-    if (safePosition in 0f..safeExtent) return ParticleAxisState(safePosition, safeVelocity)
+    if (safePosition in 0f..safeExtent) {
+        // An exact edge contact only collides when velocity points out of the scene.
+        val movingOutAtLeft = safePosition == 0f && safeVelocity < 0f
+        val movingOutAtRight = safePosition == safeExtent && safeVelocity > 0f
+        if (movingOutAtLeft || movingOutAtRight) {
+            return ParticleAxisState(safePosition, -safeVelocity * safeBounce)
+        }
+        return ParticleAxisState(safePosition, safeVelocity)
+    }
     // Use Double for the fold arithmetic: converting an enormous collision count
     // directly to Int can overflow and reverse the particle in the wrong direction.
     val extent = safeExtent.toDouble()

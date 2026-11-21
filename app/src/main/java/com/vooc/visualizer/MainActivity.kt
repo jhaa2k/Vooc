@@ -23,6 +23,7 @@ import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 import com.vooc.visualizer.studio.resolveParticleOpacity
 import com.vooc.visualizer.studio.resolveParticleEmissionTiming
 import com.vooc.visualizer.studio.resolveParticleMotion
+import com.vooc.visualizer.studio.resolveParticleRandomSample
 import com.vooc.visualizer.studio.rotateParticleEmitterOffset
 
 import android.net.Uri
@@ -3049,10 +3050,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val gravityX = gravity.x.toFloat()
                         val gravityY = gravity.y.toFloat()
                         repeat(count) { index ->
-                            val seed = index + 1f
-                            val randomA = kotlin.math.abs(sin(seed * 12.9898f) * 43758.5453f) % 1f
-                            val randomB = kotlin.math.abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
-                            val randomC = kotlin.math.abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
+                            val random = resolveParticleRandomSample(index)
+                            val randomA = random.a
+                            val randomB = random.b
+                            val randomC = random.c
                             val particleLifetime = (lifetime * (1f + (randomC * 2f - 1f) * lifetimeRandom)).coerceAtLeast(0.01f)
                             val emissionTiming = resolveParticleEmissionTiming(
                                 playbackSeconds, index, spawnInterval, particleLifetime,

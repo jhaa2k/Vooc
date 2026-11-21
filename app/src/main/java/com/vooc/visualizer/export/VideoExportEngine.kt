@@ -12,6 +12,7 @@ import com.vooc.visualizer.studio.particleForceDelta
 import com.vooc.visualizer.studio.particleForcePosition
 import com.vooc.visualizer.studio.particleSpawnOffset
 import com.vooc.visualizer.studio.particlePositionOffset
+import com.vooc.visualizer.studio.resolveParticleAnchorOffset
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 import android.content.ContentResolver
 import android.content.Context
@@ -1503,8 +1504,13 @@ object VideoExportEngine {
                     val spawnArea = textAlias("Particle Emitter Shape", "Circle", "Spawn Area")
                     // Use the shared element transform center so Position and Measure Pos
                     // affect the particle system consistently with other element types.
-                    val particleCenterX = cx
-                    val particleCenterY = cy
+                    val particleAlignment = element.value("Alignment Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                    val particleAnchor = resolveParticleAnchorOffset(
+                        textValue("Anchor X", "unset"), textValue("Anchor Y", "unset"),
+                        particleAlignment.x.toFloat(), particleAlignment.y.toFloat()
+                    )
+                    val particleCenterX = cx + particleAnchor.x * width
+                    val particleCenterY = cy + particleAnchor.y * height
                     val emitterPosition = element.value("Emitter Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                     val emitterX = particleCenterX + (emitterPosition.x.toFloat() - 0.5f) * width
                     val emitterY = particleCenterY + (emitterPosition.y.toFloat() - 0.5f) * height

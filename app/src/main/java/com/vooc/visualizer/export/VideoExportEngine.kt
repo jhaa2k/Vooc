@@ -1001,6 +1001,15 @@ object VideoExportEngine {
                         "Justified" -> cx - maxTextWidth * 0.5f
                         else -> cx
                     }
+                    canvas.save()
+                    if (textValue("Overflow Mode", "Visible") == "Clip") {
+                        canvas.clipRect(
+                            cx - maxTextWidth * 0.5f,
+                            -100000f,
+                            cx + maxTextWidth * 0.5f,
+                            100000f
+                        )
+                    }
                     fun drawTextLine(targetPaint: Paint, line: String, baseline: Float, index: Int) {
                         if (textValue("Alignment", "Center") == "Justified" && index < visibleLines.lastIndex) {
                             val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
@@ -1061,6 +1070,7 @@ object VideoExportEngine {
                     textPaint.clearShadowLayer()
                     textPaint.shader = null
                     textPaint.style = Paint.Style.FILL
+                    canvas.restore()
                 }
                 StudioElementType.BARS_SEGMENTS -> {
                     val count = number("Bar Count", 64f).toInt().coerceIn(1, 512)

@@ -35,6 +35,13 @@ class AudioProviderConfigTest {
     }
 
     @Test
+    fun disabledStereoProviderDoesNotForceStereoAnalysis() {
+        assertFalse(listOf(AudioProviderConfig(providerEnabled = false, channelMode = ProviderChannelMode.LEFT)).requiresStereoAnalysis())
+        assertTrue(listOf(AudioProviderConfig(providerEnabled = true, channelMode = ProviderChannelMode.LEFT)).requiresStereoAnalysis())
+        assertFalse(listOf(AudioProviderConfig(providerEnabled = true, channelMode = ProviderChannelMode.MONO_MIX)).requiresStereoAnalysis())
+    }
+
+    @Test
     fun firstEnabledProviderOwnsSharedAnalyzerSettings() {
         val disabled = AudioProviderConfig(providerEnabled = false, fftSize = 4096)
         val enabled = AudioProviderConfig(providerEnabled = true, fftSize = 1024)

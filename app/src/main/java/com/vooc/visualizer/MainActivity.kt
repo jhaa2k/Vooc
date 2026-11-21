@@ -2317,6 +2317,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             "Justified" -> center.x - maxTextWidth * 0.5f
                             else -> center.x
                         }
+                        native.save()
+                        if (textValue("Overflow Mode", "Visible") == "Clip") {
+                            native.clipRect(
+                                center.x - maxTextWidth * 0.5f,
+                                -100000f,
+                                center.x + maxTextWidth * 0.5f,
+                                100000f
+                            )
+                        }
                         fun drawTextLine(targetPaint: android.graphics.Paint, line: String, baseline: Float, index: Int) {
                             if (textValue("Alignment", "Center") == "Justified" && index < visibleLines.lastIndex) {
                                 val words = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
@@ -2373,6 +2382,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                         textPaint.clearShadowLayer()
                         textPaint.shader = null
+                        native.restore()
                     }
                     StudioElementType.BARS_SEGMENTS -> {
                         val providerIndex = number("Audio Provider Index", 0f).toInt()

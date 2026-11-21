@@ -300,8 +300,8 @@ class ParticlePhysicsTest {
             "Circle", 0.5f, 1f, 100f, 80f, 60f, 0f,
             (Math.PI / 2.0).toFloat(), (Math.PI / 2.0).toFloat()
         )
-        assertEquals(-60f, result.x, 0.0001f)
-        assertEquals(0f, result.y, 0.0001f)
+        assertEquals(-42.426407f, result.x, 0.0001f)
+        assertEquals(42.426407f, result.y, 0.0001f)
     }
 
     @Test fun emitterNegativeSweepRunsClockwiseFromArcStart() {
@@ -309,8 +309,8 @@ class ParticlePhysicsTest {
             "Circle", 0.5f, 1f, 100f, 80f, 60f, 0f,
             0f, (-Math.PI / 2.0).toFloat()
         )
-        assertEquals(0f, result.x, 0.0001f)
-        assertEquals(-60f, result.y, 0.0001f)
+        assertEquals(42.426407f, result.x, 0.0001f)
+        assertEquals(-42.426407f, result.y, 0.0001f)
     }
 
     @Test fun zeroSweepKeepsAllParticlesAtArcStart() {

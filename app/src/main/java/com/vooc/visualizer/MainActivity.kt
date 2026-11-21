@@ -1918,7 +1918,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     shader.setLocalMatrix(matrix)
                                     val tilePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
                                         this.shader = shader
-                                        alpha = (android.graphics.Color.alpha(bg) * opacity).toInt().coerceIn(0, 255)
+                                        alpha = (255f * opacity).toInt().coerceIn(0, 255)
                                         xfermode = android.graphics.PorterDuffXfermode(when (blend) {
                                             androidx.compose.ui.graphics.BlendMode.Plus -> android.graphics.PorterDuff.Mode.ADD
                                             androidx.compose.ui.graphics.BlendMode.Screen -> android.graphics.PorterDuff.Mode.SCREEN

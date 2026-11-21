@@ -176,7 +176,7 @@ class ParticlePhysicsTest {
         val inner = particleSpawnOffset("Ring", 1f, 0f, 100f, 80f, 60f, 20f, 0f, (Math.PI / 2.0).toFloat())
         val outer = particleSpawnOffset("Ring", 1f, 1f, 100f, 80f, 60f, 20f, 0f, (Math.PI / 2.0).toFloat())
         assertEquals(0f, middle.x, 0.0001f)
-        assertEquals(kotlin.math.sqrt(1800f), middle.y, 0.0001f)
+        assertEquals(kotlin.math.sqrt(2000f), middle.y, 0.0001f)
         assertEquals(20f, inner.y, 0.0001f)
         assertEquals(60f, outer.y, 0.0001f)
     }

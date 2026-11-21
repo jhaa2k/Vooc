@@ -1111,13 +1111,7 @@ object VideoExportEngine {
                     val strokeWidth = number("Stroke Thickness", 0f) * width / 1080f
                     if (strokeEnabled && strokeWidth > 0f) {
                         val strokePaint = Paint(textPaint).apply {
-                            val sourceStrokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
-                            this.color = android.graphics.Color.argb(
-                                (android.graphics.Color.alpha(sourceStrokeColor) * alpha / 255f).toInt().coerceIn(0, 255),
-                                android.graphics.Color.red(sourceStrokeColor),
-                                android.graphics.Color.green(sourceStrokeColor),
-                                android.graphics.Color.blue(sourceStrokeColor)
-                            )
+                            this.color = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
                             style = Paint.Style.STROKE
                             strokeJoin = when (textValue("Stroke Join", "Round")) { "Miter" -> Paint.Join.MITER; "Bevel" -> Paint.Join.BEVEL; else -> Paint.Join.ROUND }
                             this.strokeWidth = strokeWidth

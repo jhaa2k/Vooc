@@ -10,6 +10,7 @@ import com.vooc.visualizer.studio.reflectParticleAxis
 import com.vooc.visualizer.studio.particleForceDelta
 import com.vooc.visualizer.studio.particleForcePosition
 import com.vooc.visualizer.studio.particleSpawnOffset
+import com.vooc.visualizer.studio.particlePositionOffset
 
 import android.net.Uri
 import android.Manifest

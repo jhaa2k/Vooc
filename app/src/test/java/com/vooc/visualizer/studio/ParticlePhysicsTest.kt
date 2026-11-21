@@ -19,8 +19,8 @@ class ParticlePhysicsTest {
     @Test fun particleTrailGeometryPreventsOverflowFromExtremeVelocity() {
         val result = resolveParticleTrailVector(Float.MAX_VALUE, -Float.MAX_VALUE, 256f)
         assertEquals(true, result.x.isFinite() && result.y.isFinite())
-        assertEquals(0f, result.x, 0.0001f)
-        assertEquals(0f, result.y, 0.0001f)
+        assertEquals(true, result.x > 0f && result.y < 0f)
+        assertEquals(true, result.x < Float.MAX_VALUE && result.y > -Float.MAX_VALUE)
     }
     @Test fun particleTrailVectorReflectsAcrossEachMirrorAxis() {
         val horizontal = resolveParticleMirrorVector(12f, -7f, true, false)

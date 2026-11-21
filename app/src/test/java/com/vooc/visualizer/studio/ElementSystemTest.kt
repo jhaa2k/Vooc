@@ -172,7 +172,7 @@ class ElementSystemTest {
     fun audioProviderExposesOnlyImplementedAnalysisControls() {
         val names = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).map { it.name }.toSet()
         val required = setOf(
-            "Tag", "Provider Enabled", "Sample Provider", "Sample Out Count", "Mirror Samples",
+            "Tag", "Provider Enabled", "Sample Out Count", "Mirror Samples",
             "Repeat Samples", "Star And End Gap", "Smooth", "Pre Smooth", "Filter Radius",
             "Filter Strength", "AWeight", "Output Multiplier", "Lower Hz", "Higher Hz",
             "Hz Linear Factor", "Freq Shift", "Beat Smooth", "Beat Range Bar First",

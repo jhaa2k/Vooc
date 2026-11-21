@@ -25,10 +25,12 @@ internal data class ParticleLayerScale(val x: Float, val y: Float)
 
 /** Applies uniform/non-uniform layer scale consistently to preview and export particle sizes. */
 internal fun resolveParticleLayerScale(x: Float, y: Float, uniform: Boolean, particleScale: Float): ParticleLayerScale {
-    val safeScale = particleScale.coerceAtLeast(0f)
+    val safeX = x.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 1f
+    val safeY = y.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 1f
+    val safeScale = particleScale.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 1f
     return ParticleLayerScale(
-        (x * safeScale).coerceIn(0f, 10f),
-        ((if (uniform) x else y) * safeScale).coerceIn(0f, 10f)
+        (safeX * safeScale).coerceIn(0f, 10f),
+        ((if (uniform) safeX else safeY) * safeScale).coerceIn(0f, 10f)
     )
 }
 
@@ -76,33 +78,40 @@ internal fun particleSpawnOffset(
     arcStart: Float,
     arcSweep: Float
 ): ParticleSpawnOffset {
-    val a = randomA.coerceIn(0f, 1f)
-    val b = randomB.coerceIn(0f, 1f)
-    val angle = arcStart + a * arcSweep
-    val radialDistance = innerRadius.coerceAtLeast(0f) +
-        (radius.coerceAtLeast(innerRadius) - innerRadius.coerceAtLeast(0f)) * b
+    // Invalid serialized values must never inject NaN/Infinity into the render loop.
+    val a = randomA.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+    val b = randomB.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+    val safeWidth = width.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    val safeHeight = height.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    val safeInnerRadius = innerRadius.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    val safeRadius = (radius.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f)
+        .coerceAtLeast(safeInnerRadius)
+    val safeArcStart = arcStart.takeIf { it.isFinite() } ?: 0f
+    val safeArcSweep = arcSweep.takeIf { it.isFinite() } ?: 0f
+    val angle = safeArcStart + a * safeArcSweep
+    val radialDistance = safeInnerRadius + (safeRadius - safeInnerRadius) * b
     return when (shape) {
-        "Rectangle" -> ParticleSpawnOffset((a * 2f - 1f) * width, (b * 2f - 1f) * height)
+        "Rectangle" -> ParticleSpawnOffset((a * 2f - 1f) * safeWidth, (b * 2f - 1f) * safeHeight)
         "Ellipse" -> {
             // Uniform-area sampling keeps particles evenly distributed across the ellipse.
             val radialFactor = kotlin.math.sqrt(b)
             ParticleSpawnOffset(
-                kotlin.math.cos(angle) * width.coerceAtLeast(0f) * radialFactor,
-                kotlin.math.sin(angle) * height.coerceAtLeast(0f) * radialFactor
+                kotlin.math.cos(angle) * safeWidth * radialFactor,
+                kotlin.math.sin(angle) * safeHeight * radialFactor
             )
         }
         "Circle" -> {
             val radialFactor = kotlin.math.sqrt(b)
-            val circleRadius = radius.coerceAtLeast(0f) * radialFactor
+            val circleRadius = safeRadius * radialFactor
             ParticleSpawnOffset(kotlin.math.cos(angle) * circleRadius, kotlin.math.sin(angle) * circleRadius)
         }
         "Ring" -> ParticleSpawnOffset(kotlin.math.cos(angle) * radialDistance, kotlin.math.sin(angle) * radialDistance)
-        "Line", "HorizontalLine" -> ParticleSpawnOffset((a * 2f - 1f) * width, 0f)
+        "Line", "HorizontalLine" -> ParticleSpawnOffset((a * 2f - 1f) * safeWidth, 0f)
         "Edge" -> when {
-            a < 0.25f -> ParticleSpawnOffset(-width, (b * 2f - 1f) * height)
-            a < 0.5f -> ParticleSpawnOffset(width, (b * 2f - 1f) * height)
-            a < 0.75f -> ParticleSpawnOffset((b * 2f - 1f) * width, -height)
-            else -> ParticleSpawnOffset((b * 2f - 1f) * width, height)
+            a < 0.25f -> ParticleSpawnOffset(-safeWidth, (b * 2f - 1f) * safeHeight)
+            a < 0.5f -> ParticleSpawnOffset(safeWidth, (b * 2f - 1f) * safeHeight)
+            a < 0.75f -> ParticleSpawnOffset((b * 2f - 1f) * safeWidth, -safeHeight)
+            else -> ParticleSpawnOffset((b * 2f - 1f) * safeWidth, safeHeight)
         }
         else -> ParticleSpawnOffset(0f, 0f)
     }

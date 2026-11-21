@@ -1674,14 +1674,6 @@ object VideoExportEngine {
                         )
                         val fieldX = forceCenter.x
                         val fieldY = forceCenter.y
-                        val dx = fieldX - spawnX
-                        val dy = fieldY - spawnY
-                        val forceDelta = particleForceDelta(
-                            forceMode, dx, dy, forceStrength, age,
-                            cos(baseAngle), sin(baseAngle)
-                        )
-                        vx += forceDelta.x
-                        vy += forceDelta.y
                         val frequency = sineFrequency * (1f + randomB * sineFrequencyRandom)
                         val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
                             sineMagnitude * (1f + randomA * sineMagnitudeRandom)
@@ -1690,6 +1682,15 @@ object VideoExportEngine {
                             val travelTime = if (totalDrag > 0f) (1f - kotlin.math.exp(-totalDrag * age)) / totalDrag else age
                         var px = spawnX + vx * travelTime * 0.01f + gravity.x.toFloat() * age * age * 0.005f + wind.x.toFloat() * age * age * 0.005f + wave * dampingFactor + sin(age * 7f + randomA * 19f) * turbulence * age * 0.01f
                         var py = spawnY + vy * travelTime * 0.01f + gravity.y.toFloat() * age * age * 0.005f + wind.y.toFloat() * age * age * 0.005f + cos(age * 6f + randomB * 17f) * turbulence * age * 0.01f
+                        val forceDelta = particleForceDelta(
+                            forceMode, fieldX - px, fieldY - py, forceStrength, age,
+                            cos(baseAngle), sin(baseAngle)
+                        )
+                        vx += forceDelta.x
+                        vy += forceDelta.y
+                        val adjustedTravelTime = if (totalDrag > 0f) (1f - kotlin.math.exp(-totalDrag * age)) / totalDrag else age
+                        px = spawnX + vx * adjustedTravelTime * 0.01f + gravity.x.toFloat() * age * age * 0.005f + wind.x.toFloat() * age * age * 0.005f + wave * dampingFactor + sin(age * 7f + randomA * 19f) * turbulence * age * 0.01f
+                        py = spawnY + vy * adjustedTravelTime * 0.01f + gravity.y.toFloat() * age * age * 0.005f + wind.y.toFloat() * age * age * 0.005f + cos(age * 6f + randomB * 17f) * turbulence * age * 0.01f
                         if (collisionEnabled) { val hitX = reflectParticleAxis(px, vx, width.toFloat(), bounce); val hitY = reflectParticleAxis(py, vy, height.toFloat(), bounce); px = hitX.position; vx = hitX.velocity; py = hitY.position; vy = hitY.velocity }
                         val depth = randomB * perspectiveDepth
                         val perspective = (perspectiveFov / (perspectiveFov + depth * 0.1f)).coerceIn(0.05f, 1f)

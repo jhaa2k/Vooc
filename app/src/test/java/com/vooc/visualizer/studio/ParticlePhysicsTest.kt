@@ -28,3 +28,18 @@ class ParticlePhysicsTest {
         assertEquals(-7f, result.velocity, 0.0001f)
     }
 }
+
+    @Test fun vortexForceFieldAppliesTangentialAcceleration() {
+        val result = particleForceDelta("Vortex", 10f, 0f, 4f, 2f, 1f, 0f)
+        assertEquals(0f, result.position, 0.0001f)
+        assertEquals(8f, result.velocity, 0.0001f)
+    }
+
+    @Test fun attractAndRepelForceFieldsPointInOppositeDirections() {
+        val attract = particleForceDelta("Attract", 3f, 4f, 5f, 2f, 0f, 0f)
+        val repel = particleForceDelta("Repel", 3f, 4f, 5f, 2f, 0f, 0f)
+        assertEquals(6f, attract.position, 0.0001f)
+        assertEquals(8f, attract.velocity, 0.0001f)
+        assertEquals(-6f, repel.position, 0.0001f)
+        assertEquals(-8f, repel.velocity, 0.0001f)
+    }

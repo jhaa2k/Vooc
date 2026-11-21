@@ -320,7 +320,7 @@ object ElementPropertyCatalog {
 
     private val shapeAppearance = listOf(
         text("Blend Mode Content", "Appearance", "Alpha", listOf(
-            "Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken",
+            "Alpha", "Add", "Screen", "Multiply", "Darken",
             "Lighten", "Exclusion", "Subtractive", "Copy"
         )),
         text("Color", "Appearance", "#FFFFFFFF"),

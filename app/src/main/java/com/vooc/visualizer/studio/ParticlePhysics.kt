@@ -21,12 +21,12 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     val period = extent * 2.0
     val wrapped = ((coordinate % period) + period) % period
     val folded = if (wrapped > extent) period - wrapped else wrapped
-    val hitCount = if (coordinate < 0.0) kotlin.math.ceil(-coordinate / extent)
+    val hitCount = if (coordinate < 0.0) kotlin.math.floor(-coordinate / extent) + 1.0
         else kotlin.math.floor((coordinate - extent) / extent) + 1.0
     val safeHitCount = hitCount.coerceAtLeast(1.0)
     // More than 64 impacts already makes practical bounce energy negligible;
-    // cap the exponent while retaining the exact parity for the direction.
-    val direction = if (wrapped >= extent) -1f else 1f
+    // cap damping while preserving the full impact-count parity.
+    val direction = if (safeHitCount % 2.0 == 1.0) -1f else 1f
     val damping = safeBounce.toDouble().pow(safeHitCount.coerceAtMost(64.0)).toFloat()
     return ParticleAxisState(folded.toFloat().coerceIn(0f, safeExtent), safeVelocity * direction * damping)
 }

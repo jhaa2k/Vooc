@@ -23,6 +23,12 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     return ParticleAxisState(folded.coerceIn(0f, safeExtent), safeVelocity * direction * safeBounce.pow(hits))
 }
 
+/** Converts normalized particle layer position (0..1) into a center-relative canvas offset. */
+internal fun particlePositionOffset(normalizedPosition: Float): Float {
+    val safePosition = normalizedPosition.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
+    return safePosition - 0.5f
+}
+
 internal data class ParticleLayerScale(val x: Float, val y: Float)
 
 /** Applies uniform/non-uniform layer scale consistently to preview and export particle sizes. */

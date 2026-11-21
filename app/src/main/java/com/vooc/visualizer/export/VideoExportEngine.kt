@@ -14,6 +14,7 @@ import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
 import com.vooc.visualizer.analyzer.SpectrumMapper
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.analyzer.analyzerConfigSource
+import com.vooc.visualizer.analyzer.analyzerConfigSourceIndex
 import com.vooc.visualizer.analyzer.requiresStereoAnalysis
 import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.studio.ElementPropertyCatalog
@@ -134,7 +135,8 @@ object VideoExportEngine {
         val providerSamplesByIndexByFrame = Array(providerConfigs.size) { providerIndex ->
             Array(frameCount) { FloatArray(providerConfigs[providerIndex].sampleOutCount) }
         }
-        val providerSamplesByFrame = providerSamplesByIndexByFrame.first()
+        val analyzerProviderIndex = providerConfigs.analyzerConfigSourceIndex()
+        val providerSamplesByFrame = providerSamplesByIndexByFrame[analyzerProviderIndex]
         val barElements = project.document.elements.filter { it.type == StudioElementType.BARS_SEGMENTS }
         val channelsToCapture = (barElements.mapNotNull { element ->
             when ((element.value("Audio Channel") as? ElementValue.Text)?.value) {
@@ -182,7 +184,7 @@ object VideoExportEngine {
                         val shapedProviders = providerProcessors.mapIndexed { providerIndex, processor ->
                             processor.process(analysis, providerConfigs[providerIndex])
                         }
-                        val shaped = shapedProviders.first()
+                        val shaped = shapedProviders.getOrNull(analyzerProviderIndex) ?: shapedProviders.first()
                         val relativeStartUs = ptsUs - trimStartUs
                         val relativeEndUs = ptsUs + chunkDurationUs - trimStartUs
                         if (relativeEndUs >= 0L) {

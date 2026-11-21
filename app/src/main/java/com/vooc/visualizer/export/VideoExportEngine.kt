@@ -310,7 +310,12 @@ object VideoExportEngine {
             if (element.type == StudioElementType.IMAGE && (uriText.isBlank() || GeneratedAlbumArt.isForced(element))) {
                 runCatching {
                     val source = GeneratedAlbumArt.create(element)
-                    val processed = processImageForExport(source, element, null)
+                    val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                    val maskBitmap = if (maskUri.isNotBlank()) {
+                        resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                    } else null
+                    val processed = processImageForExport(source, element, maskBitmap)
+                    maskBitmap?.recycle()
                     imageCache["generated:${element.id}"] = processed
                     if (processed !== source) source.recycle()
                 }

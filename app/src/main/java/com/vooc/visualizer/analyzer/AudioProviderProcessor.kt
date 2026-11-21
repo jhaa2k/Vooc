@@ -320,6 +320,9 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
 fun List<AudioProviderConfig>.analyzerConfigSource(): AudioProviderConfig? =
     firstOrNull { it.providerEnabled } ?: firstOrNull()
 
+fun List<AudioProviderConfig>.analyzerConfigSourceIndex(): Int =
+    indexOfFirst { it.providerEnabled }.takeIf { it >= 0 } ?: 0
+
 /** Disabled providers must not force stereo capture or increase analyzer work. */
 fun List<AudioProviderConfig>.requiresStereoAnalysis(): Boolean =
     any { it.providerEnabled && it.channelMode != ProviderChannelMode.MONO_MIX }

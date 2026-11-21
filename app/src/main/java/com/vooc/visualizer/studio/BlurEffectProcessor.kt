@@ -41,7 +41,7 @@ object BlurEffectProcessor {
             number(element, "Blur Multiplier", 4.1f) +
             number(element, "Blur Spread", 0f)).coerceIn(0f, 256f)
         val quality = number(element, "Blur Quality", 1f).coerceIn(0.25f, 2f)
-        val downScale = (1f / (1f + radius / (28f * quality))).coerceIn(0.12f, 1f)
+        val downScale = (1f / (1f + radius / (8f * quality))).coerceIn(0.12f, 1f)
         val workW = max(1, (source.width * downScale).toInt())
         val workH = max(1, (source.height * downScale).toInt())
         val working = if (workW != source.width || workH != source.height)
@@ -272,7 +272,7 @@ object BlurEffectProcessor {
             pixels[i] = Color.argb(alpha, Color.red(source), Color.green(source), Color.blue(source))
         }
         var glowPixels = pixels
-        val glowRadius = (blurRadius * scale * 0.65f).coerceIn(2f, 18f)
+        val glowRadius = (number(element, "Blur Bloom Radius", 12f) * scale).coerceIn(1f, 24f)
         repeat(2) { pass -> glowPixels = blurPass(glowPixels, bloomW, bloomH, glowRadius / sqrt(2f), "Gaussian", 0.0, 0.5f to 0.5f, 0f, pass) }
         val glow = Bitmap.createBitmap(bloomW, bloomH, Bitmap.Config.ARGB_8888)
         glow.setPixels(glowPixels, 0, bloomW, 0, 0, bloomW, bloomH)

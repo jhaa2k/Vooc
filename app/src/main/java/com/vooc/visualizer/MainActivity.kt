@@ -2335,7 +2335,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             isUnderlineText = props["Underline"] == ElementValue.Bool(true)
                             if (shadowEnabled) setShadowLayer(shadowBlur, shadowX, shadowY, shadowColor)
                         }
-                        val maxTextWidth = number("Max Width", 1000f) * textUnitScale.coerceAtLeast(1f)
+                        val maxTextWidth = (number("Max Width", 1000f) * textUnitScale).coerceAtLeast(1f)
                         val wrapText = props["Wrap Text"] != ElementValue.Bool(false)
                         val textLines = if (!wrapText) listOf(displayText) else buildList {
                             displayText.split("\n").forEach { paragraph ->

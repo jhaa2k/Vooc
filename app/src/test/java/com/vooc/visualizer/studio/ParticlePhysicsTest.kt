@@ -22,6 +22,13 @@ class ParticlePhysicsTest {
         assertEquals(2f, result.velocity, 0.0001f)
     }
 
+    @Test fun exactBoundaryImpactsReverseVelocityWithCorrectParity() {
+        assertEquals(-5f, reflectParticleAxis(100f, 10f, 100f, 0.5f).velocity, 0.0001f)
+        assertEquals(2.5f, reflectParticleAxis(200f, 10f, 100f, 0.5f).velocity, 0.0001f)
+        assertEquals(-5f, reflectParticleAxis(-100f, 10f, 100f, 0.5f).velocity, 0.0001f)
+        assertEquals(2.5f, reflectParticleAxis(-200f, 10f, 100f, 0.5f).velocity, 0.0001f)
+    }
+
     @Test fun boundaryCollisionSanitizesNonFiniteInputs() {
         val invalidPosition = reflectParticleAxis(Float.NaN, 12f, 100f, 0.5f)
         assertEquals(0f, invalidPosition.position, 0.0001f)

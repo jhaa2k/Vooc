@@ -21,6 +21,13 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     return ParticleAxisState(folded.coerceIn(0f, extent), velocity * direction * bounce.coerceIn(0f, 1f).pow(hits))
 }
 
+internal data class ParticleForcePosition(val x: Float, val y: Float)
+
+/** Resolves normalized force-field coordinates in full-canvas pixel space. */
+internal fun particleForcePosition(x: Float, y: Float, canvasWidth: Float, canvasHeight: Float): ParticleForcePosition =
+    ParticleForcePosition(x.coerceIn(0f, 1f) * canvasWidth.coerceAtLeast(0f),
+        y.coerceIn(0f, 1f) * canvasHeight.coerceAtLeast(0f))
+
 internal data class ParticleForceDelta(val x: Float, val y: Float)
 
 /** Returns the velocity delta applied by an Avee-style force field at a particle position. */

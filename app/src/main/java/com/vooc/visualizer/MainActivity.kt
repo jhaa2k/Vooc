@@ -3099,6 +3099,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             )
                             var px = initialMotion.x
                             var py = initialMotion.y
+                            val forceDelta = particleForceDelta(
+                                forceMode, fieldX - px, fieldY - py, forceStrength, age,
+                                cos(baseAngle), sin(baseAngle)
+                            )
+                            vx += forceDelta.x
+                            vy += forceDelta.y
                             val adjustedMotion = resolveParticleMotion(
                                 spawnX, spawnY, vx, vy, gravityX, gravityY,
                                 wind.x.toFloat(), wind.y.toFloat(), age, totalDrag,

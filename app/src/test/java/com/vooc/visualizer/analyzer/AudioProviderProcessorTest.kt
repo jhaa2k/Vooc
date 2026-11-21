@@ -68,5 +68,29 @@ class AudioProviderProcessorTest {
         val processor = AudioProviderProcessor()
         val noBeat = processor.process(quiet, AudioProviderConfig(sampleOutCount = 32, smooth = 0f))
         assertEquals(0f, noBeat.beatValue, 0f)
+    } 
+    @Test fun repeatedSamplesRepeatMappedOutputInsteadOfRawFftBins() {
+        val result = AudioProviderProcessor().process(
+            frame(), AudioProviderConfig(sampleOutCount = 2048, repeatSamples = true, smooth = 0f, filterRadius = 0)
+        )
+        assertEquals(result.samples[0], result.samples[1024], 1e-6f)
+        assertEquals(result.samples[100], result.samples[1124], 1e-6f)
     }
+
+    @Test fun smoothingIsTimeNormalizedAcrossAnalysisCadences() {
+        val config = AudioProviderConfig(sampleOutCount = 32, smooth = 0.8f, filterRadius = 0, outputMultiplier = 1f)
+        val raw = FloatArray(1024) { 0.75f }
+        val at60Hz = AudioProviderProcessor()
+        val at30Hz = AudioProviderProcessor()
+        var result60 = 0f
+        var result30 = 0f
+        for (i in 0..60) {
+            result60 = at60Hz.process(frame(raw, time = i / 60.0), config).samples[10]
+        }
+        for (i in 0..30) {
+            result30 = at30Hz.process(frame(raw, time = i / 30.0), config).samples[10]
+        }
+        assertEquals(result60, result30, 1e-4f)
+    }
+
 }

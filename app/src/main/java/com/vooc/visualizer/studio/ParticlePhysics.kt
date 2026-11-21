@@ -98,7 +98,12 @@ internal fun particleSpawnOffset(
         }
         "Ring" -> ParticleSpawnOffset(kotlin.math.cos(angle) * radialDistance, kotlin.math.sin(angle) * radialDistance)
         "Line", "HorizontalLine" -> ParticleSpawnOffset((a * 2f - 1f) * width, 0f)
-        "Edge" -> ParticleSpawnOffset(if (a < 0.5f) -width else width, (b * 2f - 1f) * height)
+        "Edge" -> when {
+            a < 0.25f -> ParticleSpawnOffset(-width, (b * 2f - 1f) * height)
+            a < 0.5f -> ParticleSpawnOffset(width, (b * 2f - 1f) * height)
+            a < 0.75f -> ParticleSpawnOffset((b * 2f - 1f) * width, -height)
+            else -> ParticleSpawnOffset((b * 2f - 1f) * width, height)
+        }
         else -> ParticleSpawnOffset(0f, 0f)
     }
 }

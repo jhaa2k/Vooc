@@ -138,6 +138,21 @@ class ParticlePhysicsTest {
         assertEquals(true, result.x.isFinite() && result.y.isFinite())
     }
 
+    @Test fun edgeEmitterWeightsSidesByTheirPerimeterLength() {
+        val tallSide = particleSpawnOffset("Edge", 0.20f, 0.5f, 100f, 80f, 60f, 0f, 0f, 1f)
+        val wideSide = particleSpawnOffset("Edge", 0.60f, 0.5f, 100f, 80f, 60f, 0f, 0f, 1f)
+        assertEquals(-100f, tallSide.x, 0.0001f)
+        assertEquals(0f, tallSide.y, 0.0001f)
+        assertEquals(0f, wideSide.x, 0.0001f)
+        assertEquals(-80f, wideSide.y, 0.0001f)
+    }
+
+    @Test fun edgeEmitterWithZeroAreaFallsBackToCenter() {
+        val result = particleSpawnOffset("Edge", 0.7f, 0.3f, 0f, 0f, 60f, 0f, 0f, 1f)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
     @Test fun unknownEmitterFallsBackToPoint() {
         val result = particleSpawnOffset("Custom", 0.9f, 0.8f, 100f, 80f, 60f, 20f, 0f, 1f)
         assertEquals(0f, result.x, 0.0001f)

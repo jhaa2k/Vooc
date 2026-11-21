@@ -1774,25 +1774,23 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     }
                 } else if (uriText.isBlank()) null else {
                     val bitmap = runCatching {
-                        context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
-                            val decoded = BitmapFactory.decodeStream(stream) ?: return@use null
-                            val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
-                            val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.BACKGROUND || element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) && maskUri.isNotBlank()) {
-                                context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
-                            } else null
-                            val processed = when (element.type) {
-                                StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)
-                                StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
-                                StudioElementType.MOTION_BLUR_EFFECT, StudioElementType.RGB_SPLIT -> processImageForPreview(decoded, element, maskBitmap)
-                                StudioElementType.BACKGROUND -> BackgroundImageProcessor.process(decoded, element, maskBitmap)
-                                StudioElementType.MIRROR_EFFECT -> MirrorEffectProcessor.process(decoded, element)
-                                else -> decoded
-                            }
-                            val image = processed.asImageBitmap()
-                            if (processed !== decoded) decoded.recycle()
-                            maskBitmap?.recycle()
-                            image
+                        val decoded = decodeStudioPreviewBitmap(context, uriText) ?: return@runCatching null
+                        val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                        val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.BACKGROUND || element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) && maskUri.isNotBlank()) {
+                            decodeStudioPreviewBitmap(context, maskUri)
+                        } else null
+                        val processed = when (element.type) {
+                            StudioElementType.IMAGE -> processImageForPreview(decoded, element, maskBitmap)
+                            StudioElementType.BLUR_EFFECT -> processBlurEffectForPreview(decoded, element)
+                            StudioElementType.MOTION_BLUR_EFFECT, StudioElementType.RGB_SPLIT -> processImageForPreview(decoded, element, maskBitmap)
+                            StudioElementType.BACKGROUND -> BackgroundImageProcessor.process(decoded, element, maskBitmap)
+                            StudioElementType.MIRROR_EFFECT -> MirrorEffectProcessor.process(decoded, element)
+                            else -> decoded
                         }
+                        val image = processed.asImageBitmap()
+                        if (processed !== decoded) decoded.recycle()
+                        maskBitmap?.recycle()
+                        image
                     }.getOrNull()
                     bitmap?.let { element.id to it }
                 }

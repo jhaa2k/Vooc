@@ -93,6 +93,18 @@ class AudioProviderProcessorTest {
         assertEquals(result60, result30, 1e-4f)
     }
 
+    @Test fun emptyAnalysisSourceResetsPreviousProviderState() {
+        val config = AudioProviderConfig(sampleOutCount = 32, smooth = 0.9f, filterRadius = 0)
+        val processor = AudioProviderProcessor()
+        processor.process(frame(FloatArray(1024) { 1f }, time = 0.0), config)
+        val unavailable = processor.process(frame(FloatArray(0), time = 0.02), config)
+        assertTrue(unavailable.samples.all { it == 0f })
+        assertEquals(0f, unavailable.beatValue, 0f)
+        val resumed = processor.process(frame(FloatArray(1024) { 0.1f }, time = 0.04), config)
+        val fresh = AudioProviderProcessor().process(frame(FloatArray(1024) { 0.1f }, time = 0.04), config)
+        assertEquals(fresh.samples[10], resumed.samples[10], 1e-6f)
+    }
+
     @Test fun backwardTimestampResetsTemporalSmoothingAndBeatState() {
         val config = AudioProviderConfig(sampleOutCount = 32, smooth = 0.9f, filterRadius = 0)
         val processor = AudioProviderProcessor()

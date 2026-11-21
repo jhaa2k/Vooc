@@ -625,6 +625,18 @@ class ElementSystemTest {
     }
 
     @Test
+    fun backgroundAndShapeCatalogsHideUnsupportedCompositionSurfaceControls() {
+        val background = ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).map { it.name }.toSet()
+        val shape = ElementPropertyCatalog.forElement(StudioElementType.SHAPE).map { it.name }.toSet()
+        assertFalse(background.contains("Source Composition Index"))
+        assertTrue(background.containsAll(setOf("Mask Image", "Show Unblurred Content", "Show Unblurred Content Under")))
+        assertFalse(shape.contains("Source Composition Index"))
+        assertFalse(shape.contains("Mask Image"))
+        assertFalse(shape.contains("Show Unblurred Content"))
+        assertFalse(shape.contains("Show Unblurred Content Under"))
+    }
+
+    @Test
     fun particleCatalogHidesControlsNotImplementedByParticleRenderer() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.PARTICLES).associateBy { it.name }
         assertTrue(specs.containsKey("Texture / Image"))

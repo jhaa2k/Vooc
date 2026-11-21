@@ -609,11 +609,10 @@ class ElementSystemTest {
     }
 
     @Test
-    fun imageShapeParserRejectsUnsupportedCommandsAndMalformedCharacters() {
-        val bounds = android.graphics.RectF(0f, 0f, 100f, 100f)
-        assertNotNull(buildNormalizedImageShapePath("M 0 0 L 1 0 L 1 1 Z", bounds))
-        assertNull(buildNormalizedImageShapePath("M 0 0 A 1 1 0 0 1 1 1 Z", bounds))
-        assertNull(buildNormalizedImageShapePath("M 0 0 L 1 1 @ Z", bounds))
+    fun imageShapePathValidationRejectsUnsupportedCommandsAndMalformedCharacters() {
+        assertTrue(isSupportedNormalizedImageShapePath("M 0 0 L 1 0 L 1 1 Z"))
+        assertFalse(isSupportedNormalizedImageShapePath("M 0 0 A 1 1 0 0 1 1 1 Z"))
+        assertFalse(isSupportedNormalizedImageShapePath("M 0 0 L 1 1 @ Z"))
     }
 
 }

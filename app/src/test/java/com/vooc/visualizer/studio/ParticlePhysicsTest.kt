@@ -48,6 +48,17 @@ class ParticlePhysicsTest {
         assertEquals(-7f, result.velocity, 0.0001f)
     }
 
+    @Test fun boundaryCollisionHandlesExtremeFiniteCoordinatesWithoutIntegerOverflow() {
+        val positive = reflectParticleAxis(Float.MAX_VALUE, 12f, 100f, 0.5f)
+        val negative = reflectParticleAxis(-Float.MAX_VALUE, -12f, 100f, 0.5f)
+        assertEquals(true, positive.position.isFinite() && positive.position in 0f..100f)
+        assertEquals(true, negative.position.isFinite() && negative.position in 0f..100f)
+        assertEquals(true, positive.velocity.isFinite())
+        assertEquals(true, negative.velocity.isFinite())
+        assertEquals(0f, positive.velocity, 0.0001f)
+        assertEquals(0f, negative.velocity, 0.0001f)
+    }
+
     @Test fun normalizedParticlePositionKeepsDefaultAtCanvasCenter() {
         assertEquals(0f, particlePositionOffset(0.5f), 0.0001f)
     }

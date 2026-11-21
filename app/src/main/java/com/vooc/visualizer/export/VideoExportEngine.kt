@@ -1652,7 +1652,9 @@ object VideoExportEngine {
                             textAlias("Color Over Life End", "#00FFFFFF", "Color To", textValue("Color", "#FFFFFFFF"))
                         ), reactivity.colorMultiplier)
                     }.getOrDefault(colorTo)
-                    val customParticle = imageCache[textValue("Texture / Image").ifBlank { textValue("Custom Image") }]
+                    val particleTextureUri = listOf("Custom Bar Image", "Texture / Image", "Custom Image", "Image Source / File", "Target Image")
+                        .firstNotNullOfOrNull { key -> textValue(key).takeIf { it.isNotBlank() } }.orEmpty()
+                    val customParticle = imageCache[particleTextureUri]
                     val mirrorX = (element.value("Mirror X") as? ElementValue.Bool)?.value == true
                     val mirrorY = (element.value("Mirror Y") as? ElementValue.Bool)?.value == true
                     val velocityAngle = (element.value("Velocity Angle") as? ElementValue.Bool)?.value == true

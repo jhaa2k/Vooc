@@ -3098,8 +3098,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 forceMode, dx, dy, forceStrength, age,
                                 cos(baseAngle), sin(baseAngle)
                             )
-                            vx += forceDelta.position
-                            vy += forceDelta.velocity
+                            vx += forceDelta.x
+                            vy += forceDelta.y
                             val frequency = sineFrequency * (1f + randomB * sineFrequencyRandom)
                             val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
                                 sineMagnitude * (1f + randomA * sineMagnitudeRandom)

@@ -312,6 +312,14 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
     )
 }
 
+/**
+ * Selects the enabled provider that owns shared analyzer-level settings.
+ * Per-provider spectrum shaping remains independent; the first enabled provider
+ * supplies FFT/window/beat configuration to the single shared analyzer.
+ */
+fun List<AudioProviderConfig>.analyzerConfigSource(): AudioProviderConfig? =
+    firstOrNull { it.providerEnabled } ?: firstOrNull()
+
 /** Apply provider DSP settings while preserving unrelated analyzer configuration. */
 fun AudioProviderConfig.applyTo(base: AnalyzerConfig): AnalyzerConfig {
     val cfg = validated()

@@ -22,6 +22,26 @@ class ParticlePhysicsTest {
         assertEquals(2f, result.velocity, 0.0001f)
     }
 
+    @Test fun boundaryCollisionSanitizesNonFiniteInputs() {
+        val invalidPosition = reflectParticleAxis(Float.NaN, 12f, 100f, 0.5f)
+        assertEquals(0f, invalidPosition.position, 0.0001f)
+        assertEquals(12f, invalidPosition.velocity, 0.0001f)
+
+        val invalidVelocity = reflectParticleAxis(25f, Float.POSITIVE_INFINITY, 100f, 0.5f)
+        assertEquals(25f, invalidVelocity.position, 0.0001f)
+        assertEquals(0f, invalidVelocity.velocity, 0.0001f)
+
+        val invalidExtent = reflectParticleAxis(75f, -8f, Float.NaN, 0.5f)
+        assertEquals(0f, invalidExtent.position, 0.0001f)
+        assertEquals(-8f, invalidExtent.velocity, 0.0001f)
+    }
+
+    @Test fun boundaryCollisionUsesSafeDefaultForNonFiniteBounce() {
+        val result = reflectParticleAxis(110f, 20f, 100f, Float.NaN)
+        assertEquals(90f, result.position, 0.0001f)
+        assertEquals(-10f, result.velocity, 0.0001f)
+    }
+
     @Test fun particlesInsideBoundsAreUnchanged() {
         val result = reflectParticleAxis(45f, -7f, 100f, 0.25f)
         assertEquals(45f, result.position, 0.0001f)

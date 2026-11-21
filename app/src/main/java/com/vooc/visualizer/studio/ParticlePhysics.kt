@@ -43,3 +43,35 @@ internal fun particleForceDelta(
         else -> ParticleForceDelta(0f, 0f)
     }
 }
+
+internal data class ParticleSpawnOffset(val x: Float, val y: Float)
+
+/** Deterministic emitter sampling shared by preview and export. randomA/randomB are in [0, 1]. */
+internal fun particleSpawnOffset(
+    shape: String,
+    randomA: Float,
+    randomB: Float,
+    width: Float,
+    height: Float,
+    radius: Float,
+    innerRadius: Float,
+    arcStart: Float,
+    arcSweep: Float
+): ParticleSpawnOffset {
+    val a = randomA.coerceIn(0f, 1f)
+    val b = randomB.coerceIn(0f, 1f)
+    val angle = arcStart + a * arcSweep
+    val radialDistance = innerRadius.coerceAtLeast(0f) +
+        (radius.coerceAtLeast(innerRadius) - innerRadius.coerceAtLeast(0f)) * b
+    return when (shape) {
+        "Rectangle" -> ParticleSpawnOffset((a * 2f - 1f) * width, (b * 2f - 1f) * height)
+        "Ellipse", "Circle" -> ParticleSpawnOffset(
+            kotlin.math.cos(angle) * radialDistance.coerceAtLeast(width * b),
+            kotlin.math.sin(angle) * if (shape == "Circle") radialDistance else radius * height / width.coerceAtLeast(1f)
+        )
+        "Ring" -> ParticleSpawnOffset(kotlin.math.cos(angle) * radialDistance, kotlin.math.sin(angle) * radialDistance)
+        "Line", "HorizontalLine" -> ParticleSpawnOffset((a * 2f - 1f) * width, 0f)
+        "Edge" -> ParticleSpawnOffset(if (a < 0.5f) -width else width, (b * 2f - 1f) * height)
+        else -> ParticleSpawnOffset(0f, 0f)
+    }
+}

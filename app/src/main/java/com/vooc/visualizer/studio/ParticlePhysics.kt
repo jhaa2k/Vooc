@@ -45,6 +45,28 @@ internal fun particlePositionOffset(normalizedPosition: Float): Float {
     return safePosition - 0.5f
 }
 
+internal data class ParticleAnchorOffset(val x: Float, val y: Float)
+
+/** Resolves particle anchor controls as a normalized offset from the selected alignment point. */
+internal fun resolveParticleAnchorOffset(
+    anchorX: String,
+    anchorY: String,
+    alignmentX: Float,
+    alignmentY: Float
+): ParticleAnchorOffset {
+    fun axis(anchor: String, alignment: Float): Float {
+        val anchorPoint = when (anchor.lowercase()) {
+            "start" -> 0f
+            "center" -> 0.5f
+            "end" -> 1f
+            else -> return 0f
+        }
+        val safeAlignment = alignment.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
+        return anchorPoint - safeAlignment
+    }
+    return ParticleAnchorOffset(axis(anchorX, alignmentX), axis(anchorY, alignmentY))
+}
+
 internal data class ParticleLayerScale(val x: Float, val y: Float)
 
 /** Applies uniform/non-uniform layer scale consistently to preview and export particle sizes. */

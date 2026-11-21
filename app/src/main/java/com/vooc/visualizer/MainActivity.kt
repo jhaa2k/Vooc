@@ -1,4 +1,7 @@
 package com.vooc.visualizer
+import com.vooc.visualizer.studio.resolveMotionBlurLength
+import com.vooc.visualizer.studio.resolveMotionBlurSampleProgress
+import com.vooc.visualizer.studio.resolveMotionBlurExposureAlpha
 import com.vooc.visualizer.studio.scaleBarDesignDimension
 import com.vooc.visualizer.studio.BlurEffectProcessor
 

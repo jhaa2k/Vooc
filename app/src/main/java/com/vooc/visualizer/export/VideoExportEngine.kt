@@ -344,7 +344,7 @@ object VideoExportEngine {
                         } else if (element.type == StudioElementType.BACKGROUND) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {
-                                resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                                decodeExportImage(resolver, Uri.parse(maskUri), maxOf(width, height))
                             } else null
                             val processed = BackgroundImageProcessor.process(source, element, maskBitmap)
                             imageCache["${uriText}#${element.id}"] = processed
@@ -353,7 +353,7 @@ object VideoExportEngine {
                         } else if (element.type == StudioElementType.IMAGE) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {
-                                resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                                decodeExportImage(resolver, Uri.parse(maskUri), maxOf(width, height))
                             } else null
                             val processed = processImageForExport(source, element, maskBitmap)
                             imageCache["${uriText}#${element.id}"] = processed
@@ -366,7 +366,7 @@ object VideoExportEngine {
                         } else if (element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {
-                                resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                                decodeExportImage(resolver, Uri.parse(maskUri), maxOf(width, height))
                             } else null
                             val processed = processImageForExport(source, element, maskBitmap)
                             imageCache["${uriText}#${element.id}"] = processed

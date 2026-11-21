@@ -180,10 +180,10 @@ class ElementSystemTest {
             specs.getValue("Particle Emitter Shape").options
         )
         assertEquals(ElementValue.Text("Circle"), specs.getValue("Particle Emitter Shape").defaultValue)
-        assertEquals(
-            ElementValue.Text("Circle"),
-            ElementPropertyCatalog.create(StudioElementType.PARTICLES, "particles-default").value("Particle Emitter Shape")
-        )
+        assertEquals(ElementValue.Text("Circle"), specs.getValue("Spawn Area").defaultValue)
+        val particle = ElementPropertyCatalog.create(StudioElementType.PARTICLES, "particles-default")
+        assertEquals(ElementValue.Text("Circle"), particle.value("Particle Emitter Shape"))
+        assertEquals(ElementValue.Text("Circle"), particle.value("Spawn Area"))
     }
 
     @Test

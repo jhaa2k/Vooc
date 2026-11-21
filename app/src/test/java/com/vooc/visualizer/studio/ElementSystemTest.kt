@@ -200,6 +200,7 @@ class ElementSystemTest {
         assertTrue("Missing advanced shape controls: ${required - specs.keys}", specs.keys.containsAll(required))
         assertEquals(listOf("Non Zero", "Even Odd"), specs.getValue("Fill Rule").options)
         assertEquals(listOf("Inside", "Center", "Outside"), specs.getValue("Stroke Alignment").options)
+        assertFalse("PreMulAlpha has no distinct renderer implementation", specs.getValue("Blend Mode Content").options.contains("PreMulAlpha"))
     }
 
     @Test

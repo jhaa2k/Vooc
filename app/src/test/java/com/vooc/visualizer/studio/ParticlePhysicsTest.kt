@@ -48,6 +48,20 @@ class ParticlePhysicsTest {
         assertEquals(-7f, result.velocity, 0.0001f)
     }
 
+    @Test fun normalizedParticlePositionKeepsDefaultAtCanvasCenter() {
+        assertEquals(0f, particlePositionOffset(0.5f), 0.0001f)
+    }
+
+    @Test fun normalizedParticlePositionMovesAcrossFullCanvasRange() {
+        assertEquals(-0.5f, particlePositionOffset(0f), 0.0001f)
+        assertEquals(0.5f, particlePositionOffset(1f), 0.0001f)
+    }
+
+    @Test fun normalizedParticlePositionSanitizesInvalidValuesToCenter() {
+        assertEquals(0f, particlePositionOffset(Float.NaN), 0.0001f)
+        assertEquals(0f, particlePositionOffset(Float.POSITIVE_INFINITY), 0.0001f)
+    }
+
     @Test fun particleLayerScalePreservesIndependentAxesWhenNonUniform() {
         val result = resolveParticleLayerScale(2f, 0.5f, false, 1.5f)
         assertEquals(3f, result.x, 0.0001f)

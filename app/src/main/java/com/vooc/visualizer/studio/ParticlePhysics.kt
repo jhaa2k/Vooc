@@ -20,3 +20,24 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     val direction = if (hits % 2 == 0) 1f else -1f
     return ParticleAxisState(folded.coerceIn(0f, extent), velocity * direction * bounce.coerceIn(0f, 1f).pow(hits))
 }
+
+/** Returns the velocity delta applied by an Avee-style force field at a particle position. */
+internal fun particleForceDelta(
+    mode: String,
+    dx: Float,
+    dy: Float,
+    strength: Float,
+    age: Float,
+    directionX: Float,
+    directionY: Float
+): ParticleAxisState {
+    val distance = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+    val amount = strength * age
+    return when (mode) {
+        "Attract", "Radial" -> ParticleAxisState(dx / distance * amount, dy / distance * amount)
+        "Repel" -> ParticleAxisState(-dx / distance * amount, -dy / distance * amount)
+        "Directional" -> ParticleAxisState(directionX * amount, directionY * amount)
+        "Vortex" -> ParticleAxisState(-dy / distance * amount, dx / distance * amount)
+        else -> ParticleAxisState(0f, 0f)
+    }
+}

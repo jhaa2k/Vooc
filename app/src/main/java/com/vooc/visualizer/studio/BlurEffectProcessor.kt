@@ -212,12 +212,17 @@ object BlurEffectProcessor {
                         sy = y + dy
                     }
                     else -> {
-                        val offsets = arrayOf(
-                            -1f to 0f, 1f to 0f, 0f to -1f, 0f to 1f, 0f to 0f,
-                            -0.7f to -0.7f, 0.7f to -0.7f, -0.7f to 0.7f, 0.7f to 0.7f
-                        )
-                        sx = x + offsets[tap].first * step
-                        sy = y + offsets[tap].second * step
+                        val dx = when (tap) {
+                            0 -> -1f; 1 -> 1f; 5, 6 -> if (tap == 5) -0.7f else 0.7f
+                            7, 8 -> if (tap == 7) -0.7f else 0.7f
+                            else -> 0f
+                        }
+                        val dy = when (tap) {
+                            2 -> -1f; 3 -> 1f; 5, 7 -> -0.7f; 6, 8 -> 0.7f
+                            else -> 0f
+                        }
+                        sx = x + dx * step
+                        sy = y + dy * step
                     }
                 }
                 val pixel = if (algorithm == "Kawase" && tap == 4) input[y * w + x]

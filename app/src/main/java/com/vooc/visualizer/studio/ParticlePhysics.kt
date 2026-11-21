@@ -107,11 +107,27 @@ internal fun particleSpawnOffset(
         }
         "Ring" -> ParticleSpawnOffset(kotlin.math.cos(angle) * radialDistance, kotlin.math.sin(angle) * radialDistance)
         "Line", "HorizontalLine" -> ParticleSpawnOffset((a * 2f - 1f) * safeWidth, 0f)
-        "Edge" -> when {
-            a < 0.25f -> ParticleSpawnOffset(-safeWidth, (b * 2f - 1f) * safeHeight)
-            a < 0.5f -> ParticleSpawnOffset(safeWidth, (b * 2f - 1f) * safeHeight)
-            a < 0.75f -> ParticleSpawnOffset((b * 2f - 1f) * safeWidth, -safeHeight)
-            else -> ParticleSpawnOffset((b * 2f - 1f) * safeWidth, safeHeight)
+        "Edge" -> {
+            // Sample uniformly along the rectangle perimeter so long sides receive
+            // proportionally more particles than short sides.
+            val perimeter = 4f * (safeWidth + safeHeight)
+            if (perimeter <= 0f) {
+                ParticleSpawnOffset(0f, 0f)
+            } else {
+                val distance = a * perimeter
+                val leftRightLength = 2f * safeHeight
+                val topBottomLength = 2f * safeWidth
+                when {
+                    distance < leftRightLength ->
+                        ParticleSpawnOffset(-safeWidth, (b * 2f - 1f) * safeHeight)
+                    distance < leftRightLength * 2f ->
+                        ParticleSpawnOffset(safeWidth, (b * 2f - 1f) * safeHeight)
+                    distance < leftRightLength * 2f + topBottomLength ->
+                        ParticleSpawnOffset((b * 2f - 1f) * safeWidth, -safeHeight)
+                    else ->
+                        ParticleSpawnOffset((b * 2f - 1f) * safeWidth, safeHeight)
+                }
+            }
         }
         else -> ParticleSpawnOffset(0f, 0f)
     }

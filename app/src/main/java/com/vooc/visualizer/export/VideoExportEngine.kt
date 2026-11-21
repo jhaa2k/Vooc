@@ -1,4 +1,5 @@
 package com.vooc.visualizer.export
+import com.vooc.visualizer.studio.scaleBarDesignDimension
 
 import com.vooc.visualizer.studio.buildNormalizedImageShapePath
 import com.vooc.visualizer.studio.resolveParticleLayerScale

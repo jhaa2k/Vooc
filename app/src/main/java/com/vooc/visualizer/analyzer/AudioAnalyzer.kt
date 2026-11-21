@@ -8,7 +8,14 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-class ChannelAnalysis(val spectrum: FloatArray, val bands: FloatArray, val rms: Float, val peak: Float)
+class ChannelAnalysis(
+    val spectrum: FloatArray,
+    val bands: FloatArray,
+    val rms: Float,
+    val peak: Float,
+    /** Unsmoothened linear FFT magnitudes for Audio Provider DSP. */
+    val rawMagnitude: FloatArray = spectrum
+)
 
 class AnalysisFrame(
     val timeSec: Double,
@@ -254,7 +261,7 @@ class AudioAnalyzer(
             val rms = sqrt(sq / n).toFloat()
             val c = smoothingCoeff(if (pk > p.peakEnv) config.peakAttackMs else config.peakReleaseMs, dt)
             p.peakEnv = c * p.peakEnv + (1f - c) * pk
-            channels[p.select] = ChannelAnalysis(display(p.smoothed), p.bandOut.copyOf(), rms, p.peakEnv)
+            channels[p.select] = ChannelAnalysis(display(p.smoothed), p.bandOut.copyOf(), rms, p.peakEnv, p.result.raw.copyOf())
         }
         val mixPipe = pipelines.first { it.select == ChannelSelect.MIX }
         val mixAnalysis = channels.getValue(ChannelSelect.MIX)

@@ -105,6 +105,23 @@ class AudioProviderProcessorTest {
         assertEquals(fresh.samples[10], resumed.samples[10], 1e-6f)
     }
 
+    @Test fun disablingProviderOutputsSilenceAndResetsTemporalState() {
+        val processor = AudioProviderProcessor()
+        val active = AudioProviderConfig(sampleOutCount = 32, smooth = 0.9f, filterRadius = 0)
+        processor.process(frame(FloatArray(1024) { 1f }, time = 0.0), active)
+
+        val disabled = processor.process(
+            frame(FloatArray(1024) { 0.1f }, time = 0.02),
+            active.copy(providerEnabled = false)
+        )
+        assertTrue(disabled.samples.all { it == 0f })
+        assertEquals(0f, disabled.beatValue, 0f)
+
+        val resumed = processor.process(frame(FloatArray(1024) { 0.1f }, time = 0.04), active)
+        val fresh = AudioProviderProcessor().process(frame(FloatArray(1024) { 0.1f }, time = 0.04), active)
+        assertEquals(fresh.samples[10], resumed.samples[10], 1e-6f)
+    }
+
     @Test fun leftRightAndStereoAverageUseTheirOwnRawChannelSpectra() {
         val leftRaw = FloatArray(1024) { 0.2f }
         val rightRaw = FloatArray(1024) { 0.8f }

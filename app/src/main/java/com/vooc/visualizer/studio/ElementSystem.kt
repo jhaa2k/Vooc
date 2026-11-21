@@ -376,7 +376,6 @@ object ElementPropertyCatalog {
     private val provider = listOf(
         text("Tag", "General", "Audio Provider"),
         bool("Provider Enabled", "General", true),
-        text("Sample Provider", "General", "Spectrum", listOf("Spectrum")),
         integer("Sample Out Count", "Spectrum", 201, 1.0, 2048.0),
         bool("Mirror Samples", "Spectrum", false),
         bool("Repeat Samples", "Spectrum", true),

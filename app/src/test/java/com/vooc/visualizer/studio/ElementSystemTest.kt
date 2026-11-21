@@ -176,7 +176,7 @@ class ElementSystemTest {
             specs.getValue("Spawn Area").options
         )
         assertEquals(
-            listOf("Point", "Line", "HorizontalLine", "Rectangle", "Ellipse", "Ring", "Edge"),
+            listOf("Point", "Line", "HorizontalLine", "Rectangle", "Ellipse", "Circle", "Ring", "Edge"),
             specs.getValue("Particle Emitter Shape").options
         )
     }

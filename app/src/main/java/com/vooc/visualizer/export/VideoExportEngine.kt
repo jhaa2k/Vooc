@@ -1557,7 +1557,15 @@ object VideoExportEngine {
                         val randomB = abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
                         val randomC = abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
                         val particleLifetime = (lifetime * (1f + (randomC * 2f - 1f) * lifetimeRandom)).coerceAtLeast(0.01f)
-                            val age = ((seconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
+                        if (emitterBurstCount > 0 && index >= emitterBurstCount) return@repeat
+                        val burstElapsed = seconds - index * spawnInterval
+                        if (emitterBurstCount > 0 && burstElapsed < 0f) return@repeat
+                        val age = if (emitterBurstCount > 0) {
+                            if (emitterLoop) burstElapsed % emitterBurstInterval else burstElapsed
+                        } else {
+                            ((seconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
+                        }
+                        if (emitterBurstCount > 0 && age > particleLifetime) return@repeat
                         val lifeT = (age / particleLifetime).coerceIn(0f, 1f)
                         val emitterAngle = emitterArcStart + randomA * emitterArcSweep
                         val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
@@ -1583,9 +1591,6 @@ object VideoExportEngine {
                             val velocity = particleSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                         var vx = cos(angle) * velocity
                         var vy = sin(angle) * velocity
-                        val burstIndex = if (emitterBurstCount > 0) (seconds / emitterBurstInterval).toInt() else 0
-                        val inBurst = emitterBurstCount <= 0 || (index % count.coerceAtLeast(1)) < emitterBurstCount
-                        if (emitterBurstCount > 0 && (!inBurst || (!emitterLoop && burstIndex > 0))) { vx = 0f; vy = 0f }
                         val fieldX = forcePosition.x.toFloat() * width
                         val fieldY = forcePosition.y.toFloat() * height
                         val dx = fieldX - spawnX

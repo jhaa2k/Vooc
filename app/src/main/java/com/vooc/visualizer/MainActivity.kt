@@ -662,10 +662,19 @@ private fun VoocStudio(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playing = isPlaying
+                // Flush stale audio-clock samples and temporal DSP state across pause/resume.
+                analyzer.onStreamDiscontinuity(player.currentPosition.coerceAtLeast(0L) / 1000.0)
+                providerProcessors.values.forEach { it.reset() }
+            }
             override fun onPlaybackStateChanged(state: Int) { duration = player.duration.coerceAtLeast(0L) }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 trackName = mediaItem?.localConfiguration?.uri?.lastPathSegment ?: trackName
+                // A new queue item can begin near the previous item's position; do not rely on
+                // the render-loop position-delta heuristic to detect the track boundary.
+                analyzer.onStreamDiscontinuity(player.currentPosition.coerceAtLeast(0L) / 1000.0)
+                providerProcessors.values.forEach { it.reset() }
             }
         }
         player.addListener(listener)

@@ -150,6 +150,7 @@ object VideoExportEngine {
         // Quantized channel snapshots keep export memory bounded (512 bytes/channel/frame).
         val channelSpectrumByFrame = channelsToCapture.associateWith { Array(frameCount) { ByteArray(512) } }
         val providerBeatByFrame = FloatArray(frameCount)
+        val peakLevelByFrame = FloatArray(frameCount)
         val leftLevelByFrame = FloatArray(frameCount)
         val rightLevelByFrame = FloatArray(frameCount)
         val waveformLevelByFrame = FloatArray(frameCount)
@@ -191,6 +192,7 @@ object VideoExportEngine {
                                 }
                                 providerBeatByFrame[frameIndex] = shaped.beatValue
                                 providerBpmByFrame[frameIndex] = analysis.beat.bpm.takeIf { it in 40f..240f } ?: 120f
+                                peakLevelByFrame[frameIndex] = analysis.peak
                                 leftLevelByFrame[frameIndex] = analysis.channel(ChannelSelect.LEFT).rms
                                 rightLevelByFrame[frameIndex] = analysis.channel(ChannelSelect.RIGHT).rms
                                 channelSpectrumByFrame.forEach { (channel, frames) ->
@@ -234,6 +236,7 @@ object VideoExportEngine {
                 val lastProviderSamples = arrayOfNulls<FloatArray>(providerConfigs.size)
                 var lastBeat = 0f
                 var lastBpm = 120f
+                var lastPeak = 0f
                 var lastLeft = 0f
                 var lastRight = 0f
                 var lastWaveform = 0f
@@ -245,6 +248,7 @@ object VideoExportEngine {
                         }
                         lastBeat = providerBeatByFrame[i]
                         lastBpm = providerBpmByFrame[i]
+                        lastPeak = peakLevelByFrame[i]
                         lastLeft = leftLevelByFrame[i]
                         lastRight = rightLevelByFrame[i]
                         lastWaveform = waveformLevelByFrame[i]
@@ -255,6 +259,7 @@ object VideoExportEngine {
                         }
                         providerBeatByFrame[i] = lastBeat
                         providerBpmByFrame[i] = lastBpm
+                        peakLevelByFrame[i] = lastPeak
                         leftLevelByFrame[i] = lastLeft
                         rightLevelByFrame[i] = lastRight
                         waveformLevelByFrame[i] = lastWaveform
@@ -271,6 +276,7 @@ object VideoExportEngine {
                         }
                         providerBeatByFrame[i] = providerBeatByFrame[firstAssigned]
                         providerBpmByFrame[i] = providerBpmByFrame[firstAssigned]
+                        peakLevelByFrame[i] = peakLevelByFrame[firstAssigned]
                         leftLevelByFrame[i] = leftLevelByFrame[firstAssigned]
                         rightLevelByFrame[i] = rightLevelByFrame[firstAssigned]
                         waveformLevelByFrame[i] = waveformLevelByFrame[firstAssigned]
@@ -406,7 +412,7 @@ object VideoExportEngine {
                         val input = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("H.264 input buffer unavailable.")
                         if (submittedFrames < frameCount) {
                             val timeMs = submittedFrames * 1000L / fps
-                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, fontCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerSamplesByIndexByFrame.map { frames -> frames.getOrElse(submittedFrames) { FloatArray(0) } }, channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, analysisSampleRate, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
+                            drawFrame(context, canvas, paint, project, width, height, timeMs, imageCache, fontCache, barRuntimes, barLastUpdateMs, audioReactivityRuntimes, audioEnvelope.getOrElse(submittedFrames) { 0f }, peakLevelByFrame.getOrElse(submittedFrames) { 0f }, providerSamplesByFrame.getOrNull(submittedFrames), providerSamplesByIndexByFrame.map { frames -> frames.getOrElse(submittedFrames) { FloatArray(0) } }, channelSpectrumByFrame.mapValues { (_, frames) -> FloatArray(frames[submittedFrames].size) { index -> (frames[submittedFrames][index].toInt() and 0xFF) / 255f } }, analysisSampleRate, providerBeatByFrame.getOrElse(submittedFrames) { 0f }, providerBpmByFrame.getOrElse(submittedFrames) { 120f }, leftLevelByFrame.getOrElse(submittedFrames) { 0f }, rightLevelByFrame.getOrElse(submittedFrames) { 0f }, waveformLevelByFrame.getOrElse(submittedFrames) { 0f })
                             input.clear()
                             writeYuv420(bitmap, input)
                             encoder.queueInputBuffer(inputIndex, 0, input.position(), submittedFrames * 1_000_000L / fps, 0)
@@ -641,7 +647,7 @@ object VideoExportEngine {
         return blurred
     }
 
-    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, fontFaces: Map<String, Typeface>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerSamplesByIndex: List<FloatArray>?, channelSamples: Map<ChannelSelect, FloatArray>, analysisSampleRate: Int, providerBeat: Float, providerBpm: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
+    private fun drawFrame(context: Context, canvas: Canvas, paint: Paint, project: StudioProject, width: Int, height: Int, timeMs: Long, imageCache: Map<String, Bitmap>, fontFaces: Map<String, Typeface>, barRuntimes: MutableMap<String, SpectrumBarsRuntime>, barLastUpdateMs: MutableMap<String, Long>, audioReactivityRuntimes: MutableMap<String, AudioReactivityRuntime>, audioLevel: Float, providerSamples: FloatArray?, providerSamplesByIndex: List<FloatArray>?, channelSamples: Map<ChannelSelect, FloatArray>, analysisSampleRate: Int, providerBeat: Float, providerBpm: Float, peakLevel: Float, leftLevel: Float, rightLevel: Float, waveformLevel: Float) {
         val poppinsTypeface = runCatching { ResourcesCompat.getFont(context, com.vooc.visualizer.R.font.poppins_variable) }.getOrNull()
         canvas.save()
         canvas.clipRect(0, 0, width, height)
@@ -886,7 +892,7 @@ object VideoExportEngine {
                 samples = safeElementSamples,
                 overall = audioLevel,
                 beat = providerBeat,
-                peak = audioLevel,
+                peak = peakLevel,
                 rms = audioLevel,
                 waveform = waveformLevel,
                 left = leftLevel,

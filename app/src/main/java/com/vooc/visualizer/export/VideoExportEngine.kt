@@ -1731,7 +1731,7 @@ object VideoExportEngine {
                         val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
                         val trailX = vx * trailLength * 0.001f
                         val trailY = vy * trailLength * 0.001f
-                        fun drawParticleAt(x: Float, y: Float) {
+                        fun drawParticleAt(x: Float, y: Float, drawAngle: Float = visualAngle) {
                             paint.color = particleColor
                             paint.alpha = particleAlpha
                             paint.xfermode = if (exclusionBlend && android.os.Build.VERSION.SDK_INT >= 29) null else if (particleContentBlendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(particleContentBlendMode)
@@ -1745,7 +1745,7 @@ object VideoExportEngine {
                             }
                             if (customParticle != null) {
                                 canvas.save()
-                                canvas.rotate(visualAngle, x, y)
+                                canvas.rotate(drawAngle, x, y)
                                 val texturePaint = Paint(paint).apply {
                                     colorFilter = android.graphics.PorterDuffColorFilter(
                                         particleColor,
@@ -1769,9 +1769,9 @@ object VideoExportEngine {
                                 canvas.restore()
                             }
                         }
-                        if (mirrorX) drawParticleAt(width - px, py)
-                        if (mirrorY) drawParticleAt(px, height - py)
-                        if (mirrorX && mirrorY) drawParticleAt(width - px, height - py)
+                        if (mirrorX) drawParticleAt(width - px, py, 180f - visualAngle)
+                        if (mirrorY) drawParticleAt(px, height - py, -visualAngle)
+                        if (mirrorX && mirrorY) drawParticleAt(width - px, height - py, visualAngle + 180f)
                         drawParticleAt(px, py)
                     }
                     paint.xfermode = null

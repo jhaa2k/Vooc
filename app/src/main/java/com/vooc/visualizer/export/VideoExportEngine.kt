@@ -1737,13 +1737,13 @@ object VideoExportEngine {
                         val frameHeight = height * 0.45f * scale * imageScaleY
                         val fitMode = if ((element.value("Keep Aspect Ratio And Crop To Fit") as? ElementValue.Bool)?.value == true) "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
                         val keepRatio = (element.value("Keep Aspect Ratio") as? ElementValue.Bool)?.value != false
-                        val leftCrop = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * image.width).toInt()
-                        val topCrop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * image.height).toInt()
-                        val rightCrop = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * image.width).toInt()
-                        val bottomCrop = (number("Crop Bottom", 0f).coerceIn(0f, 0.95f) * image.height).toInt()
+                        val leftCrop = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * image.width).toInt().coerceIn(0, image.width - 1)
+                        val topCrop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * image.height).toInt().coerceIn(0, image.height - 1)
+                        val rightCrop = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * image.width).toInt().coerceIn(0, image.width - leftCrop - 1)
+                        val bottomCrop = (number("Crop Bottom", 0f).coerceIn(0f, 0.95f) * image.height).toInt().coerceIn(0, image.height - topCrop - 1)
                         val src = android.graphics.Rect(leftCrop, topCrop,
-                            (image.width - rightCrop).coerceAtLeast(leftCrop + 1),
-                            (image.height - bottomCrop).coerceAtLeast(topCrop + 1))
+                            image.width - rightCrop,
+                            image.height - bottomCrop)
                         val ratio = src.width().toFloat() / src.height().coerceAtLeast(1).toFloat()
                         val frameRatio = frameWidth / frameHeight.coerceAtLeast(1f)
                         val dst = when {

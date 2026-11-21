@@ -895,7 +895,7 @@ object ElementPropertyCatalog {
         number("Side Sine Wave Freq Random", "Wave Behaviour", 0.0, 0.0, 1.0),
         number("Side Sine Wave Mag", "Wave Behaviour", 0.0, -1000.0, 1000.0),
         number("Side Sine Wave Mag Random", "Wave Behaviour", 0.0, 0.0, 1.0),
-        text("Particle Emitter Shape", "Emitter", "Point", listOf("Point", "Line", "HorizontalLine", "Rectangle", "Ellipse", "Ring", "Edge")),
+        text("Particle Emitter Shape", "Emitter", "Point", listOf("Point", "Line", "HorizontalLine", "Rectangle", "Ellipse", "Circle", "Ring", "Edge")),
         ElementPropertySpec("Emitter Position", "Emitter", ElementValueType.VECTOR2, ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
         number("Emitter Rotation", "Emitter", 0.0, -360.0, 360.0),
         number("Emitter Radius", "Emitter", 100.0, 0.0, 10000.0),

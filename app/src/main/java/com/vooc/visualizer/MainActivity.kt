@@ -2285,9 +2285,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             val posMotion = motionFor("Measure Pos (Measure What)")
             val scaleMotion = motionFor("Measure Scale (Measure What)")
             val rotMotion = motionFor("Measure Rot (Measure What)")
+            val positionOffsetX = if (element.type == StudioElementType.PARTICLES) particlePositionOffset(position.x.toFloat()) else position.x.toFloat() / 200f
+            val positionOffsetY = if (element.type == StudioElementType.PARTICLES) particlePositionOffset(position.y.toFloat()) else position.y.toFloat() / 200f
             val center = Offset(
-                cx + ((position.x.toFloat() + reactivity.xOffset) / 200f + posMotion.offsetX) * size.width,
-                cy + ((position.y.toFloat() + reactivity.yOffset) / 200f + posMotion.offsetY) * size.height
+                cx + (positionOffsetX + reactivity.xOffset / 200f + posMotion.offsetX) * size.width,
+                cy + (positionOffsetY + reactivity.yOffset / 200f + posMotion.offsetY) * size.height
             )
             val scale = (number("Scale", 100f) / 100f * scaleMotion.scale * reactivity.scaleMultiplier).coerceIn(0f, 10f)
             val imageAnimationMode = textValue("Measure Animation Speed (Measure What)", "Nothing")

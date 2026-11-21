@@ -22,6 +22,7 @@ import com.vooc.visualizer.studio.resolveParticleTrailVector
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 import com.vooc.visualizer.studio.resolveParticleOpacity
 import com.vooc.visualizer.studio.resolveParticleEmissionTiming
+import com.vooc.visualizer.studio.rotateParticleEmitterOffset
 
 import android.net.Uri
 import android.Manifest

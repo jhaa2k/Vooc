@@ -16,6 +16,7 @@ import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.studio.ElementPropertyCatalog
 import com.vooc.visualizer.studio.BackgroundImageProcessor
 import com.vooc.visualizer.studio.MirrorEffectProcessor
+import com.vooc.visualizer.studio.GeneratedAlbumArt
 import com.vooc.visualizer.studio.ElementValue
 import com.vooc.visualizer.studio.StudioElementType
 import android.media.MediaCodec
@@ -306,7 +307,14 @@ object VideoExportEngine {
             val uriText = uriKeys.firstNotNullOfOrNull { key ->
                 (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
             }.orEmpty()
-            if (uriText.isNotBlank()) runCatching {
+            if (element.type == StudioElementType.IMAGE && (uriText.isBlank() || GeneratedAlbumArt.isForced(element))) {
+                runCatching {
+                    val source = GeneratedAlbumArt.create(element)
+                    val processed = processImageForExport(source, element, null)
+                    imageCache["generated:${element.id}"] = processed
+                    if (processed !== source) source.recycle()
+                }
+            } else if (uriText.isNotBlank()) runCatching {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                     BitmapFactory.decodeStream(stream)?.let { source ->
                         if (element.type == StudioElementType.MIRROR_EFFECT) {
@@ -1700,7 +1708,7 @@ object VideoExportEngine {
                 }
                 StudioElementType.MIRROR_EFFECT -> {
                     val uriText = (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
-                    val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
+                    val image = imageCache["generated:${element.id}"] ?: imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
                     if (image != null) {
                         val imageScale = element.value("Scale") as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
                         val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)

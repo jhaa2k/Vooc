@@ -599,6 +599,32 @@ class ElementSystemTest {
     }
 
     @Test
+    fun imageLayerCatalogExposesSupportedControlsWithoutInertCompositionIndex() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).associateBy { it.name }
+        val required = setOf(
+            "Import Image", "Fit Mode (Scale Type)", "Keep Aspect Ratio And Crop To Fit",
+            "Keep Aspect Ratio", "Shape", "Crop Left", "Crop Top", "Crop Right", "Crop Bottom",
+            "Corner Radius", "Mask / Shape", "Edge Blur", "Color Overlay", "Opacity / Alpha",
+            "Mask Image", "Mask Mode", "Mask Strength", "Color Key Enabled", "Auto Detect Color Key",
+            "Color Key", "Color Key Tolerance", "Transparency Strength", "Opacity Strength",
+            "Blur Enabled", "Blur Divider", "Blur Radius", "Image Sampling", "Image Tile Mode X",
+            "Image Tile Mode Y", "Image Tile Scale X", "Image Tile Scale Y", "Image Brightness",
+            "Image Contrast", "Image Hue", "Image Gamma", "Image Color Temperature",
+            "Image Flip Horizontal", "Image Flip Vertical", "Image Parallax X", "Image Parallax Y",
+            "Image Border Color", "Image Border Width", "Image Custom Shape Path",
+            "Generated Album Art Hint Shift Hue", "Generated Album Art Hint No Text",
+            "Generated Album Art Hint Force Gen", "Generated Album Art Color"
+        )
+        assertTrue("Missing Image controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertFalse("Image must not expose an unsupported composition-surface selector",
+            specs.containsKey("Source Composition Index"))
+        assertEquals(listOf("Alpha Mask", "Luminance Mask", "Inverted Mask", "Normal Mask"),
+            specs.getValue("Mask Mode").options)
+        assertEquals(listOf("Nearest", "Linear"), specs.getValue("Image Sampling").options)
+        assertEquals(ElementValue.Number(1.0), specs.getValue("Mask Strength").defaultValue)
+    }
+
+    @Test
     fun imageSamplingDoesNotOfferUnsupportedCubicMode() {
         val image = ElementPropertyCatalog.create(StudioElementType.IMAGE, "sampling")
         val spec = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).first { it.name == "Image Sampling" }

@@ -1649,8 +1649,6 @@ object VideoExportEngine {
                         if (!emissionTiming.isAlive) return@repeat
                         val age = emissionTiming.age
                         val lifeT = (age / particleLifetime).coerceIn(0f, 1f)
-                        val emitterAngle = emitterArcStart + randomA * emitterArcSweep
-                        val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
                         val spawnOffset = particleSpawnOffset(
                             spawnArea, randomA, randomB, spawnWidth, spawnHeight,
                             emitterRadius, emitterInnerRadius, emitterArcStart, emitterArcSweep

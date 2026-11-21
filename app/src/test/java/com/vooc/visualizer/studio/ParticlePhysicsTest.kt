@@ -22,8 +22,11 @@ class ParticlePhysicsTest {
         assertEquals(2f, result.velocity, 0.0001f)
     }
 
-    @Test fun exactBoundaryImpactsReverseVelocityWithCorrectParity() {
-        assertEquals(10f, reflectParticleAxis(100f, 10f, 100f, 0.5f).velocity, 0.0001f)
+    @Test fun exactBoundaryImpactsReverseOnlyOutwardVelocity() {
+        assertEquals(-5f, reflectParticleAxis(100f, 10f, 100f, 0.5f).velocity, 0.0001f)
+        assertEquals(-10f, reflectParticleAxis(100f, -10f, 100f, 0.5f).velocity, 0.0001f)
+        assertEquals(5f, reflectParticleAxis(0f, -10f, 100f, 0.5f).velocity, 0.0001f)
+        assertEquals(10f, reflectParticleAxis(0f, 10f, 100f, 0.5f).velocity, 0.0001f)
         assertEquals(2.5f, reflectParticleAxis(200f, 10f, 100f, 0.5f).velocity, 0.0001f)
         assertEquals(2.5f, reflectParticleAxis(-100f, 10f, 100f, 0.5f).velocity, 0.0001f)
         assertEquals(-1.25f, reflectParticleAxis(-200f, 10f, 100f, 0.5f).velocity, 0.0001f)

@@ -88,6 +88,15 @@ internal fun particleForceDelta(
     }
 }
 
+internal data class ParticleEmitterRadii(val outer: Float, val inner: Float)
+
+/** Sanitizes serialized emitter radii and guarantees inner <= outer. */
+internal fun resolveParticleEmitterRadii(outer: Float, inner: Float): ParticleEmitterRadii {
+    val safeOuter = outer.takeIf { it.isFinite() }?.coerceIn(0f, 10000f) ?: 100f
+    val safeInner = inner.takeIf { it.isFinite() }?.coerceIn(0f, 10000f) ?: 0f
+    return ParticleEmitterRadii(safeOuter, safeInner.coerceAtMost(safeOuter))
+}
+
 internal data class ParticleSpawnOffset(val x: Float, val y: Float)
 
 /** Deterministic emitter sampling shared by preview and export. randomA/randomB are in [0, 1]. */

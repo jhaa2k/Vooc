@@ -7,6 +7,7 @@ import com.vooc.visualizer.studio.MirrorEffectProcessor
 import com.vooc.visualizer.studio.GeneratedAlbumArt
 import com.vooc.visualizer.studio.reflectParticleAxis
 import com.vooc.visualizer.studio.particleForceDelta
+import com.vooc.visualizer.studio.particleSpawnOffset
 
 import android.net.Uri
 import android.Manifest
@@ -3068,16 +3069,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val lifeT = (age / particleLifetime).coerceIn(0f, 1f)
                             val emitterAngle = emitterArcStart + randomA * emitterArcSweep
                             val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
-                            val localX: Float
-                            val localY: Float
-                            when (spawnArea) {
-                                "Rectangle" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
-                                "Ellipse", "Circle" -> { localX = cos(emitterAngle) * radialDistance.coerceAtLeast(spawnWidth * randomB); localY = sin(emitterAngle) * (if (spawnArea == "Circle") radialDistance else (emitterRadius * spawnHeight / spawnWidth.coerceAtLeast(1f))) }
-                                "Ring" -> { localX = cos(emitterAngle) * radialDistance; localY = sin(emitterAngle) * radialDistance }
-                                "Line", "HorizontalLine" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = 0f }
-                                "Edge" -> { localX = if (randomA < 0.5f) -spawnWidth else spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
-                                else -> { localX = 0f; localY = 0f }
-                            }
+                            val spawnOffset = particleSpawnOffset(
+                                spawnArea, randomA, randomB, spawnWidth, spawnHeight,
+                                emitterRadius, emitterInnerRadius, emitterArcStart, emitterArcSweep
+                            )
+                            val localX = spawnOffset.x
+                            val localY = spawnOffset.y
                             val spawnX = emitterX + localX * cos(emitterRotation) - localY * sin(emitterRotation)
                             val spawnY = emitterY + localX * sin(emitterRotation) + localY * cos(emitterRotation)
                             val radialAngle = kotlin.math.atan2(spawnY - center.y, spawnX - center.x)

@@ -3045,8 +3045,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 colorOverLifeStart.blue + (colorOverLifeEnd.blue - colorOverLifeStart.blue) * colorT,
                                 alpha
                             )
-                            val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).dp.toPx().coerceAtLeast(0.5f)
-                            val particleHeight = (sizeT * particleScale * perspective * depthScale).dp.toPx().coerceAtLeast(0.5f)
+                            val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).coerceAtLeast(0.5f)
+                            val particleHeight = (sizeT * particleScale * perspective * depthScale).coerceAtLeast(0.5f)
                             val randomAngularVelocity = angularVelocity + (randomB * 2f - 1f) * angularVelocityRandom
                             val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
                             val trailX = vx * trailLength * 0.001f

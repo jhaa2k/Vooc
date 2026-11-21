@@ -103,6 +103,24 @@ class ParticlePhysicsTest {
         assertEquals(40f, result.y, 0.0001f)
     }
 
+    @Test fun edgeEmitterSamplesLeftAndRightSides() {
+        val left = particleSpawnOffset("Edge", 0.1f, 0.75f, 100f, 80f, 60f, 0f, 0f, 1f)
+        val right = particleSpawnOffset("Edge", 0.4f, 0.75f, 100f, 80f, 60f, 0f, 0f, 1f)
+        assertEquals(-100f, left.x, 0.0001f)
+        assertEquals(40f, left.y, 0.0001f)
+        assertEquals(100f, right.x, 0.0001f)
+        assertEquals(40f, right.y, 0.0001f)
+    }
+
+    @Test fun edgeEmitterSamplesTopAndBottomSides() {
+        val top = particleSpawnOffset("Edge", 0.6f, 0.25f, 100f, 80f, 60f, 0f, 0f, 1f)
+        val bottom = particleSpawnOffset("Edge", 0.9f, 0.25f, 100f, 80f, 60f, 0f, 0f, 1f)
+        assertEquals(-50f, top.x, 0.0001f)
+        assertEquals(-80f, top.y, 0.0001f)
+        assertEquals(-50f, bottom.x, 0.0001f)
+        assertEquals(80f, bottom.y, 0.0001f)
+    }
+
     @Test fun unknownEmitterFallsBackToPoint() {
         val result = particleSpawnOffset("Custom", 0.9f, 0.8f, 100f, 80f, 60f, 20f, 0f, 1f)
         assertEquals(0f, result.x, 0.0001f)

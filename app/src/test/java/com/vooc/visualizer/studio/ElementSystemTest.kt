@@ -294,6 +294,7 @@ class ElementSystemTest {
         assertTrue("Missing advanced text controls: ${required - specs.keys}", specs.keys.containsAll(required))
         assertEquals(listOf("Top", "Middle", "Bottom"), specs.getValue("Vertical Alignment").options)
         assertEquals(listOf("Visible", "Clip", "Ellipsis", "Scale Down"), specs.getValue("Overflow Mode").options)
+        assertFalse("Source Composition Index" in specs)
     }
 
     @Test

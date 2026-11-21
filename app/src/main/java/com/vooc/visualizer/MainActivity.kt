@@ -708,6 +708,9 @@ private fun VoocStudio(
             if (player.isPlaying) {
                 val currentPosition = player.currentPosition.coerceAtLeast(0L)
                 if (previousPosition >= 0L && (currentPosition < previousPosition || currentPosition - previousPosition > 350L)) {
+                    // Re-anchor the analyzer ring buffers as well as provider smoothing/beat state.
+                    // Resetting only the processors can otherwise read stale samples after a seek.
+                    analyzer.onStreamDiscontinuity(currentPosition / 1000.0)
                     providerProcessors.values.forEach { it.reset() }
                 }
                 val analyzed = analyzer.analyzeLive(currentPosition / 1000.0)

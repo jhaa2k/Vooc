@@ -261,6 +261,9 @@ object ElementPropertyCatalog {
             "Lighten", "Exclusion", "Subtractive", "Copy"
         )),
         text("Color", "Appearance", "#FFFFFFFF"),
+        text("Mask Image", "Appearance", ""),
+        bool("Show Unblurred Content", "Appearance", false),
+        bool("Show Unblurred Content Under", "Appearance", false)
     )
 
     private val backgroundSpecific = listOf(

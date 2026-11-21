@@ -865,7 +865,7 @@ object ElementPropertyCatalog {
         bool("Use Random Vector Instead", "Overall", false),
         number("Vector Angle", "Overall", -90.0, -360.0, 360.0),
         number("Vector Angle Z", "Overall", 0.0, -360.0, 360.0),
-        text("Force Field", "Overall", "None", listOf("None", "Attract", "Repel", "Directional", "Radial")),
+        text("Force Field", "Overall", "None", listOf("None", "Attract", "Repel", "Directional", "Radial", "Vortex")),
         number("Force Field Strength", "Overall", 0.0, -5000.0, 5000.0),
         ElementPropertySpec("Force Field Position", "Overall", ElementValueType.VECTOR2,
             ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),

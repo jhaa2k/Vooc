@@ -121,7 +121,12 @@ class AudioProviderProcessor {
                 }
             }
         }
-        if (source.isEmpty()) return AudioProviderFrame(FloatArray(cfg.sampleOutCount), 0f, frame.timeSec, frame.sampleRate)
+        if (source.isEmpty()) {
+            // A temporarily unavailable channel/source must not leave stale smoothing or beat state
+            // to leak into the next valid analysis frame.
+            reset()
+            return AudioProviderFrame(FloatArray(cfg.sampleOutCount), 0f, frame.timeSec, frame.sampleRate)
+        }
 
         // A seek or decoder timestamp jump starts a new audio stream segment. Do not
         // carry temporal smoothing or beat release state across that boundary.

@@ -2315,9 +2315,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val resolvedTextSize = ((number("Font Size", 48f) +
                             number("Measure Font Size", 0f) * measureFontResponse) * textUnitScale * scale).coerceAtLeast(6f)
                         val shadowEnabled = props["Shadow Enabled"] == ElementValue.Bool(true)
-                        val shadowColor = runCatching {
+                        val shadowColorSource = runCatching {
                             android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000"))
                         }.getOrDefault(android.graphics.Color.BLACK)
+                        val shadowColor = android.graphics.Color.argb(
+                            (android.graphics.Color.alpha(shadowColorSource) * opacity).toInt().coerceIn(0, 255),
+                            android.graphics.Color.red(shadowColorSource),
+                            android.graphics.Color.green(shadowColorSource),
+                            android.graphics.Color.blue(shadowColorSource)
+                        )
                         val shadowBlur = (number("Shadow Blur", 4f) + number("Shadow Spread", 0f)) * textUnitScale.coerceAtLeast(0f)
                         val shadowAngle = Math.toRadians(number("Shadow Angle", 45f).toDouble())
                         val shadowDistance = number("Shadow Distance", 3f) * textUnitScale

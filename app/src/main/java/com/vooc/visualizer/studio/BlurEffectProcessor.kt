@@ -177,8 +177,8 @@ object BlurEffectProcessor {
                     sample(input, w, h, x + (x - cx) * t * step / max(w, h), y + (y - cy) * t * step / max(w, h)) }
                 "Kawase" -> listOf(sample(input,w,h,x-step,y-step), sample(input,w,h,x+step,y-step),
                     sample(input,w,h,x-step,y+step), sample(input,w,h,x+step,y+step), input[index])
-                else -> listOf(sample(input,w,h,x-step,y), sample(input,w,h,x+step,y),
-                    sample(input,w,h,x,y-step), sample(input,w,h,x,y+step), input[index],
+                else -> listOf(sample(input,w,h,x-step,y.toFloat()), sample(input,w,h,x+step,y.toFloat()),
+                    sample(input,w,h,x.toFloat(),y-step), sample(input,w,h,x.toFloat(),y+step), input[index],
                     sample(input,w,h,x-step*0.7f,y-step*0.7f), sample(input,w,h,x+step*0.7f,y-step*0.7f),
                     sample(input,w,h,x-step*0.7f,y+step*0.7f), sample(input,w,h,x+step*0.7f,y+step*0.7f))
             }

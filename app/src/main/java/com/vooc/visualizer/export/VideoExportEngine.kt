@@ -1517,7 +1517,7 @@ object VideoExportEngine {
                         "Bass" -> bassValue
                         "Treble" -> trebleValue
                         "RMS", "Overall Audio Level" -> audioLevel
-                        "Peak" -> audioLevel
+                        "Peak" -> peakLevel
                         else -> 0f
                     }.coerceIn(0f, 1f)
                     val baseSpeed = numberAlias("Speed", 80f, "Start Velocity") +

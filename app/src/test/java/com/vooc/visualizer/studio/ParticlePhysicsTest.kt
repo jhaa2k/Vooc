@@ -326,6 +326,25 @@ class ParticlePhysicsTest {
         assertEquals(oneTurn.y, full.y, 0.0001f)
     }
 
+
+    @Test fun emitterRotationKeepsOffsetAtZeroDegrees() {
+        val result = rotateParticleEmitterOffset(12f, -8f, 0f)
+        assertEquals(12f, result.x, 0.0001f)
+        assertEquals(-8f, result.y, 0.0001f)
+    }
+
+    @Test fun emitterRotationTurnsOffsetNinetyDegrees() {
+        val result = rotateParticleEmitterOffset(12f, 0f, (Math.PI / 2.0).toFloat())
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(12f, result.y, 0.0001f)
+    }
+
+    @Test fun emitterRotationSanitizesNonFiniteInputs() {
+        val result = rotateParticleEmitterOffset(Float.NaN, Float.POSITIVE_INFINITY, Float.NaN)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
     @Test fun particleLayerScaleFallsBackForNonFiniteValues() {
         val result = resolveParticleLayerScale(Float.NaN, Float.POSITIVE_INFINITY, false, Float.NaN)
         assertEquals(1f, result.x, 0.0001f)

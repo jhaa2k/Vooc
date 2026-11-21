@@ -1534,9 +1534,12 @@ object VideoExportEngine {
                     val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * width * 0.25f
                     val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * height * 0.25f
                     val spawnArea = textAlias("Particle Emitter Shape", "Point", "Spawn Area")
+                    val systemPosition = element.value("Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                    val particleCenterX = systemPosition.x.toFloat().coerceIn(0f, 1f) * width
+                    val particleCenterY = systemPosition.y.toFloat().coerceIn(0f, 1f) * height
                     val emitterPosition = element.value("Emitter Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
-                    val emitterX = cx + (emitterPosition.x.toFloat() - 0.5f) * width
-                    val emitterY = cy + (emitterPosition.y.toFloat() - 0.5f) * height
+                    val emitterX = particleCenterX + (emitterPosition.x.toFloat() - 0.5f) * width
+                    val emitterY = particleCenterY + (emitterPosition.y.toFloat() - 0.5f) * height
                     val emitterRotation = number("Emitter Rotation", 0f) * PI.toFloat() / 180f
                     val emitterRadius = number("Emitter Radius", 100f).coerceAtLeast(0f) * width / 1080f
                     val emitterInnerRadius = number("Emitter Inner Radius", 0f).coerceIn(0f, number("Emitter Radius", 100f)) * width / 1080f
@@ -1666,7 +1669,7 @@ object VideoExportEngine {
                         val localY = spawnOffset.y
                         val spawnX = emitterX + localX * cos(emitterRotation) - localY * sin(emitterRotation)
                         val spawnY = emitterY + localX * sin(emitterRotation) + localY * cos(emitterRotation)
-                        val radialAngle = kotlin.math.atan2(spawnY - cy, spawnX - cx)
+                        val radialAngle = kotlin.math.atan2(spawnY - particleCenterY, spawnX - particleCenterX)
                         val angle = when {
                             randomVector -> randomA * 2f * PI.toFloat()
                             relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle

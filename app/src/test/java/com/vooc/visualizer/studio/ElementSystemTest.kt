@@ -169,6 +169,19 @@ class ElementSystemTest {
     }
 
     @Test
+    fun particleEmitterDropdownOnlyOffersImplementedShapes() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.PARTICLES).associateBy { it.name }
+        assertEquals(
+            listOf("Point", "HorizontalLine", "Rectangle", "Ellipse", "Circle", "Line", "Edge"),
+            specs.getValue("Spawn Area").options
+        )
+        assertEquals(
+            listOf("Point", "Line", "HorizontalLine", "Rectangle", "Ellipse", "Ring", "Edge"),
+            specs.getValue("Particle Emitter Shape").options
+        )
+    }
+
+    @Test
     fun particleSpeedMeasurementDropdownOnlyOffersImplementedSources() {
         val spec = ElementPropertyCatalog.forElement(StudioElementType.PARTICLES)
             .single { it.name == "Measure Overall Speed (Measure What)" }

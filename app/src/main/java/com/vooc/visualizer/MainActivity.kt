@@ -2959,9 +2959,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * size.width * 0.25f
                         val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * size.height * 0.25f
                         val spawnArea = textAlias("Particle Emitter Shape", "Point", "Spawn Area")
-                        val systemPosition = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
-                        val particleCenterX = systemPosition.x.toFloat().coerceIn(0f, 1f) * size.width
-                        val particleCenterY = systemPosition.y.toFloat().coerceIn(0f, 1f) * size.height
+                        // Use the shared element transform center so Position and Measure Pos
+                        // affect the particle system consistently with other element types.
+                        val particleCenterX = center.x
+                        val particleCenterY = center.y
                         val emitterPosition = props["Emitter Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                         val emitterX = particleCenterX + (emitterPosition.x.toFloat() - 0.5f) * size.width
                         val emitterY = particleCenterY + (emitterPosition.y.toFloat() - 0.5f) * size.height

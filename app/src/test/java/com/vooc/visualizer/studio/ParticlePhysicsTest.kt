@@ -28,6 +28,18 @@ class ParticlePhysicsTest {
         assertEquals(-7f, result.velocity, 0.0001f)
     }
 
+    @Test fun forceFieldPositionUsesNormalizedFullCanvasCoordinates() {
+        val result = particleForcePosition(0.25f, 0.75f, 1920f, 1080f)
+        assertEquals(480f, result.x, 0.0001f)
+        assertEquals(810f, result.y, 0.0001f)
+    }
+
+    @Test fun forceFieldPositionClampsOutOfRangeNormalizedValues() {
+        val result = particleForcePosition(1.5f, -0.5f, 1920f, 1080f)
+        assertEquals(1920f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
     @Test fun vortexForceFieldAppliesTangentialAcceleration() {
         val result = particleForceDelta("Vortex", 10f, 0f, 4f, 2f, 1f, 0f)
         assertEquals(0f, result.x, 0.0001f)

@@ -259,7 +259,6 @@ class ElementSystemTest {
         )
         assertTrue("Missing RGB Split controls: ${required - specs.keys}", specs.keys.containsAll(required))
         assertFalse("Source Composition Index" in specs)
-        assertFalse("Unsupported PreMulAlpha content blend mode must not be exposed", "PreMulAlpha" in specs.getValue("Blend Mode Content").options)
         assertEquals(
             listOf("Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken", "Lighten", "Exclusion", "Subtractive", "Copy"),
             specs.getValue("Blend Mode Content").options
@@ -298,6 +297,7 @@ class ElementSystemTest {
         assertEquals(listOf("Top", "Middle", "Bottom"), specs.getValue("Vertical Alignment").options)
         assertEquals(listOf("Visible", "Clip", "Ellipsis", "Scale Down"), specs.getValue("Overflow Mode").options)
         assertFalse("Source Composition Index" in specs)
+        assertFalse("Unsupported PreMulAlpha content blend mode must not be exposed", "PreMulAlpha" in specs.getValue("Blend Mode Content").options)
     }
 
     @Test

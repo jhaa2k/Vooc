@@ -78,6 +78,27 @@ class ParticlePhysicsTest {
         assertEquals(0f, result.y, 0.0001f)
     }
 
+    @Test fun forceFieldPositionSanitizesNonFiniteCoordinatesAndCanvasSize() {
+        val result = particleForcePosition(Float.NaN, Float.POSITIVE_INFINITY, Float.NaN, 1080f)
+        assertEquals(960f, result.x, 0.0001f)
+        assertEquals(540f, result.y, 0.0001f)
+    }
+
+    @Test fun forceFieldDeltaSanitizesNonFiniteInputs() {
+        val result = particleForceDelta(
+            "Directional", Float.NaN, Float.POSITIVE_INFINITY,
+            Float.NaN, 2f, Float.POSITIVE_INFINITY, -3f
+        )
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(-6f, result.y, 0.0001f)
+        assertEquals(true, result.x.isFinite() && result.y.isFinite())
+    }
+
+    @Test fun radialForceFieldHandlesVeryLargeFiniteCoordinates() {
+        val result = particleForceDelta("Attract", Float.MAX_VALUE, Float.MAX_VALUE, 2f, 1f, 0f, 0f)
+        assertEquals(true, result.x.isFinite() && result.y.isFinite())
+    }
+
     @Test fun vortexForceFieldAppliesTangentialAcceleration() {
         val result = particleForceDelta("Vortex", 10f, 0f, 4f, 2f, 1f, 0f)
         assertEquals(0f, result.x, 0.0001f)

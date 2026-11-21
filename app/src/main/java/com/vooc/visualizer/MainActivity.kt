@@ -1779,7 +1779,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     val bitmap = runCatching {
                         val decoded = decodeStudioPreviewBitmap(context, uriText) ?: return@runCatching null
                         val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
-                        val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.BACKGROUND || element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) && maskUri.isNotBlank()) {
+                        val maskBitmap = if ((element.type == StudioElementType.IMAGE || element.type == StudioElementType.BACKGROUND || element.type == StudioElementType.BLUR_EFFECT || element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) && maskUri.isNotBlank()) {
                             decodeStudioPreviewBitmap(context, maskUri)
                         } else null
                         val processed = when (element.type) {

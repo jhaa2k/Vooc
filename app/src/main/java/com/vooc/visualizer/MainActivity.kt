@@ -2964,7 +2964,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val spawnInterval = if (emissionRate > 0f) 1f / emissionRate.coerceAtLeast(0.001f) else number("Spawn Time", 0.02f).coerceIn(0f, 10f)
                         val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * size.width * 0.25f
                         val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * size.height * 0.25f
-                        val spawnArea = textAlias("Particle Emitter Shape", "Point", "Spawn Area")
+                        val spawnArea = textAlias("Particle Emitter Shape", "Circle", "Spawn Area")
                         // Use the shared element transform center so Position and Measure Pos
                         // affect the particle system consistently with other element types.
                         val particleCenterX = center.x

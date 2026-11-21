@@ -209,7 +209,7 @@ internal fun particleSpawnOffset(
     val safeRadius = (radius.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f)
         .coerceAtLeast(safeInnerRadius)
     val safeArcStart = arcStart.takeIf { it.isFinite() } ?: 0f
-    val safeArcSweep = arcSweep.takeIf { it.isFinite() } ?: 0f
+    val safeArcSweep = (arcSweep.takeIf { it.isFinite() } ?: 0f).coerceIn(-2f * Math.PI.toFloat(), 2f * Math.PI.toFloat())
     val angle = safeArcStart + a * safeArcSweep
     val radialDistance = safeInnerRadius + (safeRadius - safeInnerRadius) * b
     return when (shape) {

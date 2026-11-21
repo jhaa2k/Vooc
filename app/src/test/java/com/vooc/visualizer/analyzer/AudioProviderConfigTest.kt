@@ -77,4 +77,9 @@ class AudioProviderConfigTest {
         assertEquals(500, applied.beat.cooldownMs)
         assertTrue(applied.beat.sensitivity in 0f..1f)
     }
+    @Test fun beatReleaseIsClampedToTheSupportedHalfSecondRange() {
+        val config = AudioProviderConfig(beatRelease = 5f).validated()
+        assertEquals(0.5f, config.beatRelease, 1e-6f)
+    }
+
 }

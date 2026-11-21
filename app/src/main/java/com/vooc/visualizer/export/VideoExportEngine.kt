@@ -1623,7 +1623,7 @@ object VideoExportEngine {
                     val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f) * width / 1080f
                     val particleScale = number("Particle Scale", 100f).coerceAtLeast(0f) / 100f * scale
                     val particleLayerScaleVector = element.value("Scale") as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
-                    val particleLayerScale = particleLayerScale(
+                    val particleLayerScale = resolveParticleLayerScale(
                         particleLayerScaleVector.x.toFloat(), particleLayerScaleVector.y.toFloat(),
                         (element.value("Scale Is Uniform") as? ElementValue.Bool)?.value == true, particleScale
                     )

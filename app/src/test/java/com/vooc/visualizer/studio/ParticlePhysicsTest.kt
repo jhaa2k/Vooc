@@ -28,6 +28,24 @@ class ParticlePhysicsTest {
         assertEquals(-7f, result.velocity, 0.0001f)
     }
 
+    @Test fun particleLayerScalePreservesIndependentAxesWhenNonUniform() {
+        val result = particleLayerScale(2f, 0.5f, false, 1.5f)
+        assertEquals(3f, result.x, 0.0001f)
+        assertEquals(0.75f, result.y, 0.0001f)
+    }
+
+    @Test fun particleLayerScaleUsesXForBothAxesWhenUniform() {
+        val result = particleLayerScale(2f, 0.5f, true, 1.5f)
+        assertEquals(3f, result.x, 0.0001f)
+        assertEquals(3f, result.y, 0.0001f)
+    }
+
+    @Test fun particleLayerScaleClampsLargeValues() {
+        val result = particleLayerScale(20f, 30f, false, 2f)
+        assertEquals(10f, result.x, 0.0001f)
+        assertEquals(10f, result.y, 0.0001f)
+    }
+
     @Test fun forceFieldPositionUsesNormalizedFullCanvasCoordinates() {
         val result = particleForcePosition(0.25f, 0.75f, 1920f, 1080f)
         assertEquals(480f, result.x, 0.0001f)

@@ -3507,14 +3507,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val fillAlpha = (opacity * number("Opacity / Alpha", 1f)).coerceIn(0f, 1f)
                         val fillColor = runCatching {
                             Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Fill / Color", colorText)), reactivity.colorMultiplier))
-                        }.getOrDefault(elementColor).copy(alpha = fillAlpha)
+                        }.getOrDefault(elementColor).let { parsed -> parsed.copy(alpha = parsed.alpha * fillAlpha) }
                         val gradientEnabled = props["Gradient Fill"] == ElementValue.Bool(true)
                         val gradientStart = runCatching {
                             Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Gradient Start Color", textValue("Fill / Color", colorText))), reactivity.colorMultiplier))
-                        }.getOrDefault(fillColor).copy(alpha = fillAlpha)
+                        }.getOrDefault(fillColor).let { parsed -> parsed.copy(alpha = parsed.alpha * fillAlpha) }
                         val gradientEnd = runCatching {
                             Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")), reactivity.colorMultiplier))
-                        }.getOrDefault(Color.Black).copy(alpha = fillAlpha)
+                        }.getOrDefault(Color.Black).let { parsed -> parsed.copy(alpha = parsed.alpha * fillAlpha) }
                         val gradientAngle = number("Gradient Angle", 0f) * PI.toFloat() / 180f
                         val gradientCenterValue = props["Gradient Center"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                         val gradientCenter = Offset(left + w * gradientCenterValue.x.toFloat(), top + h * gradientCenterValue.y.toFloat())

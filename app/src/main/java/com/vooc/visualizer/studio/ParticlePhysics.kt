@@ -76,6 +76,22 @@ internal fun particlePositionOffset(normalizedPosition: Float): Float {
     return safePosition - 0.5f
 }
 
+
+/** Rotates a local emitter offset into canvas space using the configured emitter angle. */
+internal fun rotateParticleEmitterOffset(x: Float, y: Float, rotationRadians: Float): ParticleVector {
+    val safeX = x.takeIf { it.isFinite() } ?: 0f
+    val safeY = y.takeIf { it.isFinite() } ?: 0f
+    val angle = rotationRadians.takeIf { it.isFinite() } ?: 0f
+    val cosine = kotlin.math.cos(angle)
+    val sine = kotlin.math.sin(angle)
+    val rotatedX = safeX * cosine - safeY * sine
+    val rotatedY = safeX * sine + safeY * cosine
+    return ParticleVector(
+        rotatedX.takeIf { it.isFinite() } ?: 0f,
+        rotatedY.takeIf { it.isFinite() } ?: 0f
+    )
+}
+
 internal data class ParticleVector(val x: Float, val y: Float)
 
 /** Resolves a finite trail displacement from particle velocity and the configured trail length. */

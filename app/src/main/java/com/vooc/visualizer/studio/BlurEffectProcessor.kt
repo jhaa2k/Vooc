@@ -172,30 +172,65 @@ object BlurEffectProcessor {
         val cy = center.second * (h - 1)
         val cosA = cos(direction).toFloat()
         val sinA = sin(direction).toFloat()
+        val taps = when (algorithm) {
+            "Kawase" -> 5
+            "Directional", "Radial" -> 7
+            "Zoom" -> 9
+            else -> 9
+        }
         for (y in 0 until h) for (x in 0 until w) {
-            val index = y * w + x
-            val samples = when (algorithm) {
-                "Directional" -> (0..6).map { n -> sample(input, w, h,
-                    x + cosA * step * (n - 3) / 3f, y + sinA * step * (n - 3) / 3f) }
-                "Radial" -> (0..6).map { n -> val t = (n - 3) / 3f
-                    sample(input, w, h, x + (x - cx) * step * t / max(w, h), y + (y - cy) * step * t / max(w, h)) }
-                "Zoom" -> (0..8).map { n -> val t = (n - 4) / 4f * zoom
-                    sample(input, w, h, x + (x - cx) * t * step / max(w, h), y + (y - cy) * t * step / max(w, h)) }
-                "Kawase" -> listOf(sample(input,w,h,x-step,y-step), sample(input,w,h,x+step,y-step),
-                    sample(input,w,h,x-step,y+step), sample(input,w,h,x+step,y+step), input[index])
-                else -> listOf(sample(input,w,h,x-step,y.toFloat()), sample(input,w,h,x+step,y.toFloat()),
-                    sample(input,w,h,x.toFloat(),y-step), sample(input,w,h,x.toFloat(),y+step), input[index],
-                    sample(input,w,h,x-step*0.7f,y-step*0.7f), sample(input,w,h,x+step*0.7f,y-step*0.7f),
-                    sample(input,w,h,x-step*0.7f,y+step*0.7f), sample(input,w,h,x+step*0.7f,y+step*0.7f))
+            var sumA = 0
+            var sumR = 0
+            var sumG = 0
+            var sumB = 0
+            var totalWeight = 0
+            for (tap in 0 until taps) {
+                val t = when (algorithm) {
+                    "Directional", "Radial" -> (tap - 3) / 3f
+                    "Zoom" -> (tap - 4) / 4f
+                    else -> 0f
+                }
+                val sx: Float
+                val sy: Float
+                when (algorithm) {
+                    "Directional" -> {
+                        sx = x + cosA * step * t
+                        sy = y + sinA * step * t
+                    }
+                    "Radial" -> {
+                        sx = x + (x - cx) * step * t / max(w, h)
+                        sy = y + (y - cy) * step * t / max(w, h)
+                    }
+                    "Zoom" -> {
+                        sx = x + (x - cx) * t * step * zoom / max(w, h)
+                        sy = y + (y - cy) * t * step * zoom / max(w, h)
+                    }
+                    "Kawase" -> {
+                        val dx = if (tap == 0 || tap == 2) -step else if (tap == 1 || tap == 3) step else 0f
+                        val dy = if (tap == 0 || tap == 1) -step else if (tap == 2 || tap == 3) step else 0f
+                        sx = x + dx
+                        sy = y + dy
+                    }
+                    else -> {
+                        val offsets = arrayOf(
+                            -1f to 0f, 1f to 0f, 0f to -1f, 0f to 1f, 0f to 0f,
+                            -0.7f to -0.7f, 0.7f to -0.7f, -0.7f to 0.7f, 0.7f to 0.7f
+                        )
+                        sx = x + offsets[tap].first * step
+                        sy = y + offsets[tap].second * step
+                    }
+                }
+                val pixel = if (algorithm == "Kawase" && tap == 4) input[y * w + x]
+                    else sample(input, w, h, sx, sy)
+                val weight = if (algorithm == "Gaussian" && tap == 4) 4 else 1
+                sumA += Color.alpha(pixel) * weight
+                sumR += Color.red(pixel) * weight
+                sumG += Color.green(pixel) * weight
+                sumB += Color.blue(pixel) * weight
+                totalWeight += weight
             }
-            val weights = when (algorithm) {
-                "Gaussian" -> if (samples.size == 9) intArrayOf(1,1,1,1,4,1,1,1,1) else IntArray(samples.size) { 1 }
-                else -> IntArray(samples.size) { 1 }
-            }
-            val total = weights.sum().coerceAtLeast(1)
-            fun channel(selector: (Int) -> Int): Int =
-                samples.indices.sumOf { selector(samples[it]) * weights[it] } / total
-            output[index] = Color.argb(channel(Color::alpha), channel(Color::red), channel(Color::green), channel(Color::blue))
+            output[y * w + x] = Color.argb(sumA / totalWeight, sumR / totalWeight,
+                sumG / totalWeight, sumB / totalWeight)
         }
         return output
     }

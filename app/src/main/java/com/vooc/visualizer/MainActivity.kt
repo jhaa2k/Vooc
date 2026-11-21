@@ -2919,8 +2919,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             else -> androidx.compose.ui.graphics.BlendMode.SrcOver
                         }
                         val particleBlendMode = if (screenBlend) androidx.compose.ui.graphics.BlendMode.Screen else if (additiveBlend) androidx.compose.ui.graphics.BlendMode.Plus else contentBlendMode
-                        val startSize = number("Start Size", 8f).coerceAtLeast(0f)
-                        val endSize = number("End Size", 2f).coerceAtLeast(0f)
+                        val startSize = number("Start Size", 8f).coerceAtLeast(0f) * size.width / 1080f
+                        val endSize = number("End Size", 2f).coerceAtLeast(0f) * size.width / 1080f
                         val endRandom = numberAlias("End Size Random", 0f, "Particle Size Random").coerceIn(0f, 1f)
                         val fadeTime = number("Fade In And Out Time", 0.25f).coerceIn(0f, lifetime * 0.5f)
                         val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f) * size.width / 1080f

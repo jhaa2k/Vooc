@@ -13,6 +13,7 @@ import com.vooc.visualizer.studio.particleForcePosition
 import com.vooc.visualizer.studio.particleSpawnOffset
 import com.vooc.visualizer.studio.particlePositionOffset
 import com.vooc.visualizer.studio.resolveParticleAnchorOffset
+import com.vooc.visualizer.studio.resolveParticleMirrorVector
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 import com.vooc.visualizer.studio.resolveParticleOpacity
 import com.vooc.visualizer.studio.resolveParticleEmissionTiming
@@ -1729,7 +1730,8 @@ object VideoExportEngine {
                         val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
                         val trailX = vx * trailLength * 0.001f
                         val trailY = vy * trailLength * 0.001f
-                        fun drawParticleAt(x: Float, y: Float, drawAngle: Float = visualAngle) {
+                        val normalTrail = resolveParticleMirrorVector(trailX, trailY, false, false)
+                        fun drawParticleAt(x: Float, y: Float, drawAngle: Float = visualAngle, trail: com.vooc.visualizer.studio.ParticleVector = normalTrail) {
                             paint.color = particleColor
                             paint.alpha = particleAlpha
                             paint.xfermode = if (exclusionBlend && android.os.Build.VERSION.SDK_INT >= 29) null else if (particleContentBlendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(particleContentBlendMode)
@@ -1738,7 +1740,7 @@ object VideoExportEngine {
                                 paint.strokeWidth = (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f)
                                 paint.alpha = (particleAlpha * trailFade).toInt().coerceIn(0, 255)
                                 paint.strokeCap = Paint.Cap.ROUND
-                                canvas.drawLine(x - trailX, y - trailY, x, y, paint)
+                                canvas.drawLine(x - trail.x, y - trail.y, x, y, paint)
                                 paint.alpha = particleAlpha
                             }
                             if (customParticle != null) {
@@ -1756,7 +1758,7 @@ object VideoExportEngine {
                                 canvas.restore()
                             } else {
                                 canvas.save()
-                                canvas.rotate(visualAngle, x, y)
+                                canvas.rotate(drawAngle, x, y)
                                 when (particleShape) {
                                     "Square" -> canvas.drawRect(x - particleWidth / 2f, y - particleHeight / 2f, x + particleWidth / 2f, y + particleHeight / 2f, paint)
                                     "Triangle" -> { val p = android.graphics.Path().apply { moveTo(x, y - particleHeight / 2f); lineTo(x + particleWidth / 2f, y + particleHeight / 2f); lineTo(x - particleWidth / 2f, y + particleHeight / 2f); close() }; canvas.drawPath(p, paint) }
@@ -1767,9 +1769,9 @@ object VideoExportEngine {
                                 canvas.restore()
                             }
                         }
-                        if (mirrorX) drawParticleAt(width - px, py, 180f - visualAngle)
-                        if (mirrorY) drawParticleAt(px, height - py, -visualAngle)
-                        if (mirrorX && mirrorY) drawParticleAt(width - px, height - py, visualAngle + 180f)
+                        if (mirrorX) drawParticleAt(width - px, py, 180f - visualAngle, resolveParticleMirrorVector(trailX, trailY, true, false))
+                        if (mirrorY) drawParticleAt(px, height - py, -visualAngle, resolveParticleMirrorVector(trailX, trailY, false, true))
+                        if (mirrorX && mirrorY) drawParticleAt(width - px, height - py, visualAngle + 180f, resolveParticleMirrorVector(trailX, trailY, true, true))
                         drawParticleAt(px, py)
                     }
                     paint.xfermode = null

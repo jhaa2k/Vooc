@@ -320,6 +320,10 @@ fun ElementDocument.toAudioProviderConfig(): AudioProviderConfig {
 fun List<AudioProviderConfig>.analyzerConfigSource(): AudioProviderConfig? =
     firstOrNull { it.providerEnabled } ?: firstOrNull()
 
+/** Disabled providers must not force stereo capture or increase analyzer work. */
+fun List<AudioProviderConfig>.requiresStereoAnalysis(): Boolean =
+    any { it.providerEnabled && it.channelMode != ProviderChannelMode.MONO_MIX }
+
 /** Apply provider DSP settings while preserving unrelated analyzer configuration. */
 fun AudioProviderConfig.applyTo(base: AnalyzerConfig): AnalyzerConfig {
     val cfg = validated()

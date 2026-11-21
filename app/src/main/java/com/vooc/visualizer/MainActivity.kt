@@ -1952,6 +1952,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         if (bgBool("Show Unblurred Content Under") && originalImage != null) drawBackgroundBitmap(originalImage, false)
                         drawBackgroundBitmap(image, true)
                         if (bgBool("Show Unblurred Content") && originalImage != null) drawBackgroundBitmap(originalImage, false)
+                    } else {
+                        val fallback = runCatching {
+                            Color(android.graphics.Color.parseColor(bgText("Color", "#FF000000")))
+                        }.getOrDefault(Color.Black).copy(alpha = opacity)
+                        drawRect(fallback, blendMode = blend)
                     }
                 }
                 else -> Unit // Video backgrounds need a video-frame source pipeline.

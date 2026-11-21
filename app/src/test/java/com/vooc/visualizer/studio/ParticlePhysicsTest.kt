@@ -294,6 +294,38 @@ class ParticlePhysicsTest {
         assertEquals(80f, bottom.y, 0.0001f)
     }
 
+
+    @Test fun emitterArcStartAndPositiveSweepPlaceParticlesOnConfiguredArc() {
+        val result = particleSpawnOffset(
+            "Circle", 0.5f, 1f, 100f, 80f, 60f, 0f,
+            (Math.PI / 2.0).toFloat(), (Math.PI / 2.0).toFloat()
+        )
+        assertEquals(-60f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
+    @Test fun emitterNegativeSweepRunsClockwiseFromArcStart() {
+        val result = particleSpawnOffset(
+            "Circle", 0.5f, 1f, 100f, 80f, 60f, 0f,
+            0f, (-Math.PI / 2.0).toFloat()
+        )
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(-60f, result.y, 0.0001f)
+    }
+
+    @Test fun zeroSweepKeepsAllParticlesAtArcStart() {
+        val result = particleSpawnOffset("Ring", 0.9f, 1f, 100f, 80f, 60f, 20f, 0f, 0f)
+        assertEquals(60f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
+    @Test fun emitterArcSweepIsBoundedToOneFullRevolution() {
+        val full = particleSpawnOffset("Circle", 0.25f, 1f, 100f, 80f, 60f, 0f, 0f, (Math.PI * 4.0).toFloat())
+        val oneTurn = particleSpawnOffset("Circle", 0.25f, 1f, 100f, 80f, 60f, 0f, 0f, (Math.PI * 2.0).toFloat())
+        assertEquals(oneTurn.x, full.x, 0.0001f)
+        assertEquals(oneTurn.y, full.y, 0.0001f)
+    }
+
     @Test fun particleLayerScaleFallsBackForNonFiniteValues() {
         val result = resolveParticleLayerScale(Float.NaN, Float.POSITIVE_INFINITY, false, Float.NaN)
         assertEquals(1f, result.x, 0.0001f)

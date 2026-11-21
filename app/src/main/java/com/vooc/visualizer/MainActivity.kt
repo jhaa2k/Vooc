@@ -1890,48 +1890,62 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             else -> (size.height - destHeight) * 0.5f
                         } + bgNumber("Background Image Offset Y", 0f) * size.height / 1080f
                         val dst = androidx.compose.ui.geometry.Rect(left, top, left + destWidth, top + destHeight)
-                        if (bgBool("Background Tile")) {
-                            drawIntoCanvas { target ->
-                                val tileScale = bgNumber("Background Tile Scale", 1f).coerceIn(0.01f, 100f)
-                                val shader = android.graphics.BitmapShader(
-                                    bitmap.asAndroidBitmap(),
-                                    android.graphics.Shader.TileMode.REPEAT,
-                                    android.graphics.Shader.TileMode.REPEAT
-                                )
-                                val tileOffsetX = bgNumber("Background Image Offset X", 0f) * size.width / 1080f
-                                val tileOffsetY = bgNumber("Background Image Offset Y", 0f) * size.height / 1080f
-                                val matrix = android.graphics.Matrix().apply {
-                                    setScale(tileScale, tileScale)
-                                    postTranslate(tileOffsetX, tileOffsetY)
-                                }
-                                shader.setLocalMatrix(matrix)
-                                val tilePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
-                                    this.shader = shader
-                                    alpha = (opacity * 255f).toInt().coerceIn(0, 255)
-                                    xfermode = android.graphics.PorterDuffXfermode(when (blend) {
-                                        androidx.compose.ui.graphics.BlendMode.Plus -> android.graphics.PorterDuff.Mode.ADD
-                                        androidx.compose.ui.graphics.BlendMode.Screen -> android.graphics.PorterDuff.Mode.SCREEN
-                                        androidx.compose.ui.graphics.BlendMode.Multiply -> android.graphics.PorterDuff.Mode.MULTIPLY
-                                        androidx.compose.ui.graphics.BlendMode.Darken -> android.graphics.PorterDuff.Mode.DARKEN
-                                        androidx.compose.ui.graphics.BlendMode.Lighten -> android.graphics.PorterDuff.Mode.LIGHTEN
-                                        androidx.compose.ui.graphics.BlendMode.Src -> android.graphics.PorterDuff.Mode.SRC
-                                        else -> android.graphics.PorterDuff.Mode.SRC_OVER
-                                    })
-                                }
-                                target.nativeCanvas.drawRect(0f, 0f, size.width, size.height, tilePaint)
-                            }
-                        } else {
-                            drawImage(
-                                bitmap,
-                                dstOffset = androidx.compose.ui.unit.IntOffset(dst.left.toInt(), dst.top.toInt()),
-                                dstSize = androidx.compose.ui.unit.IntSize(dst.width.toInt().coerceAtLeast(1), dst.height.toInt().coerceAtLeast(1)),
-                                alpha = opacity,
-                                blendMode = blend
-                            )
+                        val tiled = bgBool("Background Tile")
+                        val clipBounds = if (tiled) androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height) else dst
+                        val cornerRadius = (bgNumber("Corner Radius", 0f) * size.width / 1080f).coerceAtLeast(0f)
+                        val roundedClip = androidx.compose.ui.graphics.Path().apply {
+                            addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                                clipBounds, androidx.compose.ui.geometry.CornerRadius(cornerRadius)
+                            ))
                         }
-                        if (applyOverlay) {
-                            val overlay = runCatching { Color(android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))) }.getOrDefault(Color.Transparent)
-                            if (overlay.alpha > 0f) drawRect(overlay.copy(alpha = overlay.alpha * opacity), blendMode = blend)
+                        clipPath(roundedClip) {
+                            if (tiled) {
+                                drawIntoCanvas { target ->
+                                    val tileScale = bgNumber("Background Tile Scale", 1f).coerceIn(0.01f, 100f)
+                                    val shader = android.graphics.BitmapShader(
+                                        bitmap.asAndroidBitmap(),
+                                        android.graphics.Shader.TileMode.REPEAT,
+                                        android.graphics.Shader.TileMode.REPEAT
+                                    )
+                                    val tileOffsetX = bgNumber("Background Image Offset X", 0f) * size.width / 1080f
+                                    val tileOffsetY = bgNumber("Background Image Offset Y", 0f) * size.height / 1080f
+                                    val matrix = android.graphics.Matrix().apply {
+                                        setScale(tileScale, tileScale)
+                                        postTranslate(tileOffsetX, tileOffsetY)
+                                    }
+                                    shader.setLocalMatrix(matrix)
+                                    val tilePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
+                                        this.shader = shader
+                                        alpha = (opacity * 255f).toInt().coerceIn(0, 255)
+                                        xfermode = android.graphics.PorterDuffXfermode(when (blend) {
+                                            androidx.compose.ui.graphics.BlendMode.Plus -> android.graphics.PorterDuff.Mode.ADD
+                                            androidx.compose.ui.graphics.BlendMode.Screen -> android.graphics.PorterDuff.Mode.SCREEN
+                                            androidx.compose.ui.graphics.BlendMode.Multiply -> android.graphics.PorterDuff.Mode.MULTIPLY
+                                            androidx.compose.ui.graphics.BlendMode.Darken -> android.graphics.PorterDuff.Mode.DARKEN
+                                            androidx.compose.ui.graphics.BlendMode.Lighten -> android.graphics.PorterDuff.Mode.LIGHTEN
+                                            androidx.compose.ui.graphics.BlendMode.Src -> android.graphics.PorterDuff.Mode.SRC
+                                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                                        })
+                                        if (bgText("Blend Mode Content") == "Exclusion" && android.os.Build.VERSION.SDK_INT >= 29) {
+                                            this.blendMode = android.graphics.BlendMode.DIFFERENCE
+                                            xfermode = null
+                                        }
+                                    }
+                                    target.nativeCanvas.drawRect(0f, 0f, size.width, size.height, tilePaint)
+                                }
+                            } else {
+                                drawImage(
+                                    bitmap,
+                                    dstOffset = androidx.compose.ui.unit.IntOffset(dst.left.toInt(), dst.top.toInt()),
+                                    dstSize = androidx.compose.ui.unit.IntSize(dst.width.toInt().coerceAtLeast(1), dst.height.toInt().coerceAtLeast(1)),
+                                    alpha = opacity,
+                                    blendMode = blend
+                                )
+                            }
+                            if (applyOverlay) {
+                                val overlay = runCatching { Color(android.graphics.Color.parseColor(bgText("Color Overlay", "#00000000"))) }.getOrDefault(Color.Transparent)
+                                if (overlay.alpha > 0f) drawRect(overlay.copy(alpha = overlay.alpha * opacity), blendMode = blend)
+                            }
                         }
                     }
                     if (image != null) {

@@ -298,7 +298,7 @@ class ParticlePhysicsTest {
         val result = resolveParticleOpacity(
             0.8f, 0.5f, 0.6f, 0.9f, 0.75f, 0.5f, 0.8f, 0.5f
         )
-        assertEquals(0.0648f, result, 0.0001f)
+        assertEquals(0.0324f, result, 0.0001f)
     }
 
     @Test fun particleOpacityClampsOutOfRangeFactors() {

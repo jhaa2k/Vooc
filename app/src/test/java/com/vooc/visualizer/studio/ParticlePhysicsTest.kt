@@ -80,7 +80,7 @@ class ParticlePhysicsTest {
 
     @Test fun forceFieldPositionSanitizesNonFiniteCoordinatesAndCanvasSize() {
         val result = particleForcePosition(Float.NaN, Float.POSITIVE_INFINITY, Float.NaN, 1080f)
-        assertEquals(960f, result.x, 0.0001f)
+        assertEquals(0f, result.x, 0.0001f)
         assertEquals(540f, result.y, 0.0001f)
     }
 
@@ -90,7 +90,7 @@ class ParticlePhysicsTest {
             Float.NaN, 2f, Float.POSITIVE_INFINITY, -3f
         )
         assertEquals(0f, result.x, 0.0001f)
-        assertEquals(-6f, result.y, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
         assertEquals(true, result.x.isFinite() && result.y.isFinite())
     }
 

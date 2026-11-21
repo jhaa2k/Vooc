@@ -881,10 +881,6 @@ object ElementPropertyCatalog {
             "Lighten", "Exclusion", "Subtractive", "Copy"
         )),
         text("Color", "Appearance", "#FFFFFFFF"),
-        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
-        text("Mask Image", "Appearance", ""),
-        bool("Show Unblurred Content", "Appearance", false),
-        bool("Show Unblurred Content Under", "Appearance", false),
         text("Texture / Image", "Appearance", ""),
         text("Color Over Life", "Appearance", "Gradient", listOf("Constant", "Gradient", "Fade To Transparent")),
         text("Color Over Life Start", "Appearance", "#FFFFFFFF"),

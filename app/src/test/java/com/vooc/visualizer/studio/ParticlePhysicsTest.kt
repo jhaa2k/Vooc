@@ -42,4 +42,28 @@ class ParticlePhysicsTest {
         assertEquals(-6f, repel.x, 0.0001f)
         assertEquals(-8f, repel.y, 0.0001f)
     }
+
+    @Test fun horizontalLineEmitterKeepsParticlesOnHorizontalAxis() {
+        val result = particleSpawnOffset("HorizontalLine", 0.75f, 0.4f, 100f, 50f, 40f, 0f, 0f, 1f)
+        assertEquals(50f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
+    @Test fun rectangleEmitterSamplesBothAxes() {
+        val result = particleSpawnOffset("Rectangle", 0.75f, 0.25f, 100f, 80f, 40f, 0f, 0f, 1f)
+        assertEquals(50f, result.x, 0.0001f)
+        assertEquals(-40f, result.y, 0.0001f)
+    }
+
+    @Test fun ringEmitterUsesConfiguredInnerAndOuterRadius() {
+        val result = particleSpawnOffset("Ring", 0.25f, 0.5f, 100f, 80f, 60f, 20f, 0f, (Math.PI / 2.0).toFloat())
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(40f, result.y, 0.0001f)
+    }
+
+    @Test fun unknownEmitterFallsBackToPoint() {
+        val result = particleSpawnOffset("Custom", 0.9f, 0.8f, 100f, 80f, 60f, 20f, 0f, 1f)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
 }

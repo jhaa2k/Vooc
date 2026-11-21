@@ -1638,7 +1638,7 @@ object VideoExportEngine {
                     val particleLayerScaleVector = element.value("Scale") as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
                     val particleLayerScale = resolveParticleLayerScale(
                         particleLayerScaleVector.x.toFloat(), particleLayerScaleVector.y.toFloat(),
-                        (element.value("Scale Is Uniform") as? ElementValue.Bool)?.value == true, particleScale
+                        (element.value("Scale Is Uniform") as? ElementValue.Bool)?.value != false, particleScale
                     )
                     val particleLayerScaleX = particleLayerScale.x
                     val particleLayerScaleY = particleLayerScale.y

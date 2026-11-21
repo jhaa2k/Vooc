@@ -202,6 +202,25 @@ class AnalyzerTest {
     }
 
     @Test
+    fun analyzerReconfigurationRebuildsFftAndChannelPipelines() {
+        val analyzer = AudioAnalyzer(sr, AnalyzerConfig(fftSize = FftSize.S1024, channelMode = ChannelMode.MONO))
+        val initial = sine(440.0, 1024, 0.5f)
+        assertEquals(1024, analyzer.analyzeWindow(initial, initial, 0.0).fftSize)
+
+        analyzer.updateConfig(
+            analyzer.config.copy(fftSize = FftSize.S4096, channelMode = ChannelMode.STEREO_SPLIT)
+        )
+        val left = sine(440.0, 4096, 0.8f)
+        val right = sine(880.0, 4096, 0.3f)
+        val rebuilt = analyzer.analyzeWindow(left, right, 0.1)
+
+        assertEquals(4096, rebuilt.fftSize)
+        assertTrue(rebuilt.channels.containsKey(ChannelSelect.LEFT))
+        assertTrue(rebuilt.channels.containsKey(ChannelSelect.RIGHT))
+        assertTrue(rebuilt.channel(ChannelSelect.LEFT).rms > rebuilt.channel(ChannelSelect.RIGHT).rms)
+    }
+
+    @Test
     fun stereoSplitProducesPerChannelAnalysis() {
         val cfg = AnalyzerConfig(channelMode = ChannelMode.STEREO_SPLIT)
         val analyzer = AudioAnalyzer(sr, cfg)

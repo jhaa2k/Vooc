@@ -7,6 +7,7 @@ import com.vooc.visualizer.studio.MirrorEffectProcessor
 import com.vooc.visualizer.studio.GeneratedAlbumArt
 import com.vooc.visualizer.studio.reflectParticleAxis
 import com.vooc.visualizer.studio.particleForceDelta
+import com.vooc.visualizer.studio.particleForcePosition
 import com.vooc.visualizer.studio.particleSpawnOffset
 
 import android.net.Uri
@@ -3095,8 +3096,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             var vy = sin(angle) * velocity
                             // Force-field coordinates are normalized against the full canvas,
                             // matching export; do not offset them by the element transform center.
-                            val fieldX = forcePosition.x.toFloat() * size.width
-                            val fieldY = forcePosition.y.toFloat() * size.height
+                            val forceCenter = particleForcePosition(
+                                forcePosition.x.toFloat(), forcePosition.y.toFloat(), size.width, size.height
+                            )
+                            val fieldX = forceCenter.x
+                            val fieldY = forceCenter.y
                             val dx = fieldX - spawnX
                             val dy = fieldY - spawnY
                             val forceDelta = particleForceDelta(

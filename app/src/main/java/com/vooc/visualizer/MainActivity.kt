@@ -19,6 +19,7 @@ import com.vooc.visualizer.studio.particlePositionOffset
 import com.vooc.visualizer.studio.resolveParticleAnchorOffset
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 import com.vooc.visualizer.studio.resolveParticleOpacity
+import com.vooc.visualizer.studio.resolveParticleEmissionTiming
 
 import android.net.Uri
 import android.Manifest
@@ -3049,15 +3050,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val randomB = kotlin.math.abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
                             val randomC = kotlin.math.abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
                             val particleLifetime = (lifetime * (1f + (randomC * 2f - 1f) * lifetimeRandom)).coerceAtLeast(0.01f)
-                            if (emitterBurstCount > 0 && index >= emitterBurstCount) return@repeat
-                            val burstElapsed = playbackSeconds - index * spawnInterval
-                            if (emitterBurstCount > 0 && burstElapsed < 0f) return@repeat
-                            val age = if (emitterBurstCount > 0) {
-                                if (emitterLoop) burstElapsed % emitterBurstInterval else burstElapsed
-                            } else {
-                                ((playbackSeconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
-                            }
-                            if (emitterBurstCount > 0 && age > particleLifetime) return@repeat
+                            val emissionTiming = resolveParticleEmissionTiming(
+                                playbackSeconds, index, spawnInterval, particleLifetime,
+                                emitterBurstCount, emitterBurstInterval, emitterLoop
+                            )
+                            if (!emissionTiming.isAlive) return@repeat
+                            val age = emissionTiming.age
                             val lifeT = (age / particleLifetime).coerceIn(0f, 1f)
                             val emitterAngle = emitterArcStart + randomA * emitterArcSweep
                             val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB

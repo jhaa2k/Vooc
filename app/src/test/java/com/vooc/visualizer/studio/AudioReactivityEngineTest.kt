@@ -45,6 +45,18 @@ class AudioReactivityEngineTest {
         val released = envelope.update(0f, 1f / 60f, 0.1f, 0.5f)
         assertTrue(released > 0f && released < attacked)
     }
+    @Test fun peakAndRmsRemainDistinctAudioMeasurements() {
+        val sources = audioReactivitySources(
+            samples = floatArrayOf(0.2f, 0.4f),
+            overall = 0.3f,
+            beat = 0f,
+            peak = 0.95f,
+            rms = 0.3f
+        )
+        assertEquals(0.95f, sources.value("Peak"), 0.0001f)
+        assertEquals(0.3f, sources.value("RMS"), 0.0001f)
+    }
+
     @Test fun spectrumSourcesAreNormalizedAndSplitIntoBands() {
         val sources = audioReactivitySources(
             samples = floatArrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1f),

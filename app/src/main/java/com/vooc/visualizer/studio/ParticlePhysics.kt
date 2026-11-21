@@ -35,6 +35,18 @@ internal fun resolveParticleEmissionTiming(
     return ParticleEmissionTiming(age.coerceIn(0f, lifetime), true)
 }
 
+internal data class ParticleRandomSample(val a: Float, val b: Float, val c: Float)
+
+/** Stable per-index random values shared by the live renderer and offline export. */
+internal fun resolveParticleRandomSample(index: Int): ParticleRandomSample {
+    val seed = index.coerceAtLeast(0) + 1f
+    return ParticleRandomSample(
+        kotlin.math.abs(kotlin.math.sin(seed * 12.9898f) * 43758.5453f) % 1f,
+        kotlin.math.abs(kotlin.math.sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f,
+        kotlin.math.abs(kotlin.math.sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
+    )
+}
+
 internal data class ParticleMotionState(val x: Float, val y: Float, val travelTime: Float)
 
 /** Shared deterministic motion integration used by both the live preview and export renderer. */

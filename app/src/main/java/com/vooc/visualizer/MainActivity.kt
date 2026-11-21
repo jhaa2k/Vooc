@@ -1833,14 +1833,16 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
             }
             when (sourceType) {
                 "Solid Color" -> {
-                    val color = runCatching {
+                    val baseColor = runCatching {
                         Color(android.graphics.Color.parseColor(bgText("Color", "#FF000000")))
-                    }.getOrDefault(Color.Black).copy(alpha = opacity)
-                    drawRect(color, blendMode = blend)
+                    }.getOrDefault(Color.Black)
+                    drawRect(baseColor.copy(alpha = baseColor.alpha * opacity), blendMode = blend)
                 }
                 "Gradient" -> {
-                    val start = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient Start", "#FF000000"))) }.getOrDefault(Color.Black).copy(alpha = opacity)
-                    val end = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient End", "#FFFFFFFF"))) }.getOrDefault(Color.White).copy(alpha = opacity)
+                    val startColor = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient Start", "#FF000000"))) }.getOrDefault(Color.Black)
+                    val endColor = runCatching { Color(android.graphics.Color.parseColor(bgText("Background Gradient End", "#FFFFFFFF"))) }.getOrDefault(Color.White)
+                    val start = startColor.copy(alpha = startColor.alpha * opacity)
+                    val end = endColor.copy(alpha = endColor.alpha * opacity)
                     val angle = Math.toRadians(bgNumber("Background Gradient Angle", 0f).toDouble())
                     val radius = (kotlin.math.sqrt(size.width * size.width + size.height * size.height) * 0.5f).coerceAtLeast(1f)
                     val dx = kotlin.math.cos(angle).toFloat() * radius
@@ -1953,10 +1955,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         drawBackgroundBitmap(image, true)
                         if (bgBool("Show Unblurred Content") && originalImage != null) drawBackgroundBitmap(originalImage, false)
                     } else {
-                        val fallback = runCatching {
+                        val fallbackBase = runCatching {
                             Color(android.graphics.Color.parseColor(bgText("Color", "#FF000000")))
-                        }.getOrDefault(Color.Black).copy(alpha = opacity)
-                        drawRect(fallback, blendMode = blend)
+                        }.getOrDefault(Color.Black)
+                        drawRect(fallbackBase.copy(alpha = fallbackBase.alpha * opacity), blendMode = blend)
                     }
                 }
                 else -> Unit // Video backgrounds need a video-frame source pipeline.

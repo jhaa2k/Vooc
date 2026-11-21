@@ -3053,7 +3053,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val particleLayerScaleVector = props["Scale"] as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
                         val particleLayerScale = resolveParticleLayerScale(
                             particleLayerScaleVector.x.toFloat(), particleLayerScaleVector.y.toFloat(),
-                            props["Scale Is Uniform"] == ElementValue.Bool(true), particleScale
+                            (props["Scale Is Uniform"] as? ElementValue.Bool)?.value != false, particleScale
                         )
                         val particleLayerScaleX = particleLayerScale.x
                         val particleLayerScaleY = particleLayerScale.y

@@ -3090,8 +3090,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val velocity = particleSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                             var vx = cos(angle) * velocity
                             var vy = sin(angle) * velocity
-                            val fieldX = forcePosition.x.toFloat() * size.width - center.x
-                            val fieldY = forcePosition.y.toFloat() * size.height - center.y
+                            // Force-field coordinates are normalized against the full canvas,
+                            // matching export; do not offset them by the element transform center.
+                            val fieldX = forcePosition.x.toFloat() * size.width
+                            val fieldY = forcePosition.y.toFloat() * size.height
                             val dx = fieldX - spawnX
                             val dy = fieldY - spawnY
                             val forceDelta = particleForceDelta(

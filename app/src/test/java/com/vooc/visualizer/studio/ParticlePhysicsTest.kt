@@ -435,6 +435,11 @@ class ParticleEmissionTimingTest {
         org.junit.Assert.assertFalse(timing.isAlive)
     }
 
+    @org.junit.Test fun nonLoopingBurstExpiresAtExactLifetimeBoundary() {
+        val timing = resolveParticleEmissionTiming(2f, 0, 0f, 2f, 4, 1f, false)
+        org.junit.Assert.assertFalse(timing.isAlive)
+    }
+
     @org.junit.Test fun burstCountAndInvalidInputsAreBounded() {
         val missing = resolveParticleEmissionTiming(1f, 4, 0f, 2f, 4, 1f, true)
         val invalid = resolveParticleEmissionTiming(Float.NaN, 0, Float.NaN, Float.NaN, 0, Float.NaN, false)

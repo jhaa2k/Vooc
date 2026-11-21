@@ -1561,11 +1561,14 @@ object VideoExportEngine {
                     val forceMode = textValue("Force Field", "None")
                     val forceStrength = number("Force Field Strength", 0f)
                     val sampleCount = providerSamples?.size ?: 0
-                    val bassValue = providerSamples?.take((sampleCount / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel
-                    val trebleValue = providerSamples?.takeLast((sampleCount / 5).coerceAtLeast(1))?.average()?.toFloat() ?: audioLevel
+                    val particleBandSize = (sampleCount / 5).coerceAtLeast(1)
+                    val bassValue = providerSamples?.take(particleBandSize)?.average()?.toFloat() ?: audioLevel
+                    val midValue = providerSamples?.drop(particleBandSize * 2)?.take(particleBandSize)?.average()?.toFloat() ?: audioLevel
+                    val trebleValue = providerSamples?.takeLast(particleBandSize)?.average()?.toFloat() ?: audioLevel
                     val measuredSpeed = when (textValue("Measure Overall Speed (Measure What)", "Nothing")) {
                         "Beat" -> providerBeat
                         "Bass" -> bassValue
+                        "Mid" -> midValue
                         "Treble" -> trebleValue
                         "RMS", "Overall Audio Level" -> audioLevel
                         "Peak" -> peakLevel

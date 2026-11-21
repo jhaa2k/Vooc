@@ -604,7 +604,7 @@ class ElementSystemTest {
         val spec = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).first { it.name == "Image Sampling" }
         assertEquals(listOf("Nearest", "Linear"), spec.options)
         val legacy = image.copy(properties = image.properties + ("Image Sampling" to ElementValue.Text("Cubic"))).normalized()
-        assertNull(legacy.value("Image Sampling"))
+        assertEquals(ElementValue.Text("Linear"), legacy.value("Image Sampling"))
         assertEquals(ElementValue.Text("Linear"), image.value("Image Sampling"))
     }
 

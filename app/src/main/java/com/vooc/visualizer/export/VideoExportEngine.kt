@@ -678,7 +678,7 @@ object VideoExportEngine {
             val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
                 alpha = (opacity * 255f).toInt().coerceIn(0, 255)
                 style = Paint.Style.FILL
-                if (android.os.Build.VERSION.SDK_INT >= 29) blendMode = if (exclusionBlend) android.graphics.BlendMode.DIFFERENCE else null
+                if (android.os.Build.VERSION.SDK_INT >= 29) this.blendMode = if (exclusionBlend) android.graphics.BlendMode.DIFFERENCE else null
                 xfermode = if (exclusionBlend && android.os.Build.VERSION.SDK_INT >= 29 || blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
             }
             when (sourceType) {

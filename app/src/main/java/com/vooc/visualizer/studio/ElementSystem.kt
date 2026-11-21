@@ -10,6 +10,13 @@ import org.json.JSONObject
  * incrementally. Element properties are stored by their specification names so future
  * property additions do not invalidate existing project documents.
  */
+/** Converts a 1080-wide design-space measurement to the active canvas width. */
+internal fun scaleBarDesignDimension(value: Float, canvasWidth: Float): Float {
+    val safeWidth = canvasWidth.takeIf { it.isFinite() && it > 0f } ?: 1080f
+    val safeValue = value.takeIf { it.isFinite() } ?: 0f
+    return safeValue * (safeWidth / 1080f)
+}
+
 enum class StudioElementType(val displayName: String) {
     AUDIO_PROVIDER("Audio Provider"),
     IMAGE("Image"),

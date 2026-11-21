@@ -647,7 +647,7 @@ object ElementPropertyCatalog {
         integer("Blur Passes", "Blur", 2, 1.0, 16.0),
         number("Blur Quality", "Blur", 1.0, 0.1, 4.0),
         number("Blur Direction", "Blur", 0.0, -360.0, 360.0),
-        number("Blur Zoom Amount", "Blur", 0.0, 0.0, 4.0),
+        number("Blur Zoom Amount", "Blur", 1.0, 0.0, 4.0),
         ElementPropertySpec("Blur Center", "Blur", ElementValueType.VECTOR2, ElementValue.Vector2(0.5, 0.5), 0.0, 1.0),
         bool("Blur Alpha Only", "Blur", false),
         bool("Blur Preserve Edges", "Blur", false),
@@ -657,6 +657,7 @@ object ElementPropertyCatalog {
         number("Blur Spread", "Blur", 0.0, 0.0, 128.0),
         number("Blur Blend Strength", "Blur", 1.0, 0.0, 1.0),
         number("Blur Bloom Strength", "Blur", 0.0, 0.0, 2.0),
+        number("Blur Bloom Radius", "Blur", 12.0, 0.0, 64.0),
         number("Blur Bloom Threshold", "Blur", 0.72, 0.0, 1.0),
         text("Blur Glow Color", "Blur", "#FFFFFFFF")
     )

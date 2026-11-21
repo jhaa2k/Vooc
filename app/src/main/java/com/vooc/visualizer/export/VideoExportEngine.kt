@@ -1,6 +1,7 @@
 package com.vooc.visualizer.export
 
 import com.vooc.visualizer.studio.buildNormalizedImageShapePath
+import com.vooc.visualizer.studio.resolveParticleLayerScale
 import com.vooc.visualizer.studio.reflectParticleAxis
 import com.vooc.visualizer.studio.particleForceDelta
 import com.vooc.visualizer.studio.particleForcePosition

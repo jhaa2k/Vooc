@@ -2982,8 +2982,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val emitterX = particleCenterX + (emitterPosition.x.toFloat() - 0.5f) * size.width
                         val emitterY = particleCenterY + (emitterPosition.y.toFloat() - 0.5f) * size.height
                         val emitterRotation = number("Emitter Rotation", 0f) * PI.toFloat() / 180f
-                        val emitterRadius = number("Emitter Radius", 100f).coerceAtLeast(0f) * size.width / 1080f
-                        val emitterInnerRadius = number("Emitter Inner Radius", 0f).coerceIn(0f, number("Emitter Radius", 100f)) * size.width / 1080f
+                        val emitterRadii = resolveParticleEmitterRadii(
+                            number("Emitter Radius", 100f), number("Emitter Inner Radius", 0f)
+                        )
+                        val emitterRadius = emitterRadii.outer * size.width / 1080f
+                        val emitterInnerRadius = emitterRadii.inner * size.width / 1080f
                         val emitterArcStart = number("Emitter Arc Start", 0f) * PI.toFloat() / 180f
                         val emitterArcSweep = number("Emitter Arc Sweep", 360f).coerceIn(-360f, 360f) * PI.toFloat() / 180f
                         val emitterBurstCount = number("Emitter Burst Count", 0f).toInt().coerceAtLeast(0)

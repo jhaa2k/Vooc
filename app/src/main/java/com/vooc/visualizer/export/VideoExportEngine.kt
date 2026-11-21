@@ -1622,6 +1622,9 @@ object VideoExportEngine {
                     val fadeTime = number("Fade In And Out Time", 0.25f).coerceIn(0f, lifetime * 0.5f)
                     val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f) * width / 1080f
                     val particleScale = number("Particle Scale", 100f).coerceAtLeast(0f) / 100f * scale
+                    val particleLayerScale = element.value("Scale") as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
+                    val particleLayerScaleX = (particleLayerScale.x.toFloat() * particleScale).coerceIn(0f, 10f)
+                    val particleLayerScaleY = ((if ((element.value("Scale Is Uniform") as? ElementValue.Bool)?.value == true) particleLayerScale.x else particleLayerScale.y).toFloat() * particleScale).coerceIn(0f, 10f)
                     val aspect = number("Size Aspect Ratio", 1f).coerceIn(0.01f, 20f)
                     val perspectiveDepth = number("Perspective Depth", 0f).coerceAtLeast(0f)
                     val perspectiveFov = number("Perspective Fov", 60f).coerceIn(1f, 179f)
@@ -1740,8 +1743,8 @@ object VideoExportEngine {
                             (android.graphics.Color.green(colorOverLifeStart) + (android.graphics.Color.green(colorOverLifeEnd) - android.graphics.Color.green(colorOverLifeStart)) * colorT).toInt(),
                             (android.graphics.Color.blue(colorOverLifeStart) + (android.graphics.Color.blue(colorOverLifeEnd) - android.graphics.Color.blue(colorOverLifeStart)) * colorT).toInt()
                         )
-                        val particleWidth = (sizeT * particleScale * perspective * depthScale * aspect).coerceAtLeast(0.5f)
-                        val particleHeight = (sizeT * particleScale * perspective * depthScale).coerceAtLeast(0.5f)
+                        val particleWidth = (sizeT * particleLayerScaleX * perspective * depthScale * aspect).coerceAtLeast(0.5f)
+                        val particleHeight = (sizeT * particleLayerScaleY * perspective * depthScale).coerceAtLeast(0.5f)
                         val randomAngularVelocity = angularVelocity + (randomB * 2f - 1f) * angularVelocityRandom
                         val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
                         val trailX = vx * trailLength * 0.001f

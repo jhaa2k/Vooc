@@ -1502,6 +1502,23 @@ object VideoExportEngine {
                         val particleShape = textValue("Particle Shape", "Circle")
                         val screenBlend = props["Particle Screen Blend"] == ElementValue.Bool(true)
                         val additiveBlend = props["Particle Additive Blend"] == ElementValue.Bool(true)
+                        val contentBlendMode = when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> android.graphics.PorterDuff.Mode.ADD
+                            "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
+                            "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
+                            "Darken" -> android.graphics.PorterDuff.Mode.DARKEN
+                            "Lighten" -> android.graphics.PorterDuff.Mode.LIGHTEN
+                            "Exclusion" -> android.graphics.PorterDuff.Mode.XOR
+                            "Copy" -> android.graphics.PorterDuff.Mode.SRC
+                            else -> android.graphics.PorterDuff.Mode.SRC_OVER
+                        }
+                        val particleContentBlendMode = when {
+                            screenBlend -> android.graphics.PorterDuff.Mode.SCREEN
+                            additiveBlend -> android.graphics.PorterDuff.Mode.ADD
+                            else -> contentBlendMode
+                        }
+                        paint.xfermode = if (particleContentBlendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null
+                            else android.graphics.PorterDuffXfermode(particleContentBlendMode)
                     val startSize = number("Start Size", 8f).coerceAtLeast(0f) * width / 1080f
                     val endSize = number("End Size", 2f).coerceAtLeast(0f) * width / 1080f
                     val endRandom = numberAlias("End Size Random", 0f, "Particle Size Random").coerceIn(0f, 1f)

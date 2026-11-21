@@ -1235,11 +1235,16 @@ object VideoExportEngine {
                     val outline = (element.value("Outline / Stroke") as? ElementValue.Bool)?.value == true
                     val strokeWidth = (number("Stroke Width", 1.5f) * width / 1080f).coerceAtLeast(0.5f)
                     val strokeColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(color)
-                    val colorA = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Bar Color A", "#FF56D8FF")), reactivity.colorMultiplier) }.getOrDefault(color)
-                    val colorB = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Bar Color B", "#FF9B5CFF")), reactivity.colorMultiplier) }.getOrDefault(color)
+                    val gradientFillEnabled = (element.value("Gradient Fill") as? ElementValue.Bool)?.value == true
+                    val colorA = runCatching { audioReactivityColor(android.graphics.Color.parseColor(
+                        textValue(if (gradientFillEnabled) "Gradient Start Color" else "Bar Color A", "#FF56D8FF")
+                    ), reactivity.colorMultiplier) }.getOrDefault(color)
+                    val colorB = runCatching { audioReactivityColor(android.graphics.Color.parseColor(
+                        textValue(if (gradientFillEnabled) "Gradient End Color" else "Bar Color B", "#FF9B5CFF")
+                    ), reactivity.colorMultiplier) }.getOrDefault(color)
                     val capColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Cap Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(strokeColor)
                     val peakColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Peak Indicator Color", textValue("Peak Color", "#FFFFFFFF"))), reactivity.colorMultiplier) }.getOrDefault(strokeColor)
-                    val colorMode = if ((element.value("Gradient Fill") as? ElementValue.Bool)?.value == true) "Gradient" else textValue("Color Mode", "Alternating")
+                    val colorMode = if (gradientFillEnabled) "Gradient" else textValue("Color Mode", "Alternating")
                     val capMode = textValue("Top/Bottom Cap", "None")
                     val capPlacement = textValue("Cap Placement", "Top")
                     val capSize = (number("Cap Size", 4f) * width / 1080f).coerceAtLeast(1f)

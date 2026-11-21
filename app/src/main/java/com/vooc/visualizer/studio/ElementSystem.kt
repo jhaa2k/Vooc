@@ -401,7 +401,7 @@ object ElementPropertyCatalog {
         text("Window Function", "Performance", "Hann", listOf("Rectangular", "Hann", "Hamming", "Blackman")),
         number("Beat Sensitivity", "Beat", 1.0, 0.0, 8.0),
         number("Beat Threshold", "Beat", 0.65, 0.0, 1.0),
-        number("Beat Release", "Beat", 0.25, 0.0, 0.5),
+        number("Beat Release", "Beat", 0.25, 0.05, 0.5),
         text("Fft Size", "Performance", "2048", listOf("256", "512", "1024", "2048", "4096", "8192"))
     )
 

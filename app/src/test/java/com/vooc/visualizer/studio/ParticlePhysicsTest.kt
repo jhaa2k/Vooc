@@ -4,6 +4,26 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ParticlePhysicsTest {
+    @Test fun particleTrailVectorReflectsAcrossEachMirrorAxis() {
+        val horizontal = resolveParticleMirrorVector(12f, -7f, true, false)
+        assertEquals(-12f, horizontal.x, 0.0001f)
+        assertEquals(-7f, horizontal.y, 0.0001f)
+
+        val vertical = resolveParticleMirrorVector(12f, -7f, false, true)
+        assertEquals(12f, vertical.x, 0.0001f)
+        assertEquals(7f, vertical.y, 0.0001f)
+
+        val both = resolveParticleMirrorVector(12f, -7f, true, true)
+        assertEquals(-12f, both.x, 0.0001f)
+        assertEquals(7f, both.y, 0.0001f)
+    }
+
+    @Test fun particleTrailMirrorVectorSanitizesNonFiniteComponents() {
+        val result = resolveParticleMirrorVector(Float.NaN, Float.POSITIVE_INFINITY, true, true)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
     @Test fun particleAnchorAndAlignmentResolveNormalizedOffsets() {
         val result = resolveParticleAnchorOffset("start", "end", 0.25f, 0.75f)
         assertEquals(-0.25f, result.x, 0.0001f)

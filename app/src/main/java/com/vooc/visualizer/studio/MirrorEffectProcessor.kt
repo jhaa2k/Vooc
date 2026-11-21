@@ -14,6 +14,13 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.pow
 
+internal fun resolveMirrorAxisPosition(origin: Float, normalizedPosition: Float, extent: Float): Float {
+    val safeExtent = extent.takeIf { it.isFinite() && it > 0f } ?: 1f
+    val safeOrigin = origin.takeIf { it.isFinite() } ?: safeExtent * 0.5f
+    val safePosition = normalizedPosition.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
+    return (safeOrigin + (safePosition - 0.5f) * safeExtent).coerceIn(-safeExtent, safeExtent * 2f)
+}
+
 /** Shared bitmap mirror/reflection renderer for preview and export. */
 object MirrorEffectProcessor {
     fun process(source: Bitmap, element: ElementDocument, targetWidth: Int = source.width, targetHeight: Int = source.height): Bitmap {
@@ -34,28 +41,25 @@ object MirrorEffectProcessor {
         val canvas = Canvas(output)
         val origin = text("Mirror Origin", "Center")
         val customCenter = element.value("Mirror Center") as? ElementValue.Vector2
-        var axisX = when (origin) {
+        val baseAxisX = when (origin) {
             "Left" -> 0f
             "Right" -> width.toFloat()
-            "Custom" -> ((customCenter?.x ?: 0.5) * width).toFloat()
+            "Custom" -> (((customCenter?.x ?: 0.5).toFloat()).takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f) * width
             else -> width * 0.5f
         }
-        var axisY = when (origin) {
+        val baseAxisY = when (origin) {
             "Top" -> 0f
             "Bottom" -> height.toFloat()
-            "Custom" -> ((customCenter?.y ?: 0.5) * height).toFloat()
+            "Custom" -> (((customCenter?.y ?: 0.5).toFloat()).takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f) * height
             else -> height * 0.5f
         }
         val axis = text("Mirror Axis", "Horizontal")
-        val position = number("Mirror Position", 0.5f).coerceIn(0f, 1f)
-        if (origin == "Center" || origin == "Custom") {
-            if (axis == "Horizontal" || axis == "Both") axisX = position * width
-            if (axis == "Vertical") axisY = position * height
-        } else if (axis == "Horizontal" || axis == "Both") {
-            axisX = position * width
-        } else if (axis == "Vertical") {
-            axisY = position * height
-        }
+        val position = number("Mirror Position", 0.5f)
+        // Position offsets the selected origin; neutral 0.5 preserves edge/custom anchors.
+        var axisX = if (axis == "Horizontal" || axis == "Both")
+            resolveMirrorAxisPosition(baseAxisX, position, width.toFloat()) else baseAxisX
+        var axisY = if (axis == "Vertical")
+            resolveMirrorAxisPosition(baseAxisY, position, height.toFloat()) else baseAxisY
         axisX = (axisX + number("Mirror Offset X", 0f) * width).coerceIn(-width.toFloat(), width * 2f)
         axisY = (axisY + number("Mirror Offset Y", 0f) * height).coerceIn(-height.toFloat(), height * 2f)
 

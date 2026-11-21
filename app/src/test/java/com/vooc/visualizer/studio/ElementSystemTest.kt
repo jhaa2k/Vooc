@@ -629,6 +629,7 @@ class ElementSystemTest {
         val background = ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).map { it.name }.toSet()
         val shape = ElementPropertyCatalog.forElement(StudioElementType.SHAPE).map { it.name }.toSet()
         assertFalse(background.contains("Source Composition Index"))
+        assertEquals(listOf("Solid Color", "Gradient", "Image"), ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).first { it.name == "Source Type" }.options)
         assertTrue(background.containsAll(setOf("Mask Image", "Show Unblurred Content", "Show Unblurred Content Under")))
         assertFalse(shape.contains("Source Composition Index"))
         assertFalse(shape.contains("Mask Image"))

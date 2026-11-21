@@ -3065,8 +3065,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             )
                             val localX = spawnOffset.x
                             val localY = spawnOffset.y
-                            val spawnX = emitterX + localX * cos(emitterRotation) - localY * sin(emitterRotation)
-                            val spawnY = emitterY + localX * sin(emitterRotation) + localY * cos(emitterRotation)
+                            val rotatedSpawnOffset = rotateParticleEmitterOffset(localX, localY, emitterRotation)
+                            val spawnX = emitterX + rotatedSpawnOffset.x
+                            val spawnY = emitterY + rotatedSpawnOffset.y
                             val radialAngle = kotlin.math.atan2(spawnY - particleCenterY, spawnX - particleCenterX)
                             val angle = when {
                                 randomVector -> randomA * 2f * PI.toFloat()

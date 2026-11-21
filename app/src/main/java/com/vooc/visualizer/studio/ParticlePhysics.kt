@@ -76,6 +76,15 @@ internal fun particlePositionOffset(normalizedPosition: Float): Float {
     return safePosition - 0.5f
 }
 
+internal data class ParticleVector(val x: Float, val y: Float)
+
+/** Reflects a particle's directional vector across the requested canvas axes. */
+internal fun resolveParticleMirrorVector(x: Float, y: Float, mirrorX: Boolean, mirrorY: Boolean): ParticleVector {
+    val safeX = x.takeIf { it.isFinite() } ?: 0f
+    val safeY = y.takeIf { it.isFinite() } ?: 0f
+    return ParticleVector(if (mirrorX) -safeX else safeX, if (mirrorY) -safeY else safeY)
+}
+
 internal data class ParticleAnchorOffset(val x: Float, val y: Float)
 
 /** Resolves particle anchor controls as a normalized offset from the selected alignment point. */

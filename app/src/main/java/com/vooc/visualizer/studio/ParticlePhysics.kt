@@ -65,10 +65,19 @@ internal fun particleSpawnOffset(
         (radius.coerceAtLeast(innerRadius) - innerRadius.coerceAtLeast(0f)) * b
     return when (shape) {
         "Rectangle" -> ParticleSpawnOffset((a * 2f - 1f) * width, (b * 2f - 1f) * height)
-        "Ellipse", "Circle" -> ParticleSpawnOffset(
-            kotlin.math.cos(angle) * radialDistance.coerceAtLeast(width * b),
-            kotlin.math.sin(angle) * if (shape == "Circle") radialDistance else radius * height / width.coerceAtLeast(1f)
-        )
+        "Ellipse" -> {
+            // Uniform-area sampling keeps particles evenly distributed across the ellipse.
+            val radialFactor = kotlin.math.sqrt(b)
+            ParticleSpawnOffset(
+                kotlin.math.cos(angle) * width.coerceAtLeast(0f) * radialFactor,
+                kotlin.math.sin(angle) * height.coerceAtLeast(0f) * radialFactor
+            )
+        }
+        "Circle" -> {
+            val radialFactor = kotlin.math.sqrt(b)
+            val circleRadius = radius.coerceAtLeast(0f) * radialFactor
+            ParticleSpawnOffset(kotlin.math.cos(angle) * circleRadius, kotlin.math.sin(angle) * circleRadius)
+        }
         "Ring" -> ParticleSpawnOffset(kotlin.math.cos(angle) * radialDistance, kotlin.math.sin(angle) * radialDistance)
         "Line", "HorizontalLine" -> ParticleSpawnOffset((a * 2f - 1f) * width, 0f)
         "Edge" -> ParticleSpawnOffset(if (a < 0.5f) -width else width, (b * 2f - 1f) * height)

@@ -319,3 +319,38 @@ class ParticlePhysicsTest {
         assertEquals(0f, valid, 0.0001f)
     }
 }
+
+
+class ParticleEmissionTimingTest {
+    @org.junit.Test fun continuousEmissionUsesDeterministicStaggeredAges() {
+        val first = resolveParticleEmissionTiming(1f, 0, 0.2f, 3f, 0, 1f, true)
+        val next = resolveParticleEmissionTiming(1f, 1, 0.2f, 3f, 0, 1f, true)
+        org.junit.Assert.assertEquals(1f, first.age, 0.0001f)
+        org.junit.Assert.assertEquals(1.2f, next.age, 0.0001f)
+        org.junit.Assert.assertTrue(first.isAlive && next.isAlive)
+    }
+
+    @org.junit.Test fun burstWaitsForItsScheduledSpawnTime() {
+        val timing = resolveParticleEmissionTiming(0.1f, 2, 0.2f, 3f, 5, 1f, false)
+        org.junit.Assert.assertFalse(timing.isAlive)
+    }
+
+    @org.junit.Test fun loopingBurstWrapsAtConfiguredInterval() {
+        val timing = resolveParticleEmissionTiming(2.5f, 0, 0.1f, 3f, 4, 1f, true)
+        org.junit.Assert.assertEquals(0.5f, timing.age, 0.0001f)
+        org.junit.Assert.assertTrue(timing.isAlive)
+    }
+
+    @org.junit.Test fun nonLoopingBurstExpiresAfterLifetime() {
+        val timing = resolveParticleEmissionTiming(4f, 0, 0f, 2f, 4, 1f, false)
+        org.junit.Assert.assertFalse(timing.isAlive)
+    }
+
+    @org.junit.Test fun burstCountAndInvalidInputsAreBounded() {
+        val missing = resolveParticleEmissionTiming(1f, 4, 0f, 2f, 4, 1f, true)
+        val invalid = resolveParticleEmissionTiming(Float.NaN, 0, Float.NaN, Float.NaN, 0, Float.NaN, false)
+        org.junit.Assert.assertFalse(missing.isAlive)
+        org.junit.Assert.assertEquals(0f, invalid.age, 0f)
+        org.junit.Assert.assertTrue(invalid.isAlive)
+    }
+}

@@ -78,6 +78,17 @@ internal fun particlePositionOffset(normalizedPosition: Float): Float {
 
 internal data class ParticleVector(val x: Float, val y: Float)
 
+/** Resolves a finite trail displacement from particle velocity and the configured trail length. */
+internal fun resolveParticleTrailVector(velocityX: Float, velocityY: Float, trailLength: Float): ParticleVector {
+    val safeVelocityX = velocityX.takeIf { it.isFinite() } ?: 0f
+    val safeVelocityY = velocityY.takeIf { it.isFinite() } ?: 0f
+    val safeLength = trailLength.takeIf { it.isFinite() }?.coerceIn(0f, 100000f) ?: 0f
+    val scale = safeLength * 0.001f
+    val x = safeVelocityX * scale
+    val y = safeVelocityY * scale
+    return ParticleVector(x.takeIf { it.isFinite() } ?: 0f, y.takeIf { it.isFinite() } ?: 0f)
+}
+
 /** Reflects a particle's directional vector across the requested canvas axes. */
 internal fun resolveParticleMirrorVector(x: Float, y: Float, mirrorX: Boolean, mirrorY: Boolean): ParticleVector {
     val safeX = x.takeIf { it.isFinite() } ?: 0f

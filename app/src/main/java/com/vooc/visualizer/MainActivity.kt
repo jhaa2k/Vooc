@@ -3196,9 +3196,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                         alpha = imageAlpha,
                                         colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(imageColorMatrix),
                                         blendMode = contentBlend,
+                                        // Android Canvas export uses bitmap filtering (bilinear) for both
+                                        // Linear and Cubic labels. Keep preview on the same filter path
+                                        // so the selected sampling mode cannot diverge after export.
                                         filterQuality = when (textValue("Image Sampling", "Linear")) {
                                             "Nearest" -> androidx.compose.ui.graphics.FilterQuality.None
-                                            "Cubic" -> androidx.compose.ui.graphics.FilterQuality.High
                                             else -> androidx.compose.ui.graphics.FilterQuality.Medium
                                         }
                                     )

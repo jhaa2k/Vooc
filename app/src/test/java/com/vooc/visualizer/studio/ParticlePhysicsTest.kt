@@ -430,6 +430,12 @@ class ParticleEmissionTimingTest {
         org.junit.Assert.assertTrue(timing.isAlive)
     }
 
+    @org.junit.Test fun loopingBurstRestartsAtExactCycleBoundary() {
+        val timing = resolveParticleEmissionTiming(2f, 0, 0f, 3f, 4, 1f, true)
+        org.junit.Assert.assertEquals(0f, timing.age, 0f)
+        org.junit.Assert.assertTrue(timing.isAlive)
+    }
+
     @org.junit.Test fun nonLoopingBurstExpiresAfterLifetime() {
         val timing = resolveParticleEmissionTiming(4f, 0, 0f, 2f, 4, 1f, false)
         org.junit.Assert.assertFalse(timing.isAlive)

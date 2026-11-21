@@ -3057,12 +3057,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val frameHeight = (size.height * 0.45f * scale * imageScaleY).coerceAtLeast(1f)
                             val fitMode = if (props["Keep Aspect Ratio And Crop To Fit"] == ElementValue.Bool(true)) "Fill (Cover)" else textValue("Fit Mode (Scale Type)", "Fit (Contain)")
                             val keepRatio = props["Keep Aspect Ratio"] != ElementValue.Bool(false)
-                            val sourceLeft = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * bitmap.width).toInt()
-                            val sourceTop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * bitmap.height).toInt()
-                            val sourceRight = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * bitmap.width).toInt()
-                            val sourceBottom = (number("Crop Bottom", 0f).coerceIn(0f, 0.95f) * bitmap.height).toInt()
-                            val sourceWidth = (bitmap.width - sourceLeft - sourceRight).coerceAtLeast(1)
-                            val sourceHeight = (bitmap.height - sourceTop - sourceBottom).coerceAtLeast(1)
+                            val sourceLeft = (number("Crop Left", 0f).coerceIn(0f, 0.95f) * bitmap.width).toInt().coerceIn(0, bitmap.width - 1)
+                            val sourceTop = (number("Crop Top", 0f).coerceIn(0f, 0.95f) * bitmap.height).toInt().coerceIn(0, bitmap.height - 1)
+                            val sourceRight = (number("Crop Right", 0f).coerceIn(0f, 0.95f) * bitmap.width).toInt().coerceIn(0, bitmap.width - sourceLeft - 1)
+                            val sourceBottom = (number("Crop Bottom", 0f).coerceIn(0f, 0.95f) * bitmap.height).toInt().coerceIn(0, bitmap.height - sourceTop - 1)
+                            val sourceWidth = bitmap.width - sourceLeft - sourceRight
+                            val sourceHeight = bitmap.height - sourceTop - sourceBottom
                             val imageRatio = sourceWidth.toFloat() / sourceHeight
                             val frameRatio = frameWidth / frameHeight
                             val destination = when {

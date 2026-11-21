@@ -668,6 +668,15 @@ private fun VoocStudio(
                 analyzer.onStreamDiscontinuity(player.currentPosition.coerceAtLeast(0L) / 1000.0)
                 providerProcessors.values.forEach { it.reset() }
             }
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                // Catch explicit seeks, including short seeks below the render-loop delta threshold.
+                analyzer.onStreamDiscontinuity(newPosition.positionMs.coerceAtLeast(0L) / 1000.0)
+                providerProcessors.values.forEach { it.reset() }
+            }
             override fun onPlaybackStateChanged(state: Int) { duration = player.duration.coerceAtLeast(0L) }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 trackName = mediaItem?.localConfiguration?.uri?.lastPathSegment ?: trackName

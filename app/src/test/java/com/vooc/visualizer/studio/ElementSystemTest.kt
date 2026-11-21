@@ -177,11 +177,12 @@ class ElementSystemTest {
             "Filter Strength", "AWeight", "Output Multiplier", "Lower Hz", "Higher Hz",
             "Hz Linear Factor", "Freq Shift", "Beat Smooth", "Beat Range Bar First",
             "Beat Range Bar Last", "Beat Range Value Lower", "Beat Range Value Higher",
-            "Analysis Mode", "Channel Mode", "Beat Detection Enabled"
+            "Analysis Mode", "Channel Mode", "Beat Detection Enabled", "Window Function",
+            "Beat Sensitivity", "Beat Threshold", "Beat Release", "Fft Size"
         )
         assertTrue("Missing audio provider controls: ${required - names}", names.containsAll(required))
+        assertEquals(listOf("256", "512", "1024", "2048", "4096", "8192"), ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).first { it.name == "Fft Size" }.options)
         val unsupported = setOf(
-            "Window Function", "Beat Sensitivity", "Beat Threshold", "Beat Release", "Fft Size",
             "Audio Input Source", "Input Gain", "Spectrum Scale", "Spectrum Compression",
             "Beat Detection Mode", "Audio Output Signal", "Analysis Update Rate"
         )

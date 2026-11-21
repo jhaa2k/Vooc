@@ -2872,7 +2872,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val particleShape = textValue("Particle Shape", "Circle")
                         val screenBlend = props["Particle Screen Blend"] == ElementValue.Bool(true)
                         val additiveBlend = props["Particle Additive Blend"] == ElementValue.Bool(true)
-                        val particleBlendMode = if (screenBlend) androidx.compose.ui.graphics.BlendMode.Screen else if (additiveBlend) androidx.compose.ui.graphics.BlendMode.Plus else androidx.compose.ui.graphics.BlendMode.SrcOver
+                        val contentBlendMode = when (textValue("Blend Mode Content", "Alpha")) {
+                            "Add" -> androidx.compose.ui.graphics.BlendMode.Plus
+                            "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                            "Multiply", "Subtractive" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                            "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
+                            "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
+                            "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Difference
+                            "Copy" -> androidx.compose.ui.graphics.BlendMode.Src
+                            else -> androidx.compose.ui.graphics.BlendMode.SrcOver
+                        }
+                        val particleBlendMode = if (screenBlend) androidx.compose.ui.graphics.BlendMode.Screen else if (additiveBlend) androidx.compose.ui.graphics.BlendMode.Plus else contentBlendMode
                         val startSize = number("Start Size", 8f).coerceAtLeast(0f)
                         val endSize = number("End Size", 2f).coerceAtLeast(0f)
                         val endRandom = numberAlias("End Size Random", 0f, "Particle Size Random").coerceIn(0f, 1f)

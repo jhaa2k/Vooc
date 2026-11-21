@@ -664,6 +664,7 @@ object VideoExportEngine {
             val sourceType = bgText("Source Type", "Solid Color")
             val opacity = (bgNumber("Opacity", 100f).coerceIn(0f, 100f) / 100f *
                 bgNumber("Opacity / Alpha", 1f).coerceIn(0f, 1f))
+            val exclusionBlend = bgText("Blend Mode Content", "Alpha") == "Exclusion"
             val blendMode = when (bgText("Blend Mode Content", "Alpha")) {
                 "Add" -> android.graphics.PorterDuff.Mode.ADD
                 "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
@@ -677,7 +678,8 @@ object VideoExportEngine {
             val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
                 alpha = (opacity * 255f).toInt().coerceIn(0, 255)
                 style = Paint.Style.FILL
-                xfermode = if (blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
+                if (android.os.Build.VERSION.SDK_INT >= 29) blendMode = if (exclusionBlend) android.graphics.BlendMode.DIFFERENCE else null
+                xfermode = if (exclusionBlend && android.os.Build.VERSION.SDK_INT >= 29 || blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
             }
             when (sourceType) {
                 "Solid Color" -> {
@@ -761,7 +763,8 @@ object VideoExportEngine {
                                 val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                                     color = overlay
                                     alpha = (android.graphics.Color.alpha(overlay) * opacity).toInt().coerceIn(0, 255)
-                                    xfermode = if (blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
+                                    if (android.os.Build.VERSION.SDK_INT >= 29) this.blendMode = if (exclusionBlend) android.graphics.BlendMode.DIFFERENCE else null
+                                    xfermode = if (exclusionBlend && android.os.Build.VERSION.SDK_INT >= 29 || blendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(blendMode)
                                 }
                                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
                             }
@@ -2158,8 +2161,10 @@ object VideoExportEngine {
                             else -> addRoundRect(rect, number("Corner Radius", 0f) * width / 1080f, number("Corner Radius", 0f) * width / 1080f, android.graphics.Path.Direction.CW)
                         }
                     }
+                    val shapeExclusionBlend = textValue("Blend Mode Content", "Alpha") == "Exclusion"
                     val shapeFillPaint = Paint(paint).apply {
-                        xfermode = android.graphics.PorterDuffXfermode(when (textValue("Blend Mode Content", "Alpha")) {
+                        if (android.os.Build.VERSION.SDK_INT >= 29) blendMode = if (shapeExclusionBlend) android.graphics.BlendMode.DIFFERENCE else null
+                        xfermode = if (shapeExclusionBlend && android.os.Build.VERSION.SDK_INT >= 29) null else android.graphics.PorterDuffXfermode(when (textValue("Blend Mode Content", "Alpha")) {
                             "Add" -> android.graphics.PorterDuff.Mode.ADD
                             "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
                             "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY
@@ -2215,7 +2220,8 @@ object VideoExportEngine {
                     if (strokeWidth > 0f || shapeType == "Line") {
                         val shapeStrokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                         val shapeStrokePaint = Paint(paint).apply {
-                            xfermode = android.graphics.PorterDuffXfermode(when (textValue("Blend Mode Content", "Alpha")) {
+                            if (android.os.Build.VERSION.SDK_INT >= 29) blendMode = if (shapeExclusionBlend) android.graphics.BlendMode.DIFFERENCE else null
+                            xfermode = if (shapeExclusionBlend && android.os.Build.VERSION.SDK_INT >= 29) null else android.graphics.PorterDuffXfermode(when (textValue("Blend Mode Content", "Alpha")) {
                             "Add" -> android.graphics.PorterDuff.Mode.ADD
                             "Screen" -> android.graphics.PorterDuff.Mode.SCREEN
                             "Multiply", "Subtractive" -> android.graphics.PorterDuff.Mode.MULTIPLY

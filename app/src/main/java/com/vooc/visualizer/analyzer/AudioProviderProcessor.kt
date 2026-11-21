@@ -110,11 +110,11 @@ class AudioProviderProcessor {
         }
         val source = when (cfg.channelMode) {
             ProviderChannelMode.MONO_MIX -> frame.rawMagnitude
-            ProviderChannelMode.LEFT -> frame.channel(ChannelSelect.LEFT).spectrum
-            ProviderChannelMode.RIGHT -> frame.channel(ChannelSelect.RIGHT).spectrum
+            ProviderChannelMode.LEFT -> frame.channel(ChannelSelect.LEFT).rawMagnitude
+            ProviderChannelMode.RIGHT -> frame.channel(ChannelSelect.RIGHT).rawMagnitude
             ProviderChannelMode.STEREO_AVERAGE -> {
-                val left = frame.channel(ChannelSelect.LEFT).spectrum
-                val right = frame.channel(ChannelSelect.RIGHT).spectrum
+                val left = frame.channel(ChannelSelect.LEFT).rawMagnitude
+                val right = frame.channel(ChannelSelect.RIGHT).rawMagnitude
                 if (left.isEmpty() || right.isEmpty()) frame.rawMagnitude
                 else FloatArray(min(left.size, right.size)) { index ->
                     (left[index] + right[index]) * 0.5f

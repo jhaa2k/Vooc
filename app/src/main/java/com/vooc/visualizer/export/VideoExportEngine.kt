@@ -3,6 +3,7 @@ package com.vooc.visualizer.export
 import com.vooc.visualizer.studio.buildNormalizedImageShapePath
 import com.vooc.visualizer.studio.reflectParticleAxis
 import com.vooc.visualizer.studio.particleForceDelta
+import com.vooc.visualizer.studio.particleForcePosition
 import com.vooc.visualizer.studio.particleSpawnOffset
 import android.content.ContentResolver
 import android.content.Context
@@ -1682,8 +1683,11 @@ object VideoExportEngine {
                             val velocity = particleSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                         var vx = cos(angle) * velocity
                         var vy = sin(angle) * velocity
-                        val fieldX = forcePosition.x.toFloat() * width
-                        val fieldY = forcePosition.y.toFloat() * height
+                        val forceCenter = particleForcePosition(
+                            forcePosition.x.toFloat(), forcePosition.y.toFloat(), width.toFloat(), height.toFloat()
+                        )
+                        val fieldX = forceCenter.x
+                        val fieldY = forceCenter.y
                         val dx = fieldX - spawnX
                         val dy = fieldY - spawnY
                         val forceDelta = particleForceDelta(

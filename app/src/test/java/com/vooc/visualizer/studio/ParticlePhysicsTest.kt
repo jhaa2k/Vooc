@@ -42,3 +42,4 @@ class ParticlePhysicsTest {
         assertEquals(-6f, repel.x, 0.0001f)
         assertEquals(-8f, repel.y, 0.0001f)
     }
+}

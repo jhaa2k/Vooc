@@ -202,6 +202,24 @@ class AnalyzerTest {
     }
 
     @Test
+    fun streamDiscontinuityClearsCachedAudioAndReanchorsLiveWindow() {
+        val analyzer = AudioAnalyzer(sr)
+        val interleaved = FloatArray(4096) { index ->
+            (0.7f * sin(2.0 * PI * 440.0 * (index / 2) / sr)).toFloat()
+        }
+        analyzer.pushInterleaved(interleaved, frames = 2048, channels = 2)
+        val beforeSeek = analyzer.analyzeLive(0.05, alignToClock = false)
+        assertTrue(beforeSeek.rms > 0.1f)
+
+        analyzer.onStreamDiscontinuity(2.0)
+        val afterSeek = analyzer.analyzeLive(2.0, alignToClock = false)
+
+        assertEquals(2.0, afterSeek.timeSec, 0.0)
+        assertEquals(0f, afterSeek.rms, 1e-6f)
+        assertEquals(0f, afterSeek.rawMagnitude.maxOrNull() ?: 0f, 1e-6f)
+    }
+
+    @Test
     fun analyzerReconfigurationRebuildsFftAndChannelPipelines() {
         val analyzer = AudioAnalyzer(sr, AnalyzerConfig(fftSize = FftSize.S1024, channelMode = ChannelMode.MONO))
         val initial = sine(440.0, 1024, 0.5f)

@@ -3619,7 +3619,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val pathEffect = dash?.let { androidx.compose.ui.graphics.PathEffect.dashPathEffect(it, number("Stroke Dash Offset", 0f) * shapeScale) }
                             val strokeColor = runCatching {
                                 Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")))
-                            }.getOrDefault(Color.White).copy(alpha = opacity)
+                            }.getOrDefault(Color.White).let { parsed ->
+                                parsed.copy(alpha = parsed.alpha * fillAlpha)
+                            }
                             val strokeAlignment = textValue("Stroke Alignment", "Center")
                             val resolvedStrokeWidth = if (strokeAlignment == "Center") strokeWidth else strokeWidth * 2f
                             val drawStroke: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit = {

@@ -499,7 +499,9 @@ object ElementPropertyCatalog {
             "Lighten", "Exclusion", "Subtractive", "Copy"
         )),
         text("Color", "Appearance", "#FFFFFFFF"),
-        integer("Source Composition Index", "Appearance", 0, 0.0, 255.0),
+        // Source Composition Index is intentionally not exposed for Image layers yet:
+        // the current image renderer consumes decoded image assets, not composition surfaces.
+        // Keeping an inert control here would imply a feature that preview/export cannot honor.
         text("Mask Image", "Appearance", ""),
         bool("Show Unblurred Content", "Appearance", false),
         bool("Show Unblurred Content Under", "Appearance", false)

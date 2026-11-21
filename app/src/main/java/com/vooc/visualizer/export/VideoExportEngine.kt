@@ -14,6 +14,7 @@ import com.vooc.visualizer.studio.particleSpawnOffset
 import com.vooc.visualizer.studio.particlePositionOffset
 import com.vooc.visualizer.studio.resolveParticleAnchorOffset
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
+import com.vooc.visualizer.studio.resolveParticleOpacity
 import android.content.ContentResolver
 import android.content.Context
 import com.vooc.visualizer.analyzer.decode.PcmDecoder
@@ -1715,10 +1716,10 @@ object VideoExportEngine {
                             android.graphics.Color.alpha(colorOverLifeStart) +
                                 (android.graphics.Color.alpha(colorOverLifeEnd) - android.graphics.Color.alpha(colorOverLifeStart)) * colorT
                             ) / 255f
-                        val particleAlpha = (
-                            alpha * fadeInScale * fadeOut * nearFade * (1f - randomA * opacityRandom) *
-                                alphaOverLife * colorFadeAlpha * colorAlpha
-                            ).toInt().coerceIn(0, 255)
+                        val particleAlpha = (resolveParticleOpacity(
+                            alpha / 255f, fadeInScale, fadeOut, nearFade,
+                            1f - randomA * opacityRandom, alphaOverLife, colorFadeAlpha, colorAlpha
+                        ) * 255f).toInt().coerceIn(0, 255)
                         val particleColor = android.graphics.Color.rgb(
                             (android.graphics.Color.red(colorOverLifeStart) + (android.graphics.Color.red(colorOverLifeEnd) - android.graphics.Color.red(colorOverLifeStart)) * colorT).toInt(),
                             (android.graphics.Color.green(colorOverLifeStart) + (android.graphics.Color.green(colorOverLifeEnd) - android.graphics.Color.green(colorOverLifeStart)) * colorT).toInt(),

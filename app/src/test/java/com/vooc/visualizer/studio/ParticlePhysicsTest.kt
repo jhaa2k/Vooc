@@ -121,6 +121,23 @@ class ParticlePhysicsTest {
         assertEquals(80f, bottom.y, 0.0001f)
     }
 
+    @Test fun particleLayerScaleFallsBackForNonFiniteValues() {
+        val result = resolveParticleLayerScale(Float.NaN, Float.POSITIVE_INFINITY, false, Float.NaN)
+        assertEquals(1f, result.x, 0.0001f)
+        assertEquals(1f, result.y, 0.0001f)
+    }
+
+    @Test fun emitterSamplingSanitizesNonFiniteAndNegativeInputs() {
+        val result = particleSpawnOffset(
+            "Rectangle", Float.NaN, Float.POSITIVE_INFINITY,
+            -100f, Float.NaN, Float.NaN, Float.NEGATIVE_INFINITY,
+            Float.NaN, Float.POSITIVE_INFINITY
+        )
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+        assertEquals(true, result.x.isFinite() && result.y.isFinite())
+    }
+
     @Test fun unknownEmitterFallsBackToPoint() {
         val result = particleSpawnOffset("Custom", 0.9f, 0.8f, 100f, 80f, 60f, 20f, 0f, 1f)
         assertEquals(0f, result.x, 0.0001f)

@@ -1224,9 +1224,9 @@ object VideoExportEngine {
                     val barWidth = (number("Bar Width", 8f) * width / 1080f).coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
                     val heightScale = number("Height Scale", 1f).coerceIn(0f, 10f)
                     val maxHeightScale = number("Max Height Scale", 1f).coerceIn(0f, 1f)
-                    val maxHeight = (number("Max Height", height * 0.35f) * width / 1080f * scaleY * heightScale * maxHeightScale).coerceIn(1f, height * 0.95f)
+                    val maxHeight = (scaleBarDesignDimension(number("Max Height", height * 0.35f), width.toFloat()) * scaleY * heightScale * maxHeightScale).coerceIn(1f, height * 0.95f)
                     val minHeightScale = number("Min Height Scale", 0f).coerceIn(0f, 1f)
-                    val minHeight = maxOf(number("Min Height", 0f) * width / 1080f, maxHeight * minHeightScale).coerceIn(0f, maxHeight)
+                    val minHeight = maxOf(scaleBarDesignDimension(number("Min Height", 0f), width.toFloat()), maxHeight * minHeightScale).coerceIn(0f, maxHeight)
                     val design = textValue("Bar Design", "Rounded Rect")
                     val orientation = textValue("Orientation", "Vertical")
                     val radialLayout = orientation == "Radial" || textValue("Shape Path", "Horizontal Line") == "Circle"

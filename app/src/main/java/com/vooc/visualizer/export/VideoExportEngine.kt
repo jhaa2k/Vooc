@@ -728,20 +728,28 @@ object VideoExportEngine {
                                 destHeight = if (imageRatio > frameRatio) height.toFloat() else width / imageRatio
                             }
                         }
-                        val alignment = bgText("Background Fit Alignment", "Center")
                         val offsetX = bgNumber("Background Image Offset X", 0f) * width / 1080f
                         val offsetY = bgNumber("Background Image Offset Y", 0f) * height / 1080f
-                        val left = when (alignment) {
+                        val left = when (bgText("Background Fit Alignment", "Center")) {
                             "Left" -> 0f
                             "Right" -> width - destWidth
                             else -> (width - destWidth) * 0.5f
                         } + offsetX
-                        val top = when (alignment) {
+                        val top = when (bgText("Background Fit Alignment", "Center")) {
                             "Top" -> 0f
                             "Bottom" -> height - destHeight
                             else -> (height - destHeight) * 0.5f
                         } + offsetY
-                        if (bgBool("Background Tile")) {
+                        val tiled = bgBool("Background Tile")
+                        val clipBounds = if (tiled) RectF(0f, 0f, width.toFloat(), height.toFloat())
+                            else RectF(left, top, left + destWidth, top + destHeight)
+                        val cornerRadius = (bgNumber("Corner Radius", 0f) * width / 1080f).coerceAtLeast(0f)
+                        val roundedClip = android.graphics.Path().apply {
+                            addRoundRect(clipBounds, cornerRadius, cornerRadius, android.graphics.Path.Direction.CW)
+                        }
+                        val save = canvas.save()
+                        canvas.clipPath(roundedClip)
+                        if (tiled) {
                             val tileScale = bgNumber("Background Tile Scale", 1f).coerceIn(0.01f, 100f)
                             val tileShader = android.graphics.BitmapShader(bitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
                             val tileMatrix = android.graphics.Matrix().apply {
@@ -769,6 +777,7 @@ object VideoExportEngine {
                                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
                             }
                         }
+                        canvas.restoreToCount(save)
                     }
                     if (image != null) {
                         if (bgBool("Show Unblurred Content Under") && originalImage != null) drawBackgroundBitmap(originalImage, false)

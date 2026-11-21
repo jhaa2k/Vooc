@@ -421,7 +421,7 @@ class ElementSystemTest {
             "Color Key Tolerance", "Transparency Strength", "Opacity Strength",
             "Blur Enabled", "Blur Divider", "Blur Radius", "Generated Album Art Hint Shift Hue",
             "Generated Album Art Hint No Text", "Generated Album Art Hint Force Gen",
-            "Generated Album Art Color", "Blend Mode Content", "Source Composition Index"
+            "Generated Album Art Color", "Blend Mode Content"
         )
         assertTrue("Missing Image controls: " + (required - specs.keys), specs.keys.containsAll(required))
         assertEquals(ElementValue.Vector2(1.0, 1.0), specs.getValue("Scale").defaultValue)

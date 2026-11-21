@@ -14,13 +14,21 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     val safeBounce = bounce.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
     if (safeExtent <= 0f) return ParticleAxisState(0f, safeVelocity)
     if (safePosition in 0f..safeExtent) return ParticleAxisState(safePosition, safeVelocity)
-    val hits = if (safePosition < 0f) ceil(-safePosition / safeExtent).toInt().coerceAtLeast(1)
-        else (floor((safePosition - safeExtent) / safeExtent).toInt() + 1).coerceAtLeast(1)
-    val period = safeExtent * 2f
-    val wrapped = ((safePosition % period) + period) % period
-    val folded = if (wrapped > safeExtent) period - wrapped else wrapped
-    val direction = if (hits % 2 == 0) 1f else -1f
-    return ParticleAxisState(folded.coerceIn(0f, safeExtent), safeVelocity * direction * safeBounce.pow(hits))
+    // Use Double for the fold arithmetic: converting an enormous collision count
+    // directly to Int can overflow and reverse the particle in the wrong direction.
+    val extent = safeExtent.toDouble()
+    val coordinate = safePosition.toDouble()
+    val period = extent * 2.0
+    val wrapped = ((coordinate % period) + period) % period
+    val folded = if (wrapped > extent) period - wrapped else wrapped
+    val hitCount = if (coordinate < 0.0) kotlin.math.ceil(-coordinate / extent)
+        else kotlin.math.floor((coordinate - extent) / extent) + 1.0
+    val safeHitCount = hitCount.coerceAtLeast(1.0)
+    // More than 64 impacts already makes practical bounce energy negligible;
+    // cap the exponent while retaining the exact parity for the direction.
+    val direction = if (wrapped > extent) -1f else 1f
+    val damping = safeBounce.toDouble().pow(safeHitCount.coerceAtMost(64.0)).toFloat()
+    return ParticleAxisState(folded.toFloat().coerceIn(0f, safeExtent), safeVelocity * direction * damping)
 }
 
 /** Converts normalized particle layer position (0..1) into a center-relative canvas offset. */

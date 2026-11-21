@@ -2923,7 +2923,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val endSize = number("End Size", 2f).coerceAtLeast(0f)
                         val endRandom = numberAlias("End Size Random", 0f, "Particle Size Random").coerceIn(0f, 1f)
                         val fadeTime = number("Fade In And Out Time", 0.25f).coerceIn(0f, lifetime * 0.5f)
-                        val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f)
+                        val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f) * size.width / 1080f
                         val particleScale = number("Particle Scale", 100f).coerceAtLeast(0f) / 100f * scale
                         val aspect = number("Size Aspect Ratio", 1f).coerceIn(0.01f, 20f)
                         val perspectiveDepth = number("Perspective Depth", 0f).coerceAtLeast(0f)
@@ -2931,7 +2931,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val nearFadeDistance = number("Near Camera Fade Out Distance", 0f).coerceAtLeast(0f)
                         val sineFrequency = number("Side Sine Wave Freq", 0f)
                         val sineFrequencyRandom = number("Side Sine Wave Freq Random", 0f).coerceIn(0f, 1f)
-                        val sineMagnitude = number("Side Sine Wave Mag", 0f)
+                        val sineMagnitude = number("Side Sine Wave Mag", 0f) * size.width / 1080f
                         val sineMagnitudeRandom = number("Side Sine Wave Mag Random", 0f).coerceIn(0f, 1f)
                         val colorFrom = runCatching { Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Color From", textValue("Color", colorText))), reactivity.colorMultiplier)) }.getOrDefault(elementColor)
                         val colorTo = runCatching { Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Color To", colorText)), reactivity.colorMultiplier)) }.getOrDefault(elementColor)

@@ -29,7 +29,7 @@ internal fun resolveParticleEmissionTiming(
             val cycle = burstInterval.takeIf { it.isFinite() }?.coerceAtLeast(0.001f) ?: 0.001f
             elapsed % cycle
         } else elapsed
-        return ParticleEmissionTiming(age.coerceAtLeast(0f), age <= lifetime)
+        return ParticleEmissionTiming(age.coerceAtLeast(0f), age < lifetime)
     }
     val age = (time + index * interval) % lifetime
     return ParticleEmissionTiming(age.coerceIn(0f, lifetime), true)

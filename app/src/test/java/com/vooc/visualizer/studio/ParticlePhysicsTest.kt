@@ -96,6 +96,9 @@ class ParticlePhysicsTest {
 
     @Test fun radialForceFieldHandlesVeryLargeFiniteCoordinates() {
         val result = particleForceDelta("Attract", Float.MAX_VALUE, Float.MAX_VALUE, 2f, 1f, 0f, 0f)
+        val expected = (2.0 / kotlin.math.sqrt(2.0)).toFloat()
+        assertEquals(expected, result.x, 0.0001f)
+        assertEquals(expected, result.y, 0.0001f)
         assertEquals(true, result.x.isFinite() && result.y.isFinite())
     }
 

@@ -301,6 +301,30 @@ class ElementSystemTest {
     }
 
     @Test
+    fun textTypographyOptionsAndDefaultsStayRendererCompatible() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.TEXT).associateBy { it.name }
+        assertEquals(
+            listOf("Regular", "Medium", "SemiBold", "Bold", "Italic", "Bold Italic"),
+            specs.getValue("Font Style").options
+        )
+        assertEquals(listOf("Sans Serif", "Serif", "Monospace", "Cursive"),
+            specs.getValue("Font Fallback").options)
+        assertEquals(listOf("Auto", "Left To Right", "Right To Left"),
+            specs.getValue("Text Direction").options)
+        assertEquals(listOf("Linear", "Radial"), specs.getValue("Text Gradient Type").options)
+        assertEquals(listOf("Miter", "Round", "Bevel"), specs.getValue("Stroke Join").options)
+        assertEquals(0.0, specs.getValue("Text Gradient Midpoint").min!!, 0.0)
+        assertEquals(1.0, specs.getValue("Text Gradient Midpoint").max!!, 0.0)
+        assertEquals(ElementValue.Text("Bold"), specs.getValue("Font Style").defaultValue)
+        assertEquals(ElementValue.Text("Poppins"), specs.getValue("Font Family").defaultValue)
+        assertEquals(ElementValue.Text("System Font"), specs.getValue("Font Asset").defaultValue)
+
+        val text = ElementPropertyCatalog.create(StudioElementType.TEXT, "typography")
+        assertEquals(ElementValue.Text("Bold"), text.withValue("Font Style", ElementValue.Text("Heavy")).value("Font Style"))
+        assertEquals(ElementValue.Text("Auto"), text.withValue("Text Direction", ElementValue.Text("Automatic")).value("Text Direction"))
+    }
+
+    @Test
     fun backgroundMirrorShaderAndCompositionExposeExpandedControlCatalogs() {
         val background = ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).map { it.name }.toSet()
         val mirror = ElementPropertyCatalog.forElement(StudioElementType.MIRROR_EFFECT).map { it.name }.toSet()

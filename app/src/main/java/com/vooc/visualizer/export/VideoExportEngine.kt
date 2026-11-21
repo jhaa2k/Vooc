@@ -58,6 +58,21 @@ import com.vooc.visualizer.studio.audioReactivityTransform
 object VideoExportEngine {
     data class Result(val frames: Int, val durationMs: Long, val audioMuxed: Boolean)
 
+    private fun decodeExportImage(resolver: ContentResolver, uri: Uri, maxDimension: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sampleSize = 1
+        while (maxOf(bounds.outWidth / sampleSize, bounds.outHeight / sampleSize) > maxDimension) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    }
+
     fun export(context: Context, resolver: ContentResolver, project: StudioProject, destination: Uri, onProgress: (Float) -> Unit = {}): Result {
         val width = (project.width.coerceIn(320, 3840) / 2) * 2
         val height = (project.height.coerceIn(320, 3840) / 2) * 2
@@ -294,7 +309,7 @@ object VideoExportEngine {
         project.layers.filter { it.kind == LayerKind.IMAGE && it.imageUri.isNotBlank() }.forEach { layer ->
             runCatching {
                 resolver.openInputStream(Uri.parse(layer.imageUri))?.use { stream ->
-                    BitmapFactory.decodeStream(stream)?.let { imageCache[layer.imageUri] = it }
+                    decodeExportImage(resolver, Uri.parse(layer.imageUri), maxOf(width, height))?.let { imageCache[layer.imageUri] = it }
                 }
             }
         }
@@ -312,7 +327,7 @@ object VideoExportEngine {
                     val source = GeneratedAlbumArt.create(element)
                     val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                     val maskBitmap = if (maskUri.isNotBlank()) {
-                        resolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) }
+                        decodeExportImage(resolver, Uri.parse(maskUri), maxOf(width, height))
                     } else null
                     val processed = processImageForExport(source, element, maskBitmap)
                     maskBitmap?.recycle()
@@ -321,7 +336,7 @@ object VideoExportEngine {
                 }
             } else if (uriText.isNotBlank()) runCatching {
                 resolver.openInputStream(Uri.parse(uriText))?.use { stream ->
-                    BitmapFactory.decodeStream(stream)?.let { source ->
+                    decodeExportImage(resolver, Uri.parse(uriText), maxOf(width, height))?.let { source ->
                         if (element.type == StudioElementType.MIRROR_EFFECT) {
                             val processed = MirrorEffectProcessor.process(source, element)
                             imageCache["${uriText}#${element.id}"] = processed

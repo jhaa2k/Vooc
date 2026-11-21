@@ -169,20 +169,23 @@ class ElementSystemTest {
     }
 
     @Test
-    fun audioProviderExposesAnalysisAndBeatConfigurationControls() {
-        val specs = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).associateBy { it.name }
+    fun audioProviderExposesOnlyImplementedAnalysisControls() {
+        val names = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).map { it.name }.toSet()
         val required = setOf(
             "Tag", "Provider Enabled", "Sample Provider", "Sample Out Count", "Mirror Samples",
             "Repeat Samples", "Star And End Gap", "Smooth", "Pre Smooth", "Filter Radius",
             "Filter Strength", "AWeight", "Output Multiplier", "Lower Hz", "Higher Hz",
             "Hz Linear Factor", "Freq Shift", "Beat Smooth", "Beat Range Bar First",
             "Beat Range Bar Last", "Beat Range Value Lower", "Beat Range Value Higher",
-            "Analysis Mode", "Channel Mode", "Window Function", "Beat Detection Enabled",
-            "Beat Sensitivity", "Beat Threshold", "Beat Release", "Fft Size"
+            "Analysis Mode", "Channel Mode", "Beat Detection Enabled"
         )
-        assertTrue("Missing audio provider controls: ${required - specs.keys}", specs.keys.containsAll(required))
-        assertEquals(listOf("256", "512", "1024", "2048", "4096", "8192"), specs.getValue("Fft Size").options)
-        assertEquals(listOf("Rectangular", "Hann", "Hamming", "Blackman"), specs.getValue("Window Function").options)
+        assertTrue("Missing audio provider controls: ${required - names}", names.containsAll(required))
+        val unsupported = setOf(
+            "Window Function", "Beat Sensitivity", "Beat Threshold", "Beat Release", "Fft Size",
+            "Audio Input Source", "Input Gain", "Spectrum Scale", "Spectrum Compression",
+            "Beat Detection Mode", "Audio Output Signal", "Analysis Update Rate"
+        )
+        assertTrue("Inactive provider controls must not be exposed: ${names intersect unsupported}", (names intersect unsupported).isEmpty())
     }
 
     @Test
@@ -204,27 +207,23 @@ class ElementSystemTest {
     }
 
     @Test
-    fun audioProviderExposesInputSpectrumFrequencyAndAdvancedBeatControls() {
-        val specs = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).associateBy { it.name }
-        val required = setOf(
+    fun audioProviderDoesNotExposeUnimplementedAdvancedControls() {
+        val names = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).map { it.name }.toSet()
+        val unsupported = setOf(
             "Audio Input Source", "Input Channel", "Input Gain", "Input Offset",
             "Input Auto Normalize", "Input Noise Gate", "Input Noise Gate Smoothing",
-            "Input DC Removal", "Stereo Width", "Stereo Balance",
-            "Spectrum Output Mode", "Spectrum Scale", "Spectrum Floor", "Spectrum Ceiling",
-            "Spectrum Compression", "Spectrum Noise Reduction", "Spectrum Averaging Frames",
-            "Spectrum Peak Normalize", "Spectrum Logarithmic Smoothing",
-            "Frequency Mapping Bias", "Frequency Mapping Curve", "Frequency Mapping Bands",
-            "Frequency Mapping Overlap", "Beat Detection Mode", "Beat Frequency Range",
-            "Beat Minimum Interval", "Beat Adaptive Sensitivity", "Beat Onset Strength",
-            "Beat Decay", "Beat Quantize", "Beat Quantize Strength", "Beat Ignore Low Energy",
-            "Beat Low Energy Threshold", "Audio Output Signal", "Audio Output Smoothing",
-            "Audio Output Clamp", "Audio Output Hold Peak", "Audio Output Peak Hold Time",
-            "Analysis Update Rate", "Analysis Buffer Size", "Analysis Multithreaded"
+            "Input DC Removal", "Stereo Width", "Stereo Balance", "Spectrum Output Mode",
+            "Spectrum Scale", "Spectrum Floor", "Spectrum Ceiling", "Spectrum Compression",
+            "Spectrum Noise Reduction", "Spectrum Averaging Frames", "Spectrum Peak Normalize",
+            "Spectrum Logarithmic Smoothing", "Frequency Mapping Bands", "Frequency Mapping Overlap",
+            "Beat Detection Mode", "Beat Frequency Range", "Beat Minimum Interval",
+            "Beat Adaptive Sensitivity", "Beat Onset Strength", "Beat Decay", "Beat Quantize",
+            "Beat Quantize Strength", "Beat Ignore Low Energy", "Beat Low Energy Threshold",
+            "Audio Output Signal", "Audio Output Smoothing", "Audio Output Clamp",
+            "Audio Output Hold Peak", "Audio Output Peak Hold Time", "Analysis Update Rate",
+            "Analysis Buffer Size", "Analysis Multithreaded"
         )
-        assertTrue("Missing advanced audio provider controls: ${required - specs.keys}", specs.keys.containsAll(required))
-        assertEquals(listOf("Playback Capture", "Imported Track", "Microphone", "Test Signal"), specs.getValue("Audio Input Source").options)
-        assertEquals(listOf("Linear", "Logarithmic", "Mel", "Bark"), specs.getValue("Spectrum Scale").options)
-        assertEquals(listOf("Adaptive", "Fixed Threshold", "Spectral Flux", "Energy"), specs.getValue("Beat Detection Mode").options)
+        assertTrue("Inactive advanced provider controls must not be exposed: ${names intersect unsupported}", (names intersect unsupported).isEmpty())
     }
 
     @Test

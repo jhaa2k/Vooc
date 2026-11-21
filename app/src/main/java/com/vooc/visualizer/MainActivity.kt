@@ -2286,23 +2286,29 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             else -> android.text.TextDirectionHeuristics.FIRSTSTRONG_LTR.isRtl(displayText, 0, displayText.length)
                         }
                         val fontStyle = textValue("Font Style", "Bold")
-                        val typefaceStyle = when (fontStyle) {
-                            "Regular" -> android.graphics.Typeface.NORMAL
-                            "Medium", "SemiBold", "Bold" -> android.graphics.Typeface.BOLD
-                            "Italic" -> android.graphics.Typeface.ITALIC
-                            "Bold Italic" -> android.graphics.Typeface.BOLD_ITALIC
-                            else -> android.graphics.Typeface.BOLD
+                        val fontWeight = when (fontStyle) {
+                            "Regular", "Italic" -> 400
+                            "Medium" -> 500
+                            "SemiBold" -> 600
+                            "Bold", "Bold Italic" -> 700
+                            else -> 700
                         }
+                        val fontItalic = fontStyle == "Italic" || fontStyle == "Bold Italic"
+                        val fallbackStyle = if (fontItalic) android.graphics.Typeface.ITALIC else if (fontWeight >= 600) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL
                         val fontFamily = textValue("Font Family", "Poppins").ifBlank { "Poppins" }
                         val fallbackFamily = when (textValue("Font Fallback", "Sans Serif")) { "Serif" -> "serif"; "Monospace" -> "monospace"; "Cursive" -> "cursive"; else -> "sans-serif" }
                         val importedTypeface = if (textValue("Font Asset", "System Font") == "Imported Font") elementFonts[element.id] else null
-                        val baseTypeface = importedTypeface?.let { android.graphics.Typeface.create(it, typefaceStyle) }
+                        val baseTypeface = importedTypeface
                             ?: if (fontFamily.equals("Poppins", ignoreCase = true)) {
-                                poppinsTypeface?.let { android.graphics.Typeface.create(it, typefaceStyle) }
-                                    ?: android.graphics.Typeface.create(fallbackFamily, typefaceStyle)
+                                poppinsTypeface ?: android.graphics.Typeface.create(fallbackFamily, android.graphics.Typeface.NORMAL)
                             } else {
-                                android.graphics.Typeface.create(fontFamily, typefaceStyle)
+                                android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL)
                             }
+                        val resolvedTypeface = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                            android.graphics.Typeface.create(baseTypeface, fontWeight, fontItalic)
+                        } else {
+                            android.graphics.Typeface.create(baseTypeface, fallbackStyle)
+                        }
                         val measureFontMode = textValue("Measure Font Size (Measure What)", "Nothing")
                         val measureFontMotion = motionFor("Measure Font Size (Measure What)")
                         val measureFontResponse = if (measureFontMode == "Nothing" || measureFontMode == "None") 0f else maxOf(

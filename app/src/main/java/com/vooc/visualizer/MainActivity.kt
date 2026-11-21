@@ -207,6 +207,24 @@ private fun processBlurEffectForPreview(source: android.graphics.Bitmap, element
     return output
 }
 
+private fun decodeStudioPreviewBitmap(context: android.content.Context, uriText: String, maxDimension: Int = 2048): android.graphics.Bitmap? {
+    if (uriText.isBlank()) return null
+    val uri = Uri.parse(uriText)
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        ?: return null
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sampleSize = 1
+    while (max(bounds.outWidth / sampleSize, bounds.outHeight / sampleSize) > maxDimension) {
+        sampleSize *= 2
+    }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sampleSize
+        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+    }
+    return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+}
+
 private fun processImageForPreview(source: android.graphics.Bitmap, element: ElementDocument, maskSource: android.graphics.Bitmap? = null): android.graphics.Bitmap {
     fun number(name: String, fallback: Float): Float = when (val value = element.value(name)) {
         is ElementValue.Number -> value.value.toFloat()
@@ -1699,8 +1717,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 if (layer.kind != LayerKind.IMAGE || layer.imageUri.isBlank()) null
                 else {
                     val bitmap: androidx.compose.ui.graphics.ImageBitmap? = runCatching {
-                        context.contentResolver.openInputStream(Uri.parse(layer.imageUri))
-                            ?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
+                        decodeStudioPreviewBitmap(context, layer.imageUri)?.asImageBitmap()
                     }.getOrNull()
                     bitmap?.let { image -> layer.id to image }
                 }
@@ -1726,7 +1743,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 if (element.type == StudioElementType.IMAGE && (uriText.isBlank() || GeneratedAlbumArt.isForced(element))) {
                     runCatching { GeneratedAlbumArt.create(element).asImageBitmap() }.getOrNull()?.let { element.id to it }
                 } else if (uriText.isBlank()) null else runCatching {
-                    context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
+                    decodeStudioPreviewBitmap(context, uriText)?.asImageBitmap()
                 }.getOrNull()?.let { element.id to it }
             }.toMap()
         }

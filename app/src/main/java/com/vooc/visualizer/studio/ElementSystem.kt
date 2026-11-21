@@ -398,58 +398,9 @@ object ElementPropertyCatalog {
         number("Beat Range Value Higher", "Beat", 50.0, 0.0, 100.0),
         text("Analysis Mode", "Performance", "Spectrum + Beat", listOf("Spectrum", "Beat", "Spectrum + Beat")),
         text("Channel Mode", "Performance", "Mono Mix", listOf("Mono Mix", "Left", "Right", "Stereo Average")),
-        text("Window Function", "Performance", "Hann", listOf("Rectangular", "Hann", "Hamming", "Blackman")),
         bool("Beat Detection Enabled", "Beat", true),
-        number("Beat Sensitivity", "Beat", 1.0, 0.0, 8.0),
-        number("Beat Threshold", "Beat", 0.65, 0.0, 1.0),
-        number("Beat Release", "Beat", 0.25, 0.0, 5.0),
-        text("Fft Size", "Performance", "2048", listOf("256", "512", "1024", "2048", "4096", "8192"))
     )
 
-
-    private val providerAdvanced = listOf(
-        text("Audio Input Source", "Audio Input", "Playback Capture", listOf("Playback Capture", "Imported Track", "Microphone", "Test Signal")),
-        text("Input Channel", "Audio Input", "Automatic", listOf("Automatic", "Mono", "Left", "Right", "Stereo")),
-        number("Input Gain", "Audio Input", 1.0, 0.0, 16.0),
-        number("Input Offset", "Audio Input", 0.0, -1.0, 1.0),
-        bool("Input Auto Normalize", "Audio Input", false),
-        number("Input Noise Gate", "Audio Input", 0.0, 0.0, 1.0),
-        number("Input Noise Gate Smoothing", "Audio Input", 0.15, 0.0, 1.0),
-        bool("Input DC Removal", "Audio Input", true),
-        number("Stereo Width", "Audio Input", 1.0, 0.0, 2.0),
-        number("Stereo Balance", "Audio Input", 0.0, -1.0, 1.0),
-        text("Spectrum Output Mode", "Spectrum Processing", "Magnitude", listOf("Magnitude", "Power", "Decibel", "Normalized")),
-        text("Spectrum Scale", "Spectrum Processing", "Logarithmic", listOf("Linear", "Logarithmic", "Mel", "Bark")),
-        number("Spectrum Floor", "Spectrum Processing", -72.0, -160.0, 0.0),
-        number("Spectrum Ceiling", "Spectrum Processing", 0.0, -120.0, 24.0),
-        number("Spectrum Compression", "Spectrum Processing", 1.0, 0.1, 8.0),
-        number("Spectrum Noise Reduction", "Spectrum Processing", 0.0, 0.0, 1.0),
-        integer("Spectrum Averaging Frames", "Spectrum Processing", 1, 1.0, 64.0),
-        bool("Spectrum Peak Normalize", "Spectrum Processing", false),
-        bool("Spectrum Logarithmic Smoothing", "Spectrum Processing", true),
-        number("Frequency Mapping Bias", "Frequency Mapping", 0.0, -1.0, 1.0),
-        number("Frequency Mapping Curve", "Frequency Mapping", 1.0, 0.1, 8.0),
-        integer("Frequency Mapping Bands", "Frequency Mapping", 64, 1.0, 2048.0),
-        number("Frequency Mapping Overlap", "Frequency Mapping", 0.0, 0.0, 0.95),
-        text("Beat Detection Mode", "Beat", "Adaptive", listOf("Adaptive", "Fixed Threshold", "Spectral Flux", "Energy")),
-        text("Beat Frequency Range", "Beat", "Full Range", listOf("Full Range", "Bass", "Low Mid", "Mid", "High Mid", "Treble", "Custom")),
-        number("Beat Minimum Interval", "Beat", 0.18, 0.05, 2.0),
-        number("Beat Adaptive Sensitivity", "Beat", 1.5, 0.1, 8.0),
-        number("Beat Onset Strength", "Beat", 0.5, 0.0, 1.0),
-        number("Beat Decay", "Beat", 0.35, 0.0, 5.0),
-        bool("Beat Quantize", "Beat", false),
-        number("Beat Quantize Strength", "Beat", 1.0, 0.0, 1.0),
-        bool("Beat Ignore Low Energy", "Beat", true),
-        number("Beat Low Energy Threshold", "Beat", 0.08, 0.0, 1.0),
-        text("Audio Output Signal", "Output", "Spectrum", listOf("Spectrum", "Waveform", "RMS", "Peak", "Beat", "Bass", "Mid", "Treble")),
-        number("Audio Output Smoothing", "Output", 0.2, 0.0, 1.0),
-        bool("Audio Output Clamp", "Output", true),
-        bool("Audio Output Hold Peak", "Output", false),
-        number("Audio Output Peak Hold Time", "Output", 0.25, 0.0, 10.0),
-        integer("Analysis Update Rate", "Performance", 60, 1.0, 240.0),
-        integer("Analysis Buffer Size", "Performance", 4096, 256.0, 65536.0),
-        bool("Analysis Multithreaded", "Performance", true)
-    )
 
     private val imageGeneral = listOf(
         text("Tag", "General", "Image"),
@@ -1263,7 +1214,7 @@ object ElementPropertyCatalog {
     )
 
     fun forElement(type: StudioElementType): List<ElementPropertySpec> {
-        if (type == StudioElementType.AUDIO_PROVIDER) return (provider + providerAdvanced).groupBy { it.name }.values.map { it.last() }
+        if (type == StudioElementType.AUDIO_PROVIDER) return provider
         if (type == StudioElementType.MIRROR_EFFECT) return (sharedGeneral + mirrorEffect + sharedAdvanced + sharedAnimation).groupBy { it.name }.values.map { it.last() }
         if (type == StudioElementType.CUSTOM_SHADER) return (sharedGeneral + customShader + sharedAdvanced + sharedAnimation).groupBy { it.name }.values.map { it.last() }
         if (type == StudioElementType.COMPOSITION) return (sharedGeneral + composition + sharedAdvanced + sharedAnimation).groupBy { it.name }.values.map { it.last() }

@@ -3,6 +3,7 @@ package com.vooc.visualizer.studio
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -595,6 +596,14 @@ class ElementSystemTest {
             val element = LegacyLayerAdapter.createSpectrumElement(kind, "mapping-${kind.name}")
             assertEquals(ElementValue.Text(design), element.value("Bar Design"))
         }
+    }
+
+    @Test
+    fun imageShapeParserRejectsUnsupportedCommandsAndMalformedCharacters() {
+        val bounds = android.graphics.RectF(0f, 0f, 100f, 100f)
+        assertNotNull(buildNormalizedImageShapePath("M 0 0 L 1 0 L 1 1 Z", bounds))
+        assertNull(buildNormalizedImageShapePath("M 0 0 A 1 1 0 0 1 1 1 Z", bounds))
+        assertNull(buildNormalizedImageShapePath("M 0 0 L 1 1 @ Z", bounds))
     }
 
 }

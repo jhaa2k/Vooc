@@ -1832,7 +1832,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 "Multiply", "Subtractive" -> androidx.compose.ui.graphics.BlendMode.Multiply
                 "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
                 "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
-                "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Difference
+                "Exclusion" -> if (android.os.Build.VERSION.SDK_INT >= 29) androidx.compose.ui.graphics.BlendMode.Difference else androidx.compose.ui.graphics.BlendMode.Xor
                 "Copy" -> androidx.compose.ui.graphics.BlendMode.Src
                 else -> androidx.compose.ui.graphics.BlendMode.SrcOver
             }

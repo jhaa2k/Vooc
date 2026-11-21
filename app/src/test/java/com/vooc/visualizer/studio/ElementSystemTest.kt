@@ -305,13 +305,17 @@ class ElementSystemTest {
         val shader = ElementPropertyCatalog.forElement(StudioElementType.CUSTOM_SHADER).map { it.name }.toSet()
         val composition = ElementPropertyCatalog.forElement(StudioElementType.COMPOSITION).map { it.name }.toSet()
         assertEquals(listOf("Solid Color", "Gradient", "Image"), ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).first { it.name == "Source Type" }.options)
-        assertTrue(background.containsAll(setOf(
+        val requiredBackgroundControls = setOf(
             "Source Type", "Image File / Source", "Fit Mode (Scale Type)",
             "Background Fit Alignment", "Background Tile", "Background Tile Scale",
             "Background Image Offset X", "Background Image Offset Y",
             "Background Gradient Type", "Background Gradient Start",
             "Background Gradient End", "Background Gradient Angle"
-        )))
+        )
+        assertTrue(
+            "Missing background controls: ${requiredBackgroundControls - background}",
+            background.containsAll(requiredBackgroundControls)
+        )
         assertFalse(background.containsAll(setOf(
             "Edge Blur (Image Fill)", "Background Blur Quality", "Background Brightness",
             "Background Contrast", "Background Saturation", "Background Grayscale", "Background Invert"

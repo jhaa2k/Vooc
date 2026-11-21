@@ -2923,7 +2923,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val randomB = kotlin.math.abs(sin(seed * 78.233f + 4.17f) * 24634.6345f) % 1f
                             val randomC = kotlin.math.abs(sin(seed * 39.425f + 9.31f) * 56445.234f) % 1f
                             val particleLifetime = (lifetime * (1f + (randomC * 2f - 1f) * lifetimeRandom)).coerceAtLeast(0.01f)
-                            val age = ((playbackSeconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
+                            if (emitterBurstCount > 0 && index >= emitterBurstCount) return@repeat
+                            val burstElapsed = playbackSeconds - index * spawnInterval
+                            if (emitterBurstCount > 0 && burstElapsed < 0f) return@repeat
+                            val age = if (emitterBurstCount > 0) {
+                                if (emitterLoop) burstElapsed % emitterBurstInterval else burstElapsed
+                            } else {
+                                ((playbackSeconds + index * spawnInterval) % particleLifetime).coerceIn(0f, particleLifetime)
+                            }
+                            if (emitterBurstCount > 0 && age > particleLifetime) return@repeat
                             val lifeT = (age / particleLifetime).coerceIn(0f, 1f)
                             val emitterAngle = emitterArcStart + randomA * emitterArcSweep
                             val radialDistance = emitterInnerRadius + (emitterRadius - emitterInnerRadius) * randomB
@@ -2945,13 +2953,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle
                                 else -> baseAngle + (randomA - 0.5f) * spreadAngle
                             }
-                            val burstIndex = if (emitterBurstCount > 0) (playbackSeconds / emitterBurstInterval).toInt() else 0
-                            val inBurst = emitterBurstCount <= 0 || (index % count.coerceAtLeast(1)) < emitterBurstCount
                             val particleSpeed = baseSpeed + (endVelocity - baseSpeed) * lifeT
                             val velocity = particleSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                             var vx = cos(angle) * velocity
                             var vy = sin(angle) * velocity
-                            if (emitterBurstCount > 0 && (!inBurst || (!emitterLoop && burstIndex > 0))) { vx = 0f; vy = 0f }
                             val fieldX = center.x + forcePosition.x.toFloat() * size.width - center.x
                             val fieldY = center.y + forcePosition.y.toFloat() * size.height - center.y
                             val dx = fieldX - spawnX

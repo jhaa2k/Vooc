@@ -3499,7 +3499,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val measuredAngle = number("Blur Direction / Angle", 0f) + if (motionSource == "Measured Movement") sin(playbackSeconds * 2.4f) * 45f else 0f
                             val resolvedAngle = if (radial) radialAngle else (measuredAngle + if (relativeMode == "Relative") number("Rotation", 0f) else 0f) * PI.toFloat() / 180f
                             val velocity = if (props["Velocity Influence"] == ElementValue.Bool(false)) 1f else (0.25f + (frame?.rms ?: 0f).coerceIn(0f, 1f) * 0.75f)
-                            val length = lengthBase * velocity
+                            val length = resolveMotionBlurLength(lengthBase, number("Motion Blur Shutter Angle", 180f), number("Motion Blur Velocity Scale", 1f), velocity)
                             val angle = resolvedAngle
                             val trails = number("Trails / Echo", 0f).toInt().coerceIn(0, 32)
                             val fade = number("Trail Opacity / Fade", 0.75f).coerceIn(0f, 1f)
@@ -3527,18 +3527,19 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 androidx.compose.ui.graphics.ColorFilter.tint(contentColor, androidx.compose.ui.graphics.BlendMode.Modulate)
                                 else null
                             for (sample in samples downTo 1) {
-                                val t = sample.toFloat() / samples
+                                val t = resolveMotionBlurSampleProgress(sample, samples, number("Motion Blur Sample Jitter", 0f))
+                                val sampleAlpha = resolveMotionBlurExposureAlpha(fade * (1f - t * 0.55f), number("Motion Blur Exposure", 0.5f))
                                 val dx = cos(angle) * length * t
                                 val dy = sin(angle) * length * t
                                 val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f + dx).toInt(), (center.y - frameHeight / 2f + dy).toInt())
-                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t * 0.55f), colorFilter = contentFilter, blendMode = contentBlend)
+                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * sampleAlpha, colorFilter = contentFilter, blendMode = contentBlend)
                             }
                             repeat(trails) { index ->
                                 val t = (index + 1f) / (trails + 1f)
                                 val dx = -cos(angle) * length * t
                                 val dy = -sin(angle) * length * t
                                 val destination = androidx.compose.ui.unit.IntOffset((center.x - frameWidth / 2f + dx).toInt(), (center.y - frameHeight / 2f + dy).toInt())
-                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * fade * (1f - t), colorFilter = contentFilter, blendMode = contentBlend)
+                                drawImage(bitmap, dstOffset = destination, dstSize = destinationSize, alpha = opacity * resolveMotionBlurExposureAlpha(fade * (1f - t), number("Motion Blur Exposure", 0.5f)), colorFilter = contentFilter, blendMode = contentBlend)
                             }
                             if (showOver) {
                                 if (original != null) drawImage(original, dstOffset = centerOffset, dstSize = destinationSize, alpha = opacity)

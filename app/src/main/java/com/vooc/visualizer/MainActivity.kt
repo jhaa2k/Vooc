@@ -77,6 +77,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.max
 import android.graphics.BitmapFactory
 import com.vooc.visualizer.analyzer.ChannelSelect
 import androidx.compose.ui.graphics.StrokeCap
@@ -1766,7 +1767,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     val generated = runCatching { GeneratedAlbumArt.create(element) }.getOrNull()
                     generated?.let { source ->
                         val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
-                        val maskBitmap = if (maskUri.isNotBlank()) context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) } else null
+                        val maskBitmap = if (maskUri.isNotBlank()) decodeStudioPreviewBitmap(context, maskUri) else null
                         val processed = processImageForPreview(source, element, maskBitmap)
                         maskBitmap?.recycle()
                         if (processed !== source) source.recycle()

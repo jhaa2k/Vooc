@@ -1424,6 +1424,23 @@ private fun ElementStudioEditor(
         Text("PROPERTIES", color = Lime, style = MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
         if (selected != null) {
             Text("PROPERTIES / ${selected.tag.uppercase()}", color = Lime, style = MaterialTheme.typography.labelMedium)
+            if (selected.type == StudioElementType.AUDIO_PROVIDER) {
+                val activeProviders = elements.filter {
+                    it.type == StudioElementType.AUDIO_PROVIDER && it.visible &&
+                        ((it.value("Provider Enabled") as? ElementValue.Bool)?.value ?: true)
+                }
+                val analyzerOwner = activeProviders.firstOrNull()
+                val isAnalyzerOwner = analyzerOwner?.id == selected.id
+                Text(
+                    if (isAnalyzerOwner) {
+                        "SHARED ANALYZER OWNER: FFT SIZE, WINDOW FUNCTION AND BEAT DETECTION SETTINGS HERE APPLY TO ALL PROVIDERS. EACH PROVIDER KEEPS ITS OWN CHANNEL AND SPECTRUM SHAPING."
+                    } else {
+                        "SHARED ANALYZER SETTINGS COME FROM ${analyzerOwner?.tag ?: "THE FIRST ENABLED PROVIDER"}. FFT SIZE, WINDOW FUNCTION AND BEAT DETECTION SETTINGS HERE DO NOT OVERRIDE IT; CHANNEL AND SPECTRUM SHAPING REMAIN PER-PROVIDER."
+                    },
+                    color = Muted,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
             val specs = remember(selected.type) { ElementPropertyCatalog.forElement(selected.type) }
             val categories = remember(specs) { specs.groupBy { it.category } }
             categories.forEach { (category, properties) ->

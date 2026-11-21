@@ -105,6 +105,34 @@ class AudioProviderProcessorTest {
         assertEquals(fresh.samples[10], resumed.samples[10], 1e-6f)
     }
 
+    @Test fun leftRightAndStereoAverageUseTheirOwnRawChannelSpectra() {
+        val leftRaw = FloatArray(1024) { 0.2f }
+        val rightRaw = FloatArray(1024) { 0.8f }
+        val displayed = FloatArray(1024) { 0.1f }
+        val stereo = AnalysisFrame(
+            timeSec = 0.0, sampleRate = 44100, fftSize = 2048,
+            binWidthHz = 44100f / 2048, spectrum = displayed, rawMagnitude = FloatArray(1024) { 0.5f },
+            phase = FloatArray(1024), db = FloatArray(1024), bands = FloatArray(3),
+            bandLabels = listOf("Bass", "Mid", "Treble"), beat = BeatState.NONE,
+            rms = 0.2f, peak = 0.5f,
+            channels = mapOf(
+                ChannelSelect.MIX to ChannelAnalysis(displayed, FloatArray(3), 0.2f, 0.5f, FloatArray(1024) { 0.5f }),
+                ChannelSelect.LEFT to ChannelAnalysis(displayed, FloatArray(3), 0.2f, 0.5f, leftRaw),
+                ChannelSelect.RIGHT to ChannelAnalysis(displayed, FloatArray(3), 0.2f, 0.5f, rightRaw)
+            ),
+            waveform = FloatArray(256)
+        )
+        val base = AudioProviderConfig(
+            sampleOutCount = 32, lowerHz = 100f, higherHz = 1000f,
+            smooth = 0f, preSmooth = 0f, filterRadius = 0, outputMultiplier = 1f
+        )
+        val left = AudioProviderProcessor().process(stereo, base.copy(channelMode = ProviderChannelMode.LEFT))
+        val right = AudioProviderProcessor().process(stereo, base.copy(channelMode = ProviderChannelMode.RIGHT))
+        val average = AudioProviderProcessor().process(stereo, base.copy(channelMode = ProviderChannelMode.STEREO_AVERAGE))
+        assertTrue(right.samples[10] > left.samples[10])
+        assertEquals((left.samples[10] + right.samples[10]) * 0.5f, average.samples[10], 1e-5f)
+    }
+
     @Test fun backwardTimestampResetsTemporalSmoothingAndBeatState() {
         val config = AudioProviderConfig(sampleOutCount = 32, smooth = 0.9f, filterRadius = 0)
         val processor = AudioProviderProcessor()

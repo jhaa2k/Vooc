@@ -169,7 +169,7 @@ class ElementSystemTest {
     }
 
     @Test
-    fun particleEmitterDropdownOnlyOffersImplementedShapes() {
+    fun particleEmitterDropdownOnlyOffersImplementedShapesAndDefaultsToVisibleSpread() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.PARTICLES).associateBy { it.name }
         assertEquals(
             listOf("Point", "HorizontalLine", "Rectangle", "Ellipse", "Circle", "Line", "Edge"),
@@ -178,6 +178,11 @@ class ElementSystemTest {
         assertEquals(
             listOf("Point", "Line", "HorizontalLine", "Rectangle", "Ellipse", "Circle", "Ring", "Edge"),
             specs.getValue("Particle Emitter Shape").options
+        )
+        assertEquals(ElementValue.Text("Circle"), specs.getValue("Particle Emitter Shape").defaultValue)
+        assertEquals(
+            ElementValue.Text("Circle"),
+            ElementPropertyCatalog.create(StudioElementType.PARTICLES, "particles-default").value("Particle Emitter Shape")
         )
     }
 

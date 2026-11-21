@@ -2131,8 +2131,9 @@ object VideoExportEngine {
                     }
                 }
                 StudioElementType.SHAPE -> {
-                    val shapeWidth = number("Width", 300f) * scale * width / 1080f
-                    val shapeHeight = number("Height", 300f) * scale * width / 1080f
+                    val shapeScale = scale * width / 1080f
+                    val shapeWidth = number("Width", 300f) * shapeScale
+                    val shapeHeight = number("Height", 300f) * shapeScale
                     val fill = runCatching {
                         audioReactivityColor(android.graphics.Color.parseColor(textValue("Fill / Color", textValue("Color", "#FFFFFFFF"))), reactivity.colorMultiplier)
                     }.getOrDefault(color)
@@ -2175,7 +2176,7 @@ object VideoExportEngine {
                                 }
                                 if (points.size >= 3) close()
                             }
-                            else -> addRoundRect(rect, number("Corner Radius", 0f) * width / 1080f, number("Corner Radius", 0f) * width / 1080f, android.graphics.Path.Direction.CW)
+                            else -> addRoundRect(rect, number("Corner Radius", 0f) * shapeScale, number("Corner Radius", 0f) * width / 1080f, android.graphics.Path.Direction.CW)
                         }
                     }
                     val shapeExclusionBlend = textValue("Blend Mode Content", "Alpha") == "Exclusion"
@@ -2219,21 +2220,21 @@ object VideoExportEngine {
                     }
                     shapePath.transform(shapeMatrix)
                     val shapeShadowEnabled = element.value("Shape Shadow Enabled") == ElementValue.Bool(true)
-                    val shapeBlurRadius = number("Shape Blur", 0f) * width / 1080f
+                    val shapeBlurRadius = number("Shape Blur", 0f) * shapeScale
                     if (shapeShadowEnabled || shapeBlurRadius > 0f) {
                         val shapeShadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shape Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
                         val shapeShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                             this.color = if (shapeShadowEnabled) shapeShadowColor else fill
-                            this.alpha = if (shapeShadowEnabled) (alpha * android.graphics.Color.alpha(shapeShadowColor) / 255f).toInt().coerceIn(0, 255) else (alpha * number("Opacity / Alpha", 1f)).toInt().coerceIn(0, 255)
+                            this.alpha = if (shapeShadowEnabled) (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f) * android.graphics.Color.alpha(shapeShadowColor) / 255f).toInt().coerceIn(0, 255) else (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt().coerceIn(0, 255)
                             this.style = Paint.Style.FILL
-                            val blur = (number("Shape Shadow Blur", 8f) + number("Shape Blur", 0f)) * width / 1080f
-                            if (blur > 0f) setShadowLayer(blur, number("Shape Shadow Offset X", 0f) * width / 1080f, number("Shape Shadow Offset Y", 4f) * width / 1080f, shapeShadowColor)
+                            val blur = (number("Shape Shadow Blur", 8f) + number("Shape Blur", 0f)) * shapeScale
+                            if (blur > 0f) setShadowLayer(blur, number("Shape Shadow Offset X", 0f) * shapeScale, number("Shape Shadow Offset Y", 4f) * shapeScale, shapeShadowColor)
                         }
                         canvas.drawPath(shapePath, shapeShadowPaint)
                     }
                     canvas.drawPath(shapePath, shapeFillPaint)
                     shapeFillPaint.shader = null
-                    val strokeWidth = number("Stroke / Border Width", 0f) * width / 1080f
+                    val strokeWidth = number("Stroke / Border Width", 0f) * shapeScale
                     if (strokeWidth > 0f || shapeType == "Line") {
                         val shapeStrokeColor = runCatching { android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")) }.getOrDefault(android.graphics.Color.WHITE)
                         val shapeStrokePaint = Paint(paint).apply {
@@ -2258,7 +2259,7 @@ object VideoExportEngine {
                             strokeMiter = number("Stroke Miter Limit", 4f).coerceAtLeast(1f)
                             val pattern = textValue("Stroke Dash Pattern").split(',', ' ').mapNotNull { it.trim().toFloatOrNull()?.takeIf { value -> value > 0f } }.toFloatArray()
                             val intervals = when (textValue("Stroke Style", "Solid")) { "Dashed" -> floatArrayOf(this.strokeWidth * 4f, this.strokeWidth * 2f); "Dotted" -> floatArrayOf(this.strokeWidth, this.strokeWidth * 1.8f); else -> pattern.takeIf { it.size >= 2 } }
-                            if (intervals != null) pathEffect = android.graphics.DashPathEffect(intervals, number("Stroke Dash Offset", 0f) * width / 1080f)
+                            if (intervals != null) pathEffect = android.graphics.DashPathEffect(intervals, number("Stroke Dash Offset", 0f) * shapeScale)
                         }
                         canvas.save()
                         when (textValue("Stroke Alignment", "Center")) {

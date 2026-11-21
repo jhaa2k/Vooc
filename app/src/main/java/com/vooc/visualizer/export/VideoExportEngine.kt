@@ -387,9 +387,14 @@ object VideoExportEngine {
                             imageCache[uriText] = source
                             maskBitmap?.recycle()
                         } else if (element.type == StudioElementType.BLUR_EFFECT) {
-                            val blurred = BlurEffectProcessor.process(source, element)
+                            val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                            val maskBitmap = if (maskUri.isNotBlank()) {
+                                decodeExportImage(resolver, Uri.parse(maskUri), maxOf(width, height))
+                            } else null
+                            val blurred = BlurEffectProcessor.process(source, element, maskBitmap)
                             imageCache["${uriText}#${element.id}"] = blurred
                             imageCache[uriText] = source
+                            maskBitmap?.recycle()
                         } else if (element.type == StudioElementType.MOTION_BLUR_EFFECT || element.type == StudioElementType.RGB_SPLIT) {
                             val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
                             val maskBitmap = if (maskUri.isNotBlank()) {

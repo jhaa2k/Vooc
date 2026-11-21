@@ -678,6 +678,7 @@ class ElementSystemTest {
         assertTrue(specs.containsKey("Texture / Image"))
         assertTrue(specs.containsKey("Emitter Burst Count"))
         assertTrue(specs.containsKey("Emitter Burst Interval"))
+        assertTrue(specs.getValue("Particle Emitter Shape").options.contains("HorizontalLine"))
         assertFalse(specs.containsKey("Source Composition Index"))
         assertFalse(specs.containsKey("Mask Image"))
         assertFalse(specs.containsKey("Show Unblurred Content"))

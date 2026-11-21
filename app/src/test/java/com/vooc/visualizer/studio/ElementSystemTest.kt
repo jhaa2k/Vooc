@@ -248,7 +248,7 @@ class ElementSystemTest {
     fun rgbSplitExposesMaskBlendAndOriginalContentControls() {
         val specs = ElementPropertyCatalog.forElement(StudioElementType.RGB_SPLIT).associateBy { it.name }
         val required = setOf(
-            "Target Image", "Blend Mode Content", "Color", "Source Composition Index",
+            "Target Image", "Blend Mode Content", "Color",
             "Mask Image", "Show Unblurred Content", "Show Unblurred Content Under",
             "Split Amount", "Split Amount / Distance", "Split Multiplier",
             "Angle / Direction", "Speed / Frequency", "Center / Focus Point",
@@ -257,6 +257,7 @@ class ElementSystemTest {
             "Split Color 0", "Split Color 1", "Split Color 2"
         )
         assertTrue("Missing RGB Split controls: ${required - specs.keys}", specs.keys.containsAll(required))
+        assertFalse("Source Composition Index" in specs)
         assertEquals(
             listOf("Alpha", "PreMulAlpha", "Add", "Screen", "Multiply", "Darken", "Lighten", "Exclusion", "Subtractive", "Copy"),
             specs.getValue("Blend Mode Content").options

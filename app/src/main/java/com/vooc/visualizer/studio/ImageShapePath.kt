@@ -8,15 +8,13 @@ import android.graphics.RectF
  * and maps its 0..1 coordinates into the supplied destination rectangle.
  */
 internal fun isSupportedNormalizedImageShapePath(data: String): Boolean {
-    if (data.isBlank()) return false
+    if (data.isBlank() || data.length > 16384) return false
+    // Whitelist the complete input, not only recognized tokens: unsupported SVG
+    // commands (for example A/S/T) must never be silently skipped.
+    if (data.any { !(it.isWhitespace() || it == ',' || it in "MmLlHhVvQqCcZz0123456789.+-eE") }) return false
     val matches = Regex("[MmLlHhVvQqCcZz]|[-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?").findAll(data).toList()
-    if (matches.isEmpty() || matches.size > 2048) return false
-    var previousEnd = 0
-    for (match in matches) {
-        if (data.substring(previousEnd, match.range.first).any { !it.isWhitespace() && it != ',' }) return false
-        previousEnd = match.range.last + 1
-    }
-    return data.substring(previousEnd).none { !it.isWhitespace() && it != ',' }
+    return matches.isNotEmpty() && matches.size <= 2048 &&
+        data.none { it.isLetter() && it !in "MmLlHhVvQqCcZzEe" }
 }
 
 fun buildNormalizedImageShapePath(data: String, bounds: RectF): Path? {

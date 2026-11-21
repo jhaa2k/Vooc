@@ -264,7 +264,7 @@ object ElementPropertyCatalog {
     )
 
     private val backgroundSpecific = listOf(
-        text("Source Type", "Background", "Solid Color", listOf("Solid Color", "Gradient", "Image", "Video")),
+        text("Source Type", "Background", "Solid Color", listOf("Solid Color", "Gradient", "Image")),
         text("Image File / Source", "Background", ""),
         text("Fit Mode (Scale Type)", "Background", "Fill (Cover)", listOf(
             "Fit (Contain)", "Fill (Cover)", "Stretch"

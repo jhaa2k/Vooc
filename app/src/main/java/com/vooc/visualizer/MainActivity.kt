@@ -2355,7 +2355,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 "Justified" -> android.graphics.Paint.Align.LEFT
                                 else -> android.graphics.Paint.Align.CENTER
                             }
-                            typeface = baseTypeface
+                            typeface = resolvedTypeface
                             letterSpacing = number("Letter Spacing", 0f) / 100f
                             isUnderlineText = props["Underline"] == ElementValue.Bool(true)
                             if (shadowEnabled) setShadowLayer(shadowBlur, shadowX, shadowY, shadowColor)

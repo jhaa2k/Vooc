@@ -4,6 +4,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ParticlePhysicsTest {
+    @Test fun particleAnchorAndAlignmentResolveNormalizedOffsets() {
+        val result = resolveParticleAnchorOffset("start", "end", 0.25f, 0.75f)
+        assertEquals(-0.25f, result.x, 0.0001f)
+        assertEquals(0.25f, result.y, 0.0001f)
+    }
+
+    @Test fun unsetParticleAnchorsKeepDefaultEmitterCenter() {
+        val result = resolveParticleAnchorOffset("unset", "unset", 0.2f, 0.8f)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
+    @Test fun particleAnchorAlignmentSanitizesInvalidValues() {
+        val result = resolveParticleAnchorOffset("end", "start", Float.NaN, Float.POSITIVE_INFINITY)
+        assertEquals(0.5f, result.x, 0.0001f)
+        assertEquals(-0.5f, result.y, 0.0001f)
+    }
+
     @Test fun particleReflectsBackIntoSceneAfterRightEdgeImpact() {
         val result = reflectParticleAxis(110f, 20f, 100f, 0.5f)
         assertEquals(90f, result.position, 0.0001f)

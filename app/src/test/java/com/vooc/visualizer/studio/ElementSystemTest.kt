@@ -169,6 +169,16 @@ class ElementSystemTest {
     }
 
     @Test
+    fun particleSpeedMeasurementDropdownOnlyOffersImplementedSources() {
+        val spec = ElementPropertyCatalog.forElement(StudioElementType.PARTICLES)
+            .single { it.name == "Measure Overall Speed (Measure What)" }
+        assertEquals(
+            listOf("Nothing", "Beat", "Bass", "Mid", "Treble", "RMS", "Peak", "Overall Audio Level"),
+            spec.options
+        )
+    }
+
+    @Test
     fun audioProviderExposesOnlyImplementedAnalysisControls() {
         val names = ElementPropertyCatalog.forElement(StudioElementType.AUDIO_PROVIDER).map { it.name }.toSet()
         val required = setOf(

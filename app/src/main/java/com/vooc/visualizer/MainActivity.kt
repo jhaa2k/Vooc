@@ -5,6 +5,7 @@ import com.vooc.visualizer.studio.buildNormalizedImageShapePath
 import com.vooc.visualizer.studio.BackgroundImageProcessor
 import com.vooc.visualizer.studio.MirrorEffectProcessor
 import com.vooc.visualizer.studio.GeneratedAlbumArt
+import com.vooc.visualizer.studio.resolveParticleLayerScale
 import com.vooc.visualizer.studio.reflectParticleAxis
 import com.vooc.visualizer.studio.particleForceDelta
 import com.vooc.visualizer.studio.particleForcePosition

@@ -1535,9 +1535,10 @@ object VideoExportEngine {
                     val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * width * 0.25f
                     val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * height * 0.25f
                     val spawnArea = textAlias("Particle Emitter Shape", "Point", "Spawn Area")
-                    val systemPosition = element.value("Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
-                    val particleCenterX = systemPosition.x.toFloat().coerceIn(0f, 1f) * width
-                    val particleCenterY = systemPosition.y.toFloat().coerceIn(0f, 1f) * height
+                    // Use the shared element transform center so Position and Measure Pos
+                    // affect the particle system consistently with other element types.
+                    val particleCenterX = cx
+                    val particleCenterY = cy
                     val emitterPosition = element.value("Emitter Position") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                     val emitterX = particleCenterX + (emitterPosition.x.toFloat() - 0.5f) * width
                     val emitterY = particleCenterY + (emitterPosition.y.toFloat() - 0.5f) * height

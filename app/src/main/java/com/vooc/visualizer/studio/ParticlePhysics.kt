@@ -24,7 +24,7 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
 internal data class ParticleLayerScale(val x: Float, val y: Float)
 
 /** Applies uniform/non-uniform layer scale consistently to preview and export particle sizes. */
-internal fun particleLayerScale(x: Float, y: Float, uniform: Boolean, particleScale: Float): ParticleLayerScale {
+internal fun resolveParticleLayerScale(x: Float, y: Float, uniform: Boolean, particleScale: Float): ParticleLayerScale {
     val safeScale = particleScale.coerceAtLeast(0f)
     return ParticleLayerScale(
         (x * safeScale).coerceIn(0f, 10f),

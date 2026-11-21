@@ -21,6 +21,17 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     return ParticleAxisState(folded.coerceIn(0f, extent), velocity * direction * bounce.coerceIn(0f, 1f).pow(hits))
 }
 
+internal data class ParticleLayerScale(val x: Float, val y: Float)
+
+/** Applies uniform/non-uniform layer scale consistently to preview and export particle sizes. */
+internal fun particleLayerScale(x: Float, y: Float, uniform: Boolean, particleScale: Float): ParticleLayerScale {
+    val safeScale = particleScale.coerceAtLeast(0f)
+    return ParticleLayerScale(
+        (x * safeScale).coerceIn(0f, 10f),
+        ((if (uniform) x else y) * safeScale).coerceIn(0f, 10f)
+    )
+}
+
 internal data class ParticleForcePosition(val x: Float, val y: Float)
 
 /** Resolves normalized force-field coordinates in full-canvas pixel space. */

@@ -107,6 +107,7 @@ import com.vooc.visualizer.analyzer.AudioProviderProcessor
 import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
 import com.vooc.visualizer.analyzer.SpectrumMapper
 import com.vooc.visualizer.analyzer.analyzerConfigSource
+import com.vooc.visualizer.analyzer.analyzerConfigSourceIndex
 import com.vooc.visualizer.analyzer.requiresStereoAnalysis
 import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
@@ -715,7 +716,7 @@ private fun VoocStudio(
                     providerProcessors.getValue(element.id).process(analyzed, providerConfigs[index])
                 }
                 providerFrames = processedProviders
-                providerFrame = processedProviders.firstOrNull()
+                providerFrame = processedProviders.getOrNull(providerConfigs.analyzerConfigSourceIndex())
                 previousPosition = currentPosition
             } else {
                 previousPosition = -1L

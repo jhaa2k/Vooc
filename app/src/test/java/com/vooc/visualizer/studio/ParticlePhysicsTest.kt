@@ -4,6 +4,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ParticlePhysicsTest {
+    @Test fun particleTrailGeometryScalesVelocityByConfiguredLength() {
+        val result = resolveParticleTrailVector(120f, -40f, 25f)
+        assertEquals(3f, result.x, 0.0001f)
+        assertEquals(-1f, result.y, 0.0001f)
+    }
+
+    @Test fun particleTrailGeometryReturnsZeroForInvalidInputs() {
+        val result = resolveParticleTrailVector(Float.NaN, Float.POSITIVE_INFINITY, Float.NaN)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
+    @Test fun particleTrailGeometryPreventsOverflowFromExtremeVelocity() {
+        val result = resolveParticleTrailVector(Float.MAX_VALUE, -Float.MAX_VALUE, 256f)
+        assertEquals(true, result.x.isFinite() && result.y.isFinite())
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
     @Test fun particleTrailVectorReflectsAcrossEachMirrorAxis() {
         val horizontal = resolveParticleMirrorVector(12f, -7f, true, false)
         assertEquals(-12f, horizontal.x, 0.0001f)

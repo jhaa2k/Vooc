@@ -793,6 +793,10 @@ object ElementPropertyCatalog {
         bool("Segment 2 Flip Every Other", "Segment 2", false)
     )
 
+    private val particleSpeedMeasureOptions = listOf(
+        "Nothing", "Beat", "Bass", "Mid", "Treble", "RMS", "Peak", "Overall Audio Level"
+    )
+
     private val particlesGeneral = listOf(
         text("Tag", "General", "Particles"),
         bool("Visible", "General", true),
@@ -881,7 +885,7 @@ object ElementPropertyCatalog {
         number("End Size ZFactor", "Appearance", 0.0, -10.0, 10.0),
         number("Near Camera Fade Out Distance", "Appearance", 0.0, 0.0, 1000.0),
         number("Spawn Time", "Behaviour", 0.02, 0.0, 10.0),
-        text("Measure Overall Speed (Measure What)", "Behaviour", "Nothing", MeasureWhatEngine.options),
+        text("Measure Overall Speed (Measure What)", "Behaviour", "Nothing", particleSpeedMeasureOptions),
         number("Measure Overall Speed A (X Amount)", "Behaviour", 0.0, -1000.0, 1000.0),
         number("Measure Overall Speed B (Y Amount)", "Behaviour", 0.0, -1000.0, 1000.0),
         number("Speed", "Behaviour", 80.0, -5000.0, 5000.0),

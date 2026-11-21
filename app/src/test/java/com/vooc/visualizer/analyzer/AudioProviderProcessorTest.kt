@@ -191,4 +191,20 @@ class AudioProviderProcessorTest {
         assertEquals(mono.samples[20], left.samples[20], 1e-6f)
     }
 
+
+    @Test
+    fun unavailableStereoChannelsFallBackToMonoMixForEveryChannelMode() {
+        val raw = FloatArray(1024) { index -> if (index in 20..35) 0.7f else 0.12f }
+        val monoFrame = frame(raw)
+        val base = AudioProviderConfig(
+            sampleOutCount = 64, lowerHz = 100f, higherHz = 10000f,
+            smooth = 0f, preSmooth = 0f, filterRadius = 0, outputMultiplier = 1f
+        )
+        val mono = AudioProviderProcessor().process(monoFrame, base.copy(channelMode = ProviderChannelMode.MONO_MIX))
+        for (mode in listOf(ProviderChannelMode.LEFT, ProviderChannelMode.RIGHT, ProviderChannelMode.STEREO_AVERAGE)) {
+            val fallback = AudioProviderProcessor().process(monoFrame, base.copy(channelMode = mode))
+            assertEquals("Fallback for $mode should use the mono mix", mono.samples[24], fallback.samples[24], 1e-6f)
+        }
+    }
+
 }

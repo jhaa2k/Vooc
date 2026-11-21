@@ -47,6 +47,8 @@ class AudioProviderConfigTest {
         val enabled = AudioProviderConfig(providerEnabled = true, fftSize = 1024)
         assertEquals(enabled, listOf(disabled, enabled).analyzerConfigSource())
         assertEquals(disabled, listOf(disabled).analyzerConfigSource())
+        assertEquals(1, listOf(disabled, enabled).analyzerConfigSourceIndex())
+        assertEquals(0, listOf(disabled).analyzerConfigSourceIndex())
     }
 
     @Test

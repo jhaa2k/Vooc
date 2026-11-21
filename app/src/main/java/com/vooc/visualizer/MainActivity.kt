@@ -3468,8 +3468,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         }
                     }
                     StudioElementType.SHAPE -> {
-                        val w = (number("Width", 300f).dp.toPx() * scale).coerceAtLeast(0f)
-                        val h = (number("Height", 300f).dp.toPx() * scale).coerceAtLeast(0f)
+                        val shapeScale = size.width / 1080f * scale
+                        val w = (number("Width", 300f) * shapeScale).coerceAtLeast(0f)
+                        val h = (number("Height", 300f) * shapeScale).coerceAtLeast(0f)
                         val left = center.x - w / 2f
                         val top = center.y - h / 2f
                         val shapeType = textValue("Shape Type", "Rectangle")
@@ -3538,7 +3539,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     if (points.size >= 3) close()
                                 }
                                 else -> addRoundRect(androidx.compose.ui.geometry.RoundRect(left, top, left + w, top + h,
-                                    androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f).dp.toPx())))
+                                    androidx.compose.ui.geometry.CornerRadius(number("Corner Radius", 0f) * shapeScale)))
                             }
                             fillType = if (textValue("Fill Rule", "Non Zero") == "Even Odd") androidx.compose.ui.graphics.PathFillType.EvenOdd else androidx.compose.ui.graphics.PathFillType.NonZero
                         }
@@ -3547,14 +3548,14 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val shapeMatrix = android.graphics.Matrix().apply { setTranslate(-center.x, -center.y); postSkew(skewX, skewY); postTranslate(center.x, center.y) }
                         val shapePath = baseShapePath.asAndroidPath().apply { transform(shapeMatrix) }.asComposePath()
                         val shadowEnabled = props["Shape Shadow Enabled"] == ElementValue.Bool(true)
-                        val shapeBlur = number("Shape Blur", 0f).dp.toPx().coerceIn(0f, 256f)
+                        val shapeBlur = (number("Shape Blur", 0f) * shapeScale).coerceIn(0f, 256f)
                         if (shadowEnabled || shapeBlur > 0f) {
                             val shadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shape Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
                             val shadowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                                 color = if (shadowEnabled) shadowColor else android.graphics.Color.TRANSPARENT
                                 alpha = (255f * fillAlpha).toInt().coerceIn(0, 255)
-                                val blurRadius = (number("Shape Shadow Blur", 8f).dp.toPx() + shapeBlur).coerceAtLeast(0f)
-                                if (blurRadius > 0f) setShadowLayer(blurRadius, number("Shape Shadow Offset X", 0f).dp.toPx(), number("Shape Shadow Offset Y", 4f).dp.toPx(), shadowColor)
+                                val blurRadius = (number("Shape Shadow Blur", 8f) * shapeScale + shapeBlur).coerceAtLeast(0f)
+                                if (blurRadius > 0f) setShadowLayer(blurRadius, number("Shape Shadow Offset X", 0f) * shapeScale, number("Shape Shadow Offset Y", 4f) * shapeScale, shadowColor)
                             }
                             drawIntoCanvas { canvas ->
                                 canvas.nativeCanvas.drawPath(shapePath.asAndroidPath(), shadowPaint)
@@ -3571,12 +3572,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             else -> androidx.compose.ui.graphics.BlendMode.SrcOver
                         }
                         if (shapeType == "Line") {
-                            val lineWidth = number("Stroke / Border Width", 3f).dp.toPx().coerceAtLeast(1f)
+                            val lineWidth = (number("Stroke / Border Width", 3f) * shapeScale).coerceAtLeast(1f)
                             drawPath(shapePath, fillColor, blendMode = shapeBlendMode, style = Stroke(width = lineWidth, cap = when (textValue("Stroke Cap", "Round")) { "Butt" -> androidx.compose.ui.graphics.StrokeCap.Butt; "Square" -> androidx.compose.ui.graphics.StrokeCap.Square; else -> androidx.compose.ui.graphics.StrokeCap.Round }, join = when (textValue("Stroke Join", "Round")) { "Miter" -> androidx.compose.ui.graphics.StrokeJoin.Miter; "Bevel" -> androidx.compose.ui.graphics.StrokeJoin.Bevel; else -> androidx.compose.ui.graphics.StrokeJoin.Round }))
                         } else {
                             drawPath(shapePath, brush = gradientBrush, blendMode = shapeBlendMode)
                         }
-                        val strokeWidth = number("Stroke / Border Width", 0f).dp.toPx()
+                        val strokeWidth = number("Stroke / Border Width", 0f) * shapeScale
                         if (strokeWidth > 0f && shapeType != "Line") {
                             val strokeStyle = textValue("Stroke Style", "Solid")
                             val customDash = textValue("Stroke Dash Pattern").split(',', ' ').mapNotNull { it.trim().toFloatOrNull()?.takeIf { value -> value > 0f } }.toFloatArray()
@@ -3585,7 +3586,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 "Dotted" -> floatArrayOf(strokeWidth, strokeWidth * 1.8f)
                                 else -> customDash.takeIf { it.size >= 2 }
                             }
-                            val pathEffect = dash?.let { androidx.compose.ui.graphics.PathEffect.dashPathEffect(it, number("Stroke Dash Offset", 0f).dp.toPx()) }
+                            val pathEffect = dash?.let { androidx.compose.ui.graphics.PathEffect.dashPathEffect(it, number("Stroke Dash Offset", 0f) * shapeScale) }
                             val strokeColor = runCatching {
                                 Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FFFFFFFF")))
                             }.getOrDefault(Color.White).copy(alpha = opacity)

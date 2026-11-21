@@ -73,7 +73,7 @@ data class AudioProviderConfig(
             fftSize = fftSize.takeIf { it in setOf(256, 512, 1024, 2048, 4096, 8192) } ?: 2048,
             beatSensitivity = beatSensitivity.finiteClamp(0f, 8f),
             beatThreshold = beatThreshold.finiteClamp(0f, 1f),
-            beatRelease = beatRelease.finiteClamp(0f, 0.5f)
+            beatRelease = beatRelease.finiteClamp(0.05f, 0.5f)
         )
     }
 

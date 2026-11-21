@@ -87,8 +87,7 @@ object GeneratedAlbumArt {
                 alpha = 210
                 textSize = dimension * 0.075f
                 typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
-                letterSpacing = 0.08f
-            }
+                }
             canvas.drawText("VOOC", dimension * 0.09f, dimension * 0.88f, textPaint)
         }
         background.shader = null

@@ -131,6 +131,21 @@ class ParticlePhysicsTest {
         assertEquals(-8f, repel.y, 0.0001f)
     }
 
+    @Test fun emitterRadiiClampInnerRadiusToOuterRadius() {
+        val result = resolveParticleEmitterRadii(80f, 120f)
+        assertEquals(80f, result.outer, 0.0001f)
+        assertEquals(80f, result.inner, 0.0001f)
+    }
+
+    @Test fun emitterRadiiSanitizeNegativeAndNonFiniteValues() {
+        val negative = resolveParticleEmitterRadii(-10f, -5f)
+        assertEquals(0f, negative.outer, 0.0001f)
+        assertEquals(0f, negative.inner, 0.0001f)
+        val invalid = resolveParticleEmitterRadii(Float.NaN, Float.POSITIVE_INFINITY)
+        assertEquals(100f, invalid.outer, 0.0001f)
+        assertEquals(100f, invalid.inner, 0.0001f)
+    }
+
     @Test fun horizontalLineEmitterKeepsParticlesOnHorizontalAxis() {
         val result = particleSpawnOffset("HorizontalLine", 0.75f, 0.4f, 100f, 50f, 40f, 0f, 0f, 1f)
         assertEquals(50f, result.x, 0.0001f)

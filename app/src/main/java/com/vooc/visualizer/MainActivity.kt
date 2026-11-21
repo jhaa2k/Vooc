@@ -18,6 +18,7 @@ import com.vooc.visualizer.studio.particleSpawnOffset
 import com.vooc.visualizer.studio.particlePositionOffset
 import com.vooc.visualizer.studio.resolveParticleAnchorOffset
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
+import com.vooc.visualizer.studio.resolveParticleOpacity
 
 import android.net.Uri
 import android.Manifest
@@ -3126,9 +3127,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val colorFadeAlpha = if (colorOverLifeMode == "Fade To Transparent") 1f - lifeT else 1f
                             val colorAlpha = (colorOverLifeStart.alpha +
                                 (colorOverLifeEnd.alpha - colorOverLifeStart.alpha) * colorT).coerceIn(0f, 1f)
-                            val alpha = (opacity * fadeInScale * fadeOut * nearFade *
-                                (1f - randomA * opacityRandom) * alphaOverLife * colorFadeAlpha * colorAlpha)
-                                .coerceIn(0f, 1f)
+                            val alpha = resolveParticleOpacity(
+                                opacity, fadeInScale, fadeOut, nearFade,
+                                1f - randomA * opacityRandom, alphaOverLife, colorFadeAlpha, colorAlpha
+                            )
                             val particleColor = Color(
                                 colorOverLifeStart.red + (colorOverLifeEnd.red - colorOverLifeStart.red) * colorT,
                                 colorOverLifeStart.green + (colorOverLifeEnd.green - colorOverLifeStart.green) * colorT,

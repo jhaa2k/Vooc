@@ -11,6 +11,7 @@ import com.vooc.visualizer.studio.particleForceDelta
 import com.vooc.visualizer.studio.particleForcePosition
 import com.vooc.visualizer.studio.particleSpawnOffset
 import com.vooc.visualizer.studio.particlePositionOffset
+import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 
 import android.net.Uri
 import android.Manifest

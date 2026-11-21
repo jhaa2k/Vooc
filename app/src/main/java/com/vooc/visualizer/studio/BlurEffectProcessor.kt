@@ -64,10 +64,13 @@ object BlurEffectProcessor {
         val alphaOnly = enabled(element, "Blur Alpha Only")
         val preserveEdges = enabled(element, "Blur Preserve Edges")
         val threshold = number(element, "Blur Threshold", 0f).coerceIn(0f, 1f)
-        val mask = maskSource?.let {
-            val scaled = if (it.width != workW || it.height != workH) Bitmap.createScaledBitmap(it, workW, workH, true) else it
-            IntArray(workW * workH).also { pixels -> scaled.getPixels(pixels, 0, workW, 0, 0, workW, workH) }
+        val scaledMask = maskSource?.let {
+            if (it.width != workW || it.height != workH) Bitmap.createScaledBitmap(it, workW, workH, true) else it
         }
+        val mask = scaledMask?.let { bitmap ->
+            IntArray(workW * workH).also { pixels -> bitmap.getPixels(pixels, 0, workW, 0, 0, workW, workH) }
+        }
+        if (scaledMask != null && scaledMask !== maskSource) scaledMask.recycle()
         val maskMode = text(element, "Blur Mask Mode", "None")
         val maskStrength = number(element, "Blur Mask Strength", 1f).coerceIn(0f, 1f)
         val strength = number(element, "Blur Blend Strength", 1f).coerceIn(0f, 1f)
@@ -131,20 +134,23 @@ object BlurEffectProcessor {
         }
         if (enabled(element, "Show Unblurred Content Under")) canvas.drawBitmap(source, 0f, 0f, null)
         val baseTint = parseColor(text(element, "Color", "#FFFFFFFF"), Color.WHITE)
-        val basePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-            alpha = (number(element, "Opacity", 100f).coerceIn(0f, 100f) * 2.55f).toInt()
-            if (baseTint != Color.WHITE) colorFilter = PorterDuffColorFilter(baseTint, PorterDuff.Mode.MULTIPLY)
-            if (blend != PorterDuff.Mode.SRC_OVER) xfermode = PorterDuffXfermode(blend)
-        }
-        canvas.drawBitmap(processed, 0f, 0f, basePaint)
+        val layerOpacity = (number(element, "Opacity", 100f).coerceIn(0f, 100f) *
+            number(element, "Blur Blend Strength", 1f).coerceIn(0f, 1f) * 2.55f).toInt()
         for (index in 1..3) {
             val (sxRaw, syRaw) = vector(element, "${index}layer Scale", if (index == 1) 1f else 0f, if (index == 1) 1f else 0f)
             val sx = sxRaw.coerceIn(0f, 10f)
             val sy = syRaw.coerceIn(0f, 10f)
             if (sx <= 0f || sy <= 0f) continue
             val tint = parseColor(text(element, "${index}layer Color", "#FFFFFFFF"), Color.WHITE)
+            val combinedTint = Color.argb(
+                Color.alpha(baseTint) * Color.alpha(tint) / 255,
+                Color.red(baseTint) * Color.red(tint) / 255,
+                Color.green(baseTint) * Color.green(tint) / 255,
+                Color.blue(baseTint) * Color.blue(tint) / 255
+            )
             val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                if (tint != Color.WHITE) colorFilter = PorterDuffColorFilter(tint, PorterDuff.Mode.MULTIPLY)
+                alpha = layerOpacity.coerceIn(0, 255)
+                if (combinedTint != Color.WHITE) colorFilter = PorterDuffColorFilter(combinedTint, PorterDuff.Mode.MULTIPLY)
                 if (blend != PorterDuff.Mode.SRC_OVER) xfermode = PorterDuffXfermode(blend)
             }
             val halfW = source.width * sx / 2f

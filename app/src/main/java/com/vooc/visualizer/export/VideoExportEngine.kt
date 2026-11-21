@@ -2172,8 +2172,8 @@ object VideoExportEngine {
                         this.style = Paint.Style.FILL
                         this.alpha = (alpha * number("Opacity / Alpha", 1f).coerceIn(0f, 1f)).toInt()
                         if (element.value("Gradient Fill") == ElementValue.Bool(true)) {
-                            val startColor = runCatching { android.graphics.Color.parseColor(textValue("Gradient Start Color", "#FFFFFFFF")) }.getOrDefault(fill)
-                            val endColor = runCatching { android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                            val startColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Gradient Start Color", "#FFFFFFFF")), reactivity.colorMultiplier) }.getOrDefault(fill)
+                            val endColor = runCatching { audioReactivityColor(android.graphics.Color.parseColor(textValue("Gradient End Color", "#FF000000")), reactivity.colorMultiplier) }.getOrDefault(android.graphics.Color.BLACK)
                             val gradientCenter = element.value("Gradient Center") as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                             val gx = rect.left + shapeWidth * gradientCenter.x.toFloat()
                             val gy = rect.top + shapeHeight * gradientCenter.y.toFloat()

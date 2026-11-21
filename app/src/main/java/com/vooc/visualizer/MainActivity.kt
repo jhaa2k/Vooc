@@ -2304,22 +2304,23 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             kotlin.math.abs(measureFontMotion.offsetX) / 0.05f,
                             kotlin.math.abs(measureFontMotion.offsetY) / 0.05f
                         ).coerceIn(0f, 1f)
+                        val textUnitScale = size.width / 1080f
                         val resolvedTextSize = ((number("Font Size", 48f) +
-                            number("Measure Font Size", 0f) * measureFontResponse) * scale).coerceAtLeast(6f).sp.toPx()
+                            number("Measure Font Size", 0f) * measureFontResponse) * textUnitScale * scale).coerceAtLeast(6f)
                         val shadowEnabled = props["Shadow Enabled"] == ElementValue.Bool(true)
                         val shadowColor = runCatching {
                             android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000"))
                         }.getOrDefault(android.graphics.Color.BLACK)
-                        val shadowBlur = (number("Shadow Blur", 4f) + number("Shadow Spread", 0f)).dp.toPx().coerceAtLeast(0f)
+                        val shadowBlur = (number("Shadow Blur", 4f) + number("Shadow Spread", 0f)) * textUnitScale.coerceAtLeast(0f)
                         val shadowAngle = Math.toRadians(number("Shadow Angle", 45f).toDouble())
-                        val shadowDistance = number("Shadow Distance", 3f).dp.toPx()
-                        val shadowX = number("Shadow Offset X", 2f).dp.toPx() + kotlin.math.cos(shadowAngle).toFloat() * shadowDistance
-                        val shadowY = number("Shadow Offset Y", 2f).dp.toPx() + kotlin.math.sin(shadowAngle).toFloat() * shadowDistance
+                        val shadowDistance = number("Shadow Distance", 3f) * textUnitScale
+                        val shadowX = number("Shadow Offset X", 2f) * textUnitScale + kotlin.math.cos(shadowAngle).toFloat() * shadowDistance
+                        val shadowY = number("Shadow Offset Y", 2f) * textUnitScale + kotlin.math.sin(shadowAngle).toFloat() * shadowDistance
                         val strokeEnabled = props["Stroke Enabled"] == ElementValue.Bool(true)
                         val strokeColor = runCatching {
                             Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")))
                         }.getOrDefault(Color.Black).copy(alpha = opacity)
-                        val strokeWidth = number("Stroke Thickness", 0f).dp.toPx().coerceAtLeast(0f)
+                        val strokeWidth = number("Stroke Thickness", 0f) * textUnitScale.coerceAtLeast(0f)
                         val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                             color = elementColor.toArgb()
                             textSize = resolvedTextSize
@@ -2334,7 +2335,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             isUnderlineText = props["Underline"] == ElementValue.Bool(true)
                             if (shadowEnabled) setShadowLayer(shadowBlur, shadowX, shadowY, shadowColor)
                         }
-                        val maxTextWidth = number("Max Width", 1000f).dp.toPx().coerceAtLeast(1f)
+                        val maxTextWidth = number("Max Width", 1000f) * textUnitScale.coerceAtLeast(1f)
                         val wrapText = props["Wrap Text"] != ElementValue.Bool(false)
                         val textLines = if (!wrapText) listOf(displayText) else buildList {
                             displayText.split("\n").forEach { paragraph ->
@@ -2356,8 +2357,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val maximumLines = number("Maximum Lines", 0f).toInt().coerceAtLeast(0)
                         val visibleLines = (if (maximumLines > 0) textLines.take(maximumLines) else textLines).toMutableList()
                         if (textValue("Overflow Mode", "Visible") == "Ellipsis" && visibleLines.size < textLines.size && visibleLines.isNotEmpty()) visibleLines[visibleLines.lastIndex] = android.text.TextUtils.ellipsize(visibleLines.last(), android.text.TextPaint(textPaint), maxTextWidth, android.text.TextUtils.TruncateAt.END).toString()
-                        val lineHeight = if (textValue("Line Height Mode", "Multiplier") == "Fixed" && number("Fixed Line Height", 0f) > 0f) number("Fixed Line Height", 0f).dp.toPx() else textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
-                        val paragraphSpacing = number("Paragraph Spacing", 0f).dp.toPx()
+                        val lineHeight = if (textValue("Line Height Mode", "Multiplier") == "Fixed" && number("Fixed Line Height", 0f) > 0f) number("Fixed Line Height", 0f) * textUnitScale else textPaint.textSize * number("Line Spacing", 1f).coerceIn(0.5f, 4f)
+                        val paragraphSpacing = number("Paragraph Spacing", 0f) * textUnitScale
                         val textBlockHeight = (visibleLines.size - 1) * (lineHeight + paragraphSpacing)
                         val firstBaseline = when (textValue("Vertical Alignment", "Middle")) { "Top" -> center.y - textBlockHeight * 0.5f + textPaint.textSize * 0.5f; "Bottom" -> center.y + textBlockHeight * 0.5f - textPaint.textSize * 0.5f; else -> center.y - textBlockHeight * 0.5f }
                         if (textValue("Overflow Mode", "Visible") == "Scale Down") { val widest = visibleLines.maxOfOrNull { textPaint.measureText(it) } ?: 0f; if (widest > maxTextWidth && widest > 0f) textPaint.textScaleX *= maxTextWidth / widest }
@@ -2414,7 +2415,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 drawTextLine(outlinePaint, line, firstBaseline + index * (lineHeight + paragraphSpacing), index)
                             }
                         }
-                        if (props["Text Background Enabled"] == ElementValue.Bool(true)) { val bg = runCatching { android.graphics.Color.parseColor(textValue("Text Background Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT); val px = number("Text Background Padding X", 0f).dp.toPx(); val py = number("Text Background Padding Y", 0f).dp.toPx(); val top = firstBaseline - textPaint.textSize * 0.8f - py; val bottom = firstBaseline + (visibleLines.size - 1) * (lineHeight + paragraphSpacing) + textPaint.textSize * 0.25f + py; val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = bg }; native.drawRoundRect(center.x - maxTextWidth * 0.5f - px, top, center.x + maxTextWidth * 0.5f + px, bottom, number("Text Background Corner Radius", 0f).dp.toPx(), number("Text Background Corner Radius", 0f).dp.toPx(), bgPaint) }
+                        if (props["Text Background Enabled"] == ElementValue.Bool(true)) { val bg = runCatching { android.graphics.Color.parseColor(textValue("Text Background Color", "#00000000")) }.getOrDefault(android.graphics.Color.TRANSPARENT); val px = number("Text Background Padding X", 0f) * textUnitScale; val py = number("Text Background Padding Y", 0f) * textUnitScale; val top = firstBaseline - textPaint.textSize * 0.8f - py; val bottom = firstBaseline + (visibleLines.size - 1) * (lineHeight + paragraphSpacing) + textPaint.textSize * 0.25f + py; val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = bg }; native.drawRoundRect(center.x - maxTextWidth * 0.5f - px, top, center.x + maxTextWidth * 0.5f + px, bottom, number("Text Background Corner Radius", 0f) * textUnitScale, number("Text Background Corner Radius", 0f).dp.toPx(), bgPaint) }
                         val gradientStart = runCatching {
                             android.graphics.Color.parseColor(textValue("Text Gradient Start", "#FFFFFFFF"))
                         }.getOrDefault(android.graphics.Color.WHITE)

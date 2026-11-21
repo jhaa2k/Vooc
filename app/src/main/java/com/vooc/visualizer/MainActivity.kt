@@ -1,4 +1,5 @@
 package com.vooc.visualizer
+import com.vooc.visualizer.studio.scaleBarDesignDimension
 
 import com.vooc.visualizer.studio.replacePreservingOrder
 import com.vooc.visualizer.studio.buildNormalizedImageShapePath

@@ -143,7 +143,8 @@ class ParticlePhysicsTest {
         assertEquals(0f, negative.inner, 0.0001f)
         val invalid = resolveParticleEmitterRadii(Float.NaN, Float.POSITIVE_INFINITY)
         assertEquals(100f, invalid.outer, 0.0001f)
-        assertEquals(100f, invalid.inner, 0.0001f)
+        // Invalid inner radius falls back to zero, then remains within the outer radius.
+        assertEquals(0f, invalid.inner, 0.0001f)
     }
 
     @Test fun horizontalLineEmitterKeepsParticlesOnHorizontalAxis() {

@@ -703,6 +703,7 @@ private fun VoocStudio(
             analyzerConfig = providerAnalyzerConfig
         }
         var previousPosition = -1L
+        var previousProviderFrameTimeSec = Double.NaN
         while (true) {
             position = player.currentPosition.coerceAtLeast(0L)
             if (player.isPlaying) {
@@ -712,14 +713,20 @@ private fun VoocStudio(
                     // Resetting only the processors can otherwise read stale samples after a seek.
                     analyzer.onStreamDiscontinuity(currentPosition / 1000.0)
                     providerProcessors.values.forEach { it.reset() }
+                    previousProviderFrameTimeSec = Double.NaN
                 }
                 val analyzed = analyzer.analyzeLive(currentPosition / 1000.0)
                 frame = analyzed
-                val processedProviders = providerElements.mapIndexed { index, element ->
-                    providerProcessors.getValue(element.id).process(analyzed, providerConfigs[index])
+                // analyzeLive may return the same cached FFT frame on several UI ticks.
+                // Advance stateful provider DSP only once per distinct analysis timestamp.
+                if (analyzed.timeSec != previousProviderFrameTimeSec) {
+                    val processedProviders = providerElements.mapIndexed { index, element ->
+                        providerProcessors.getValue(element.id).process(analyzed, providerConfigs[index])
+                    }
+                    providerFrames = processedProviders
+                    providerFrame = processedProviders.getOrNull(providerConfigs.analyzerConfigSourceIndex())
+                    previousProviderFrameTimeSec = analyzed.timeSec
                 }
-                providerFrames = processedProviders
-                providerFrame = processedProviders.getOrNull(providerConfigs.analyzerConfigSourceIndex())
                 previousPosition = currentPosition
             } else {
                 previousPosition = -1L

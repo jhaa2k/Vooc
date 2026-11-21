@@ -159,7 +159,7 @@ object BlurEffectProcessor {
                 source.width / 2f + halfW, source.height / 2f + halfH), paint)
         }
         if (enabled(element, "Show Unblurred Content")) canvas.drawBitmap(source, 0f, 0f, null)
-        applyBloom(canvas, processed, element)
+        applyBloom(canvas, processed, element, radius)
         if (processed !== source) processed.recycle()
         return output
     }
@@ -227,7 +227,7 @@ object BlurEffectProcessor {
                 }
                 val pixel = if (algorithm == "Kawase" && tap == 4) input[y * w + x]
                     else sample(input, w, h, sx, sy)
-                val weight = if (algorithm == "Gaussian" && tap == 4) 4 else 1
+                val weight = if (algorithm == "Gaussian") when (tap) { 0, 1, 2, 3 -> 2; 4 -> 4; else -> 1 } else 1
                 sumA += Color.alpha(pixel) * weight
                 sumR += Color.red(pixel) * weight
                 sumG += Color.green(pixel) * weight
@@ -252,29 +252,36 @@ object BlurEffectProcessor {
     private fun parseColor(value: String, fallback: Int): Int =
         runCatching { Color.parseColor(value) }.getOrDefault(fallback)
 
-    private fun applyBloom(canvas: Canvas, bitmap: Bitmap, element: ElementDocument) {
+    private fun applyBloom(canvas: Canvas, bitmap: Bitmap, element: ElementDocument, blurRadius: Float) {
         val strength = number(element, "Blur Bloom Strength", 0f).coerceIn(0f, 2f)
         if (strength <= 0f) return
         val tint = parseColor(text(element, "Blur Glow Color", "#FFFFFFFF"), Color.WHITE)
         val threshold = number(element, "Blur Bloom Threshold", 0.72f).coerceIn(0f, 1f)
+        val scale = min(1f, 512f / max(bitmap.width, bitmap.height))
+        val bloomW = max(1, (bitmap.width * scale).toInt())
+        val bloomH = max(1, (bitmap.height * scale).toInt())
+        val small = if (bloomW != bitmap.width || bloomH != bitmap.height) Bitmap.createScaledBitmap(bitmap, bloomW, bloomH, true) else bitmap
+        val pixels = IntArray(bloomW * bloomH)
+        small.getPixels(pixels, 0, bloomW, 0, 0, bloomW, bloomH)
+        if (small !== bitmap) small.recycle()
+        for (i in pixels.indices) {
+            val source = pixels[i]
+            val lum = luminance(source) / 255f
+            val highlight = ((lum - threshold) / (1f - threshold).coerceAtLeast(0.001f)).coerceIn(0f, 1f)
+            val alpha = (Color.alpha(source) * highlight).toInt().coerceIn(0, 255)
+            pixels[i] = Color.argb(alpha, Color.red(source), Color.green(source), Color.blue(source))
+        }
+        var glowPixels = pixels
+        val glowRadius = (blurRadius * scale * 0.65f).coerceIn(2f, 18f)
+        repeat(2) { pass -> glowPixels = blurPass(glowPixels, bloomW, bloomH, glowRadius / sqrt(2f), "Gaussian", 0.0, 0.5f to 0.5f, 0f, pass) }
+        val glow = Bitmap.createBitmap(bloomW, bloomH, Bitmap.Config.ARGB_8888)
+        glow.setPixels(glowPixels, 0, bloomW, 0, 0, bloomW, bloomH)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
             alpha = (strength * 120f).toInt().coerceIn(0, 240)
-            colorFilter = PorterDuffColorFilter(tint, PorterDuff.Mode.SCREEN)
+            colorFilter = PorterDuffColorFilter(tint, PorterDuff.Mode.MULTIPLY)
             xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
         }
-        if (threshold <= 0f) canvas.drawBitmap(bitmap, 0f, 0f, paint)
-        else {
-            val glow = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-            val pixels = IntArray(glow.width * glow.height)
-            glow.getPixels(pixels, 0, glow.width, 0, 0, glow.width, glow.height)
-            for (i in pixels.indices) {
-                val lum = luminance(pixels[i]) / 255f
-                val a = (Color.alpha(pixels[i]) * ((lum - threshold) / (1f - threshold).coerceAtLeast(0.001f)).coerceIn(0f, 1f)).toInt()
-                pixels[i] = (pixels[i] and 0x00FFFFFF) or (a shl 24)
-            }
-            glow.setPixels(pixels, 0, glow.width, 0, 0, glow.width, glow.height)
-            canvas.drawBitmap(glow, 0f, 0f, paint)
-            glow.recycle()
-        }
+        canvas.drawBitmap(glow, null, RectF(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat()), paint)
+        glow.recycle()
     }
 }

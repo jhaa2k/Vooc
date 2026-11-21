@@ -3143,13 +3143,13 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
                             val trailX = vx * trailLength * 0.001f
                             val trailY = vy * trailLength * 0.001f
-                            fun drawParticleAt(x: Float, y: Float) {
+                            fun drawParticleAt(x: Float, y: Float, drawAngle: Float = visualAngle) {
                                 if (trailLength > 0f) {
                                     drawLine(particleColor.copy(alpha = alpha * trailFade), Offset(x - trailX, y - trailY), Offset(x, y),
                                         (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f), cap = androidx.compose.ui.graphics.StrokeCap.Round, blendMode = particleBlendMode)
                                 }
                                 if (customParticle != null) {
-                                    rotate(visualAngle, Offset(x, y)) {
+                                    rotate(drawAngle, Offset(x, y)) {
                                         drawImage(customParticle,
                                             dstOffset = androidx.compose.ui.unit.IntOffset((x - particleWidth / 2f).toInt(), (y - particleHeight / 2f).toInt()),
                                             dstSize = androidx.compose.ui.unit.IntSize(particleWidth.toInt().coerceAtLeast(1), particleHeight.toInt().coerceAtLeast(1)),
@@ -3169,9 +3169,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                     }
                                 }
                             }
-                            if (mirrorX) drawParticleAt(size.width - px, py)
-                            if (mirrorY) drawParticleAt(px, size.height - py)
-                            if (mirrorX && mirrorY) drawParticleAt(size.width - px, size.height - py)
+                            if (mirrorX) drawParticleAt(size.width - px, py, 180f - visualAngle)
+                            if (mirrorY) drawParticleAt(px, size.height - py, -visualAngle)
+                            if (mirrorX && mirrorY) drawParticleAt(size.width - px, size.height - py, visualAngle + 180f)
                             drawParticleAt(px, py)
                         }
                     }

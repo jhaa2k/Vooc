@@ -551,7 +551,7 @@ object ElementPropertyCatalog {
         bool("Generated Album Art Hint No Text", "Generated Album Art", false),
         bool("Generated Album Art Hint Force Gen", "Generated Album Art", false),
         text("Generated Album Art Color", "Generated Album Art", "#FFFFFFFF"),
-        text("Image Sampling", "Image", "Linear", listOf("Nearest", "Linear", "Cubic")),
+        text("Image Sampling", "Image", "Linear", listOf("Nearest", "Linear")),
         text("Image Tile Mode X", "Image", "Clamp", listOf("Clamp", "Repeat", "Mirror")),
         text("Image Tile Mode Y", "Image", "Clamp", listOf("Clamp", "Repeat", "Mirror")),
         number("Image Tile Scale X", "Image", 1.0, 0.1, 4.0),

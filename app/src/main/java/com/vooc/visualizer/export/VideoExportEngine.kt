@@ -1093,7 +1093,13 @@ object VideoExportEngine {
                     }
                     val shadowEnabled = (element.value("Shadow Enabled") as? ElementValue.Bool)?.value == true
                     if (shadowEnabled) {
-                        val shadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                        val shadowColorSource = runCatching { android.graphics.Color.parseColor(textValue("Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
+                        val shadowColor = android.graphics.Color.argb(
+                            (android.graphics.Color.alpha(shadowColorSource) * alpha / 255f).toInt().coerceIn(0, 255),
+                            android.graphics.Color.red(shadowColorSource),
+                            android.graphics.Color.green(shadowColorSource),
+                            android.graphics.Color.blue(shadowColorSource)
+                        )
                         textPaint.setShadowLayer(
                             (number("Shadow Blur", 4f) + number("Shadow Spread", 0f)) * width / 1080f,
                             (number("Shadow Offset X", 2f) + kotlin.math.cos(Math.toRadians(number("Shadow Angle", 45f).toDouble())).toFloat() * number("Shadow Distance", 3f)) * width / 1080f,

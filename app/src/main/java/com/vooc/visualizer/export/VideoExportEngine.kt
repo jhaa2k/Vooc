@@ -14,6 +14,7 @@ import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
 import com.vooc.visualizer.analyzer.SpectrumMapper
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.analyzer.analyzerConfigSource
+import com.vooc.visualizer.analyzer.requiresStereoAnalysis
 import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.studio.ElementPropertyCatalog
 import com.vooc.visualizer.studio.BackgroundImageProcessor
@@ -121,7 +122,7 @@ object VideoExportEngine {
         }.take(32).ifEmpty { listOf(ElementPropertyCatalog.create(StudioElementType.AUDIO_PROVIDER, "audio-provider-export-default")) }
         val providerConfigs = providerElements.map { it.toAudioProviderConfig() }
         val providerConfig = providerConfigs.analyzerConfigSource() ?: com.vooc.visualizer.analyzer.AudioProviderConfig()
-        val needsStereoReactivity = providerConfigs.any { it.channelMode != com.vooc.visualizer.analyzer.ProviderChannelMode.MONO_MIX } ||
+        val needsStereoReactivity = providerConfigs.requiresStereoAnalysis() ||
             project.document.elements.any { element ->
             val source = (element.value("Audio Reactivity Source") as? ElementValue.Text)?.value
             (element.value("Audio Reactivity Enabled") as? ElementValue.Bool)?.value == true &&

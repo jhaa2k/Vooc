@@ -4,6 +4,37 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.pow
 
+
+internal data class ParticleEmissionTiming(val age: Float, val isAlive: Boolean)
+
+/** Resolves deterministic particle age for continuous emission and timed burst emitters. */
+internal fun resolveParticleEmissionTiming(
+    playbackSeconds: Float,
+    particleIndex: Int,
+    spawnInterval: Float,
+    particleLifetime: Float,
+    burstCount: Int,
+    burstInterval: Float,
+    loopBurst: Boolean
+): ParticleEmissionTiming {
+    val time = playbackSeconds.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    val interval = spawnInterval.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    val lifetime = particleLifetime.takeIf { it.isFinite() }?.coerceAtLeast(0.01f) ?: 0.01f
+    val index = particleIndex.coerceAtLeast(0)
+    if (burstCount > 0) {
+        if (index >= burstCount) return ParticleEmissionTiming(0f, false)
+        val elapsed = time - index * interval
+        if (elapsed < 0f) return ParticleEmissionTiming(0f, false)
+        val age = if (loopBurst) {
+            val cycle = burstInterval.takeIf { it.isFinite() }?.coerceAtLeast(0.001f) ?: 0.001f
+            elapsed % cycle
+        } else elapsed
+        return ParticleEmissionTiming(age.coerceAtLeast(0f), age <= lifetime)
+    }
+    val age = (time + index * interval) % lifetime
+    return ParticleEmissionTiming(age.coerceIn(0f, lifetime), true)
+}
+
 internal data class ParticleAxisState(val position: Float, val velocity: Float)
 
 /** Folds an unconstrained particle coordinate back into the scene after boundary impacts. */

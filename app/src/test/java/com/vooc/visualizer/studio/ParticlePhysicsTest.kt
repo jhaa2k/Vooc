@@ -293,4 +293,29 @@ class ParticlePhysicsTest {
         assertEquals(0f, result.x, 0.0001f)
         assertEquals(0f, result.y, 0.0001f)
     }
+
+    @Test fun particleOpacityCombinesLifeAndColorFactors() {
+        val result = resolveParticleOpacity(
+            0.8f, 0.5f, 0.6f, 0.9f, 0.75f, 0.5f, 0.8f, 0.5f
+        )
+        assertEquals(0.0648f, result, 0.0001f)
+    }
+
+    @Test fun particleOpacityClampsOutOfRangeFactors() {
+        val result = resolveParticleOpacity(
+            2f, 1.5f, -1f, 1f, 1f, 1f, 1f, 1f
+        )
+        assertEquals(0f, result, 0.0001f)
+    }
+
+    @Test fun particleOpacitySanitizesNonFiniteFactors() {
+        val result = resolveParticleOpacity(
+            Float.NaN, 1f, 1f, 1f, 1f, 1f, 1f, 1f
+        )
+        assertEquals(0f, result, 0.0001f)
+        val valid = resolveParticleOpacity(
+            1f, 1f, 1f, 1f, Float.POSITIVE_INFINITY, 1f, 1f, 1f
+        )
+        assertEquals(0f, valid, 0.0001f)
+    }
 }

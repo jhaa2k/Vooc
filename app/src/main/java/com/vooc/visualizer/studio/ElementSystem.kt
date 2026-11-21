@@ -654,7 +654,11 @@ object ElementPropertyCatalog {
         text("Blur Mask Mode", "Blur", "None", listOf("None", "Alpha", "Luminance", "Inverted Alpha", "Inverted Luminance")),
         number("Blur Mask Strength", "Blur", 1.0, 0.0, 1.0),
         number("Blur Threshold", "Blur", 0.0, 0.0, 1.0),
-        number("Blur Spread", "Blur", 0.0, 0.0, 128.0)
+        number("Blur Spread", "Blur", 0.0, 0.0, 128.0),
+        number("Blur Blend Strength", "Blur", 1.0, 0.0, 1.0),
+        number("Blur Bloom Strength", "Blur", 0.0, 0.0, 2.0),
+        number("Blur Bloom Threshold", "Blur", 0.72, 0.0, 1.0),
+        text("Blur Glow Color", "Blur", "#FFFFFFFF")
     )
 
     private val barsGeneral = listOf(

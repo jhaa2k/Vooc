@@ -599,6 +599,16 @@ class ElementSystemTest {
     }
 
     @Test
+    fun imageSamplingDoesNotOfferUnsupportedCubicMode() {
+        val image = ElementPropertyCatalog.create(StudioElementType.IMAGE, "sampling")
+        val spec = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).first { it.name == "Image Sampling" }
+        assertEquals(listOf("Nearest", "Linear"), spec.options)
+        val legacy = image.copy(properties = image.properties + ("Image Sampling" to ElementValue.Text("Cubic"))).normalized()
+        assertNull(legacy.value("Image Sampling"))
+        assertEquals(ElementValue.Text("Linear"), image.value("Image Sampling"))
+    }
+
+    @Test
     fun imageShapeParserRejectsUnsupportedCommandsAndMalformedCharacters() {
         val bounds = android.graphics.RectF(0f, 0f, 100f, 100f)
         assertNotNull(buildNormalizedImageShapePath("M 0 0 L 1 0 L 1 1 Z", bounds))

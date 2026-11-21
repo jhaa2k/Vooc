@@ -175,15 +175,23 @@ object VideoExportEngine {
                     }
                 )
                 val providerProcessors = providerConfigs.map { AudioProviderProcessor() }
+                var lastProviderAnalysisTimeSec = Double.NaN
+                var latestShapedProviders: List<com.vooc.visualizer.analyzer.AudioProviderFrame> = emptyList()
                 decoder.decode { samples, frames, ptsUs ->
                     if (frames > 0) {
                         offlineAnalyzer.pushInterleaved(samples, frames, stream.channels)
                         val chunkDurationUs = frames * 1_000_000L / stream.sampleRate
                         val endTimeSec = (ptsUs + chunkDurationUs) / 1_000_000.0
                         val analysis = offlineAnalyzer.analyzeLive(endTimeSec, alignToClock = false)
-                        val shapedProviders = providerProcessors.mapIndexed { providerIndex, processor ->
-                            processor.process(analysis, providerConfigs[providerIndex])
+                        // The analyzer can return its cached frame when a decoder chunk adds
+                        // less than one FFT hop. Do not advance provider smoothing twice.
+                        if (analysis.timeSec != lastProviderAnalysisTimeSec) {
+                            latestShapedProviders = providerProcessors.mapIndexed { providerIndex, processor ->
+                                processor.process(analysis, providerConfigs[providerIndex])
+                            }
+                            lastProviderAnalysisTimeSec = analysis.timeSec
                         }
+                        val shapedProviders = latestShapedProviders
                         val shaped = shapedProviders.getOrNull(analyzerProviderIndex) ?: shapedProviders.first()
                         val relativeStartUs = ptsUs - trimStartUs
                         val relativeEndUs = ptsUs + chunkDurationUs - trimStartUs

@@ -625,6 +625,18 @@ class ElementSystemTest {
     }
 
     @Test
+    fun particleCatalogHidesControlsNotImplementedByParticleRenderer() {
+        val specs = ElementPropertyCatalog.forElement(StudioElementType.PARTICLES).associateBy { it.name }
+        assertTrue(specs.containsKey("Texture / Image"))
+        assertTrue(specs.containsKey("Emitter Burst Count"))
+        assertTrue(specs.containsKey("Emitter Burst Interval"))
+        assertFalse(specs.containsKey("Source Composition Index"))
+        assertFalse(specs.containsKey("Mask Image"))
+        assertFalse(specs.containsKey("Show Unblurred Content"))
+        assertFalse(specs.containsKey("Show Unblurred Content Under"))
+    }
+
+    @Test
     fun imageSamplingDoesNotOfferUnsupportedCubicMode() {
         val image = ElementPropertyCatalog.create(StudioElementType.IMAGE, "sampling")
         val spec = ElementPropertyCatalog.forElement(StudioElementType.IMAGE).first { it.name == "Image Sampling" }

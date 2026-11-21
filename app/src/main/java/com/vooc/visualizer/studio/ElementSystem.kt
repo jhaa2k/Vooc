@@ -272,7 +272,6 @@ object ElementPropertyCatalog {
         text("Fit Mode (Scale Type)", "Background", "Fill (Cover)", listOf(
             "Fit (Contain)", "Fill (Cover)", "Stretch"
         )),
-        bool("Edge Blur (Image Fill)", "Background", false),
         number("Blur Radius", "Background", 24.0, 0.0, 256.0),
         number("Corner Radius", "Background", 0.0, 0.0, 512.0),
         text("Color Overlay", "Background", "#00000000"),
@@ -282,12 +281,6 @@ object ElementPropertyCatalog {
         number("Background Tile Scale", "Background", 1.0, 0.01, 100.0),
         number("Background Image Offset X", "Background", 0.0, -10000.0, 10000.0),
         number("Background Image Offset Y", "Background", 0.0, -10000.0, 10000.0),
-        number("Background Blur Quality", "Background", 1.0, 0.1, 4.0),
-        number("Background Brightness", "Background", 1.0, 0.0, 4.0),
-        number("Background Contrast", "Background", 1.0, 0.0, 4.0),
-        number("Background Saturation", "Background", 1.0, 0.0, 4.0),
-        bool("Background Grayscale", "Background", false),
-        bool("Background Invert", "Background", false),
         text("Background Gradient Type", "Background", "Linear", listOf("Linear", "Radial")),
         text("Background Gradient Start", "Background", "#FF000000"),
         text("Background Gradient End", "Background", "#FFFFFFFF"),

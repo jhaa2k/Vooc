@@ -16,7 +16,9 @@ class AudioProviderProcessorTest {
         binWidthHz = sampleRate.toFloat() / fftSize, spectrum = spectrum,
         rawMagnitude = spectrum, phase = FloatArray(spectrum.size), db = FloatArray(spectrum.size),
         bands = FloatArray(3), bandLabels = listOf("Bass", "Mid", "Treble"), beat = beat,
-        rms = 0.2f, peak = 0.5f, channels = emptyMap(), waveform = FloatArray(256)
+        rms = 0.2f, peak = 0.5f,
+        channels = mapOf(ChannelSelect.MIX to ChannelAnalysis(spectrum, FloatArray(3), 0.2f, 0.5f, spectrum)),
+        waveform = FloatArray(256)
     )
 
     @Test fun outputCountAndGapAreApplied() {

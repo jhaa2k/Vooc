@@ -93,7 +93,7 @@ internal fun particleForcePosition(x: Float, y: Float, canvasWidth: Float, canva
 
 internal data class ParticleForceDelta(val x: Float, val y: Float)
 
-/** Returns the velocity delta applied by an Avee-style force field at a particle position. */
+/** Returns the velocity delta applied by a configured particle force field. */
 internal fun particleForceDelta(
     mode: String,
     dx: Float,

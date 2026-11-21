@@ -1663,7 +1663,7 @@ object VideoExportEngine {
                             "Rectangle" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
                             "Ellipse", "Circle" -> { localX = cos(emitterAngle) * radialDistance.coerceAtLeast(spawnWidth * randomB); localY = sin(emitterAngle) * (if (spawnArea == "Circle") radialDistance else emitterRadius * spawnHeight / spawnWidth.coerceAtLeast(1f)) }
                             "Ring" -> { localX = cos(emitterAngle) * radialDistance; localY = sin(emitterAngle) * radialDistance }
-                            "Line" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = 0f }
+                            "Line", "HorizontalLine" -> { localX = (randomA * 2f - 1f) * spawnWidth; localY = 0f }
                             "Edge" -> { localX = if (randomA < 0.5f) -spawnWidth else spawnWidth; localY = (randomB * 2f - 1f) * spawnHeight }
                             else -> { localX = 0f; localY = 0f }
                         }

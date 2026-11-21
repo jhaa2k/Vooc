@@ -9,8 +9,17 @@ import android.graphics.RectF
  */
 fun buildNormalizedImageShapePath(data: String, bounds: RectF): Path? {
     if (data.isBlank()) return null
-    val tokens = Regex("[MmLlHhVvQqCcZz]|[-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?").findAll(data).map { it.value }.toList()
-    if (tokens.isEmpty() || tokens.size > 2048) return null
+    val matches = Regex("[MmLlHhVvQqCcZz]|[-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?").findAll(data).toList()
+    if (matches.isEmpty() || matches.size > 2048) return null
+    // Reject unsupported SVG commands and malformed characters instead of silently
+    // dropping them and accidentally rendering a different, partial shape.
+    var previousEnd = 0
+    for (match in matches) {
+        if (data.substring(previousEnd, match.range.first).any { !it.isWhitespace() && it != ',' }) return null
+        previousEnd = match.range.last + 1
+    }
+    if (data.substring(previousEnd).any { !it.isWhitespace() && it != ',' }) return null
+    val tokens = matches.map { it.value }
     val path = Path()
     var i = 0
     var command = ' '

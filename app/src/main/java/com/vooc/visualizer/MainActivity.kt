@@ -2330,9 +2330,15 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val shadowX = number("Shadow Offset X", 2f) * textUnitScale + kotlin.math.cos(shadowAngle).toFloat() * shadowDistance
                         val shadowY = number("Shadow Offset Y", 2f) * textUnitScale + kotlin.math.sin(shadowAngle).toFloat() * shadowDistance
                         val strokeEnabled = props["Stroke Enabled"] == ElementValue.Bool(true)
-                        val strokeColor = runCatching {
-                            Color(android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000")))
-                        }.getOrDefault(Color.Black).copy(alpha = opacity)
+                        val strokeColorSource = runCatching {
+                            android.graphics.Color.parseColor(textValue("Stroke Color", "#FF000000"))
+                        }.getOrDefault(android.graphics.Color.BLACK)
+                        val strokeColor = Color(android.graphics.Color.argb(
+                            (android.graphics.Color.alpha(strokeColorSource) * opacity).toInt().coerceIn(0, 255),
+                            android.graphics.Color.red(strokeColorSource),
+                            android.graphics.Color.green(strokeColorSource),
+                            android.graphics.Color.blue(strokeColorSource)
+                        ))
                         val strokeWidth = number("Stroke Thickness", 0f) * textUnitScale.coerceAtLeast(0f)
                         val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                             color = elementColor.toArgb()

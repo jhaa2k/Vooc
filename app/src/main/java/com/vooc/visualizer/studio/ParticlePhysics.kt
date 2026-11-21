@@ -39,9 +39,13 @@ internal fun resolveParticleLayerScale(x: Float, y: Float, uniform: Boolean, par
 internal data class ParticleForcePosition(val x: Float, val y: Float)
 
 /** Resolves normalized force-field coordinates in full-canvas pixel space. */
-internal fun particleForcePosition(x: Float, y: Float, canvasWidth: Float, canvasHeight: Float): ParticleForcePosition =
-    ParticleForcePosition(x.coerceIn(0f, 1f) * canvasWidth.coerceAtLeast(0f),
-        y.coerceIn(0f, 1f) * canvasHeight.coerceAtLeast(0f))
+internal fun particleForcePosition(x: Float, y: Float, canvasWidth: Float, canvasHeight: Float): ParticleForcePosition {
+    val safeX = x.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
+    val safeY = y.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
+    val safeWidth = canvasWidth.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    val safeHeight = canvasHeight.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    return ParticleForcePosition(safeX * safeWidth, safeY * safeHeight)
+}
 
 internal data class ParticleForceDelta(val x: Float, val y: Float)
 
@@ -55,13 +59,23 @@ internal fun particleForceDelta(
     directionX: Float,
     directionY: Float
 ): ParticleForceDelta {
-    val distance = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-    val amount = strength * age
+    val safeDx = dx.takeIf { it.isFinite() } ?: 0f
+    val safeDy = dy.takeIf { it.isFinite() } ?: 0f
+    val safeStrength = strength.takeIf { it.isFinite() } ?: 0f
+    val safeAge = age.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: 0f
+    val safeDirectionX = directionX.takeIf { it.isFinite() } ?: 0f
+    val safeDirectionY = directionY.takeIf { it.isFinite() } ?: 0f
+    val scale = maxOf(kotlin.math.abs(safeDx), kotlin.math.abs(safeDy))
+    val distance = if (scale > 0f) {
+        scale * kotlin.math.sqrt((safeDx / scale).pow(2) + (safeDy / scale).pow(2))
+    } else 0f
+    val divisor = distance.coerceAtLeast(1f)
+    val amount = (safeStrength * safeAge).takeIf { it.isFinite() } ?: 0f
     return when (mode) {
-        "Attract", "Radial" -> ParticleForceDelta(dx / distance * amount, dy / distance * amount)
-        "Repel" -> ParticleForceDelta(-dx / distance * amount, -dy / distance * amount)
-        "Directional" -> ParticleForceDelta(directionX * amount, directionY * amount)
-        "Vortex" -> ParticleForceDelta(-dy / distance * amount, dx / distance * amount)
+        "Attract", "Radial" -> ParticleForceDelta(safeDx / divisor * amount, safeDy / divisor * amount)
+        "Repel" -> ParticleForceDelta(-safeDx / divisor * amount, -safeDy / divisor * amount)
+        "Directional" -> ParticleForceDelta(safeDirectionX * amount, safeDirectionY * amount)
+        "Vortex" -> ParticleForceDelta(-safeDy / divisor * amount, safeDx / divisor * amount)
         else -> ParticleForceDelta(0f, 0f)
     }
 }

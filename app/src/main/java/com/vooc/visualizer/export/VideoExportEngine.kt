@@ -2095,7 +2095,7 @@ object VideoExportEngine {
                         val measuredAngle = number("Blur Direction / Angle", 0f) + if (motionSource == "Measured Movement") sin(seconds * 2.4f) * 45f else 0f
                         val resolvedAngle = if (radial) radialAngle else (measuredAngle + if (relativeMode == "Relative") number("Rotation", 0f) else 0f) * PI.toFloat() / 180f
                         val velocity = if (element.value("Velocity Influence") == ElementValue.Bool(false)) 1f else (0.25f + audioLevel.coerceIn(0f, 1f) * 0.75f)
-                        val length = lengthBase * velocity
+                        val length = resolveMotionBlurLength(lengthBase, number("Motion Blur Shutter Angle", 180f), number("Motion Blur Velocity Scale", 1f), velocity)
                         val angle = resolvedAngle
                         val trails = number("Trails / Echo", 0f).toInt().coerceIn(0, 32)
                         val fade = number("Trail Opacity / Fade", 0.75f).coerceIn(0f, 1f)
@@ -2123,18 +2123,19 @@ object VideoExportEngine {
                             }
                         }
                         for (sample in samples downTo 1) {
-                            val t = sample.toFloat() / samples
+                            val t = resolveMotionBlurSampleProgress(sample, samples, number("Motion Blur Sample Jitter", 0f))
+                            val sampleAlpha = resolveMotionBlurExposureAlpha(fade * (1f - t * 0.55f), number("Motion Blur Exposure", 0.5f))
                             val dx = cos(angle) * length * t
                             val dy = sin(angle) * length * t
                             canvas.drawBitmap(image, null, RectF(destination.left + dx, destination.top + dy, destination.right + dx, destination.bottom + dy),
-                                contentPaint((alpha * fade * (1f - t * 0.55f)).toInt()))
+                                contentPaint((alpha * sampleAlpha).toInt()))
                         }
                         repeat(trails) { index ->
                             val t = (index + 1f) / (trails + 1f)
                             val dx = -cos(angle) * length * t
                             val dy = -sin(angle) * length * t
                             canvas.drawBitmap(image, null, RectF(destination.left + dx, destination.top + dy, destination.right + dx, destination.bottom + dy),
-                                contentPaint((alpha * fade * (1f - t)).toInt()))
+                                contentPaint((alpha * resolveMotionBlurExposureAlpha(fade * (1f - t), number("Motion Blur Exposure", 0.5f))).toInt()))
                         }
                         if (showOver && original != null) canvas.drawBitmap(original, null, destination, paint)
                         else canvas.drawBitmap(image, null, destination, contentPaint(alpha))

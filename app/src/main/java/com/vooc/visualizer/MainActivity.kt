@@ -16,6 +16,7 @@ import com.vooc.visualizer.studio.particleForceDelta
 import com.vooc.visualizer.studio.particleForcePosition
 import com.vooc.visualizer.studio.particleSpawnOffset
 import com.vooc.visualizer.studio.particlePositionOffset
+import com.vooc.visualizer.studio.resolveParticleAnchorOffset
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 
 import android.net.Uri
@@ -2928,8 +2929,13 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val spawnArea = textAlias("Particle Emitter Shape", "Circle", "Spawn Area")
                         // Use the shared element transform center so Position and Measure Pos
                         // affect the particle system consistently with other element types.
-                        val particleCenterX = center.x
-                        val particleCenterY = center.y
+                        val particleAlignment = props["Alignment Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                        val particleAnchor = resolveParticleAnchorOffset(
+                            textValue("Anchor X", "unset"), textValue("Anchor Y", "unset"),
+                            particleAlignment.x.toFloat(), particleAlignment.y.toFloat()
+                        )
+                        val particleCenterX = center.x + particleAnchor.x * size.width
+                        val particleCenterY = center.y + particleAnchor.y * size.height
                         val emitterPosition = props["Emitter Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                         val emitterX = particleCenterX + (emitterPosition.x.toFloat() - 0.5f) * size.width
                         val emitterY = particleCenterY + (emitterPosition.y.toFloat() - 0.5f) * size.height

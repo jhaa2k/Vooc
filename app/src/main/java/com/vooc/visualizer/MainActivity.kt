@@ -2694,7 +2694,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val modeBrush = when (colorMode) {
                                 "Gradient", "By Amplitude" -> androidx.compose.ui.graphics.SolidColor(fill)
                                 "Alternating" -> androidx.compose.ui.graphics.SolidColor(if (index % 2 == 0) colorA else colorB)
-                                "Per Bar" -> androidx.compose.ui.graphics.SolidColor(runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor))
+                                "Per Bar" -> androidx.compose.ui.graphics.SolidColor(fill)
                                 else -> androidx.compose.ui.graphics.SolidColor(elementColor)
                             }
                             if (design == "Custom Image" && customImage != null) {
@@ -2768,7 +2768,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                                 else level + radialColorBlendOffset).coerceIn(0f, 1f)
                                 val radialColor = when (colorMode) {
                                     "Alternating" -> if (index % 2 == 0) colorA else colorB
-                                    "Per Bar" -> runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor)
+                                    "Per Bar" -> runCatching {
+                                        Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF")), reactivity.colorMultiplier))
+                                            .copy(alpha = opacity)
+                                    }.getOrDefault(elementColor.copy(alpha = opacity))
                                     "Gradient", "By Amplitude" -> Color(
                                         colorA.red + (colorB.red - colorA.red) * radialColorBlendPosition,
                                         colorA.green + (colorB.green - colorA.green) * radialColorBlendPosition,
@@ -2895,7 +2898,10 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             else level + colorBlendOffset).coerceIn(0f, 1f)
                             val colorForBar = when (colorMode) {
                                 "Alternating" -> if (index % 2 == 0) colorA else colorB
-                                "Per Bar" -> runCatching { Color(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF"))) }.getOrDefault(elementColor)
+                                "Per Bar" -> runCatching {
+                                        Color(audioReactivityColor(android.graphics.Color.parseColor(textValue("Per-Bar Color", "#FFFFFFFF")), reactivity.colorMultiplier))
+                                            .copy(alpha = opacity)
+                                    }.getOrDefault(elementColor.copy(alpha = opacity))
                                 "Gradient", "By Amplitude" -> Color(
                                     colorA.red + (colorB.red - colorA.red) * blendPosition,
                                     colorA.green + (colorB.green - colorA.green) * blendPosition,

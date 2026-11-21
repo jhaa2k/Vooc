@@ -6,6 +6,7 @@ import com.vooc.visualizer.studio.BackgroundImageProcessor
 import com.vooc.visualizer.studio.MirrorEffectProcessor
 import com.vooc.visualizer.studio.GeneratedAlbumArt
 import com.vooc.visualizer.studio.reflectParticleAxis
+import com.vooc.visualizer.studio.particleForceDelta
 
 import android.net.Uri
 import android.Manifest
@@ -3093,12 +3094,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val fieldY = center.y + forcePosition.y.toFloat() * size.height - center.y
                             val dx = fieldX - spawnX
                             val dy = fieldY - spawnY
-                            val distance = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-                            when (forceMode) {
-                                "Attract", "Radial" -> { vx += dx / distance * forceStrength * age; vy += dy / distance * forceStrength * age }
-                                "Repel" -> { vx -= dx / distance * forceStrength * age; vy -= dy / distance * forceStrength * age }
-                                "Directional" -> { vx += cos(baseAngle) * forceStrength * age; vy += sin(baseAngle) * forceStrength * age }
-                            }
+                            val forceDelta = particleForceDelta(
+                                forceMode, dx, dy, forceStrength, age,
+                                cos(baseAngle), sin(baseAngle)
+                            )
+                            vx += forceDelta.position
+                            vy += forceDelta.velocity
                             val frequency = sineFrequency * (1f + randomB * sineFrequencyRandom)
                             val wave = sin(age * frequency * 2f * PI.toFloat() + randomC * 2f * PI.toFloat()) *
                                 sineMagnitude * (1f + randomA * sineMagnitudeRandom)

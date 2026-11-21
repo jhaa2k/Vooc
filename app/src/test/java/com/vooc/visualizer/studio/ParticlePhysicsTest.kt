@@ -170,6 +170,24 @@ class ParticlePhysicsTest {
         assertEquals(-8f, repel.y, 0.0001f)
     }
 
+    @Test fun directionalForceUsesConfiguredDirectionAndAge() {
+        val result = particleForceDelta("Directional", 20f, -10f, 3f, 2f, 0.6f, -0.8f)
+        assertEquals(3.6f, result.x, 0.0001f)
+        assertEquals(-4.8f, result.y, 0.0001f)
+    }
+
+    @Test fun zeroDistanceRadialForceDoesNotCreateAnUndefinedDirection() {
+        val result = particleForceDelta("Attract", 0f, 0f, 10f, 5f, 1f, 0f)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
+    @Test fun unknownForceFieldModeDoesNotAlterParticleVelocity() {
+        val result = particleForceDelta("Unknown", 10f, 5f, 4f, 3f, 1f, 0f)
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(0f, result.y, 0.0001f)
+    }
+
     @Test fun emitterRadiiClampInnerRadiusToOuterRadius() {
         val result = resolveParticleEmitterRadii(80f, 120f)
         assertEquals(80f, result.outer, 0.0001f)

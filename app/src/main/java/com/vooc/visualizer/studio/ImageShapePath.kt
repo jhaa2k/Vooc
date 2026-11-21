@@ -7,19 +7,21 @@ import android.graphics.RectF
  * Parses a normalized SVG path (M/L/H/V/Q/C/Z, absolute or relative)
  * and maps its 0..1 coordinates into the supplied destination rectangle.
  */
-fun buildNormalizedImageShapePath(data: String, bounds: RectF): Path? {
-    if (data.isBlank()) return null
+internal fun isSupportedNormalizedImageShapePath(data: String): Boolean {
+    if (data.isBlank()) return false
     val matches = Regex("[MmLlHhVvQqCcZz]|[-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?").findAll(data).toList()
-    if (matches.isEmpty() || matches.size > 2048) return null
-    // Reject unsupported SVG commands and malformed characters instead of silently
-    // dropping them and accidentally rendering a different, partial shape.
+    if (matches.isEmpty() || matches.size > 2048) return false
     var previousEnd = 0
     for (match in matches) {
-        if (data.substring(previousEnd, match.range.first).any { !it.isWhitespace() && it != ',' }) return null
+        if (data.substring(previousEnd, match.range.first).any { !it.isWhitespace() && it != ',' }) return false
         previousEnd = match.range.last + 1
     }
-    if (data.substring(previousEnd).any { !it.isWhitespace() && it != ',' }) return null
-    val tokens = matches.map { it.value }
+    return data.substring(previousEnd).none { !it.isWhitespace() && it != ',' }
+}
+
+fun buildNormalizedImageShapePath(data: String, bounds: RectF): Path? {
+    if (!isSupportedNormalizedImageShapePath(data)) return null
+    val tokens = Regex("[MmLlHhVvQqCcZz]|[-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?").findAll(data).map { it.value }.toList()
     val path = Path()
     var i = 0
     var command = ' '

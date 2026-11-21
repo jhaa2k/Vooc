@@ -14,6 +14,7 @@ import com.vooc.visualizer.studio.particleSpawnOffset
 import com.vooc.visualizer.studio.particlePositionOffset
 import com.vooc.visualizer.studio.resolveParticleAnchorOffset
 import com.vooc.visualizer.studio.resolveParticleMirrorVector
+import com.vooc.visualizer.studio.resolveParticleTrailVector
 import com.vooc.visualizer.studio.resolveParticleEmitterRadii
 import com.vooc.visualizer.studio.resolveParticleOpacity
 import com.vooc.visualizer.studio.resolveParticleEmissionTiming
@@ -1728,8 +1729,9 @@ object VideoExportEngine {
                         val particleHeight = (sizeT * particleLayerScaleY * perspective * depthScale).coerceAtLeast(0.5f)
                         val randomAngularVelocity = angularVelocity + (randomB * 2f - 1f) * angularVelocityRandom
                         val visualAngle = if (velocityAngle) Math.toDegrees(kotlin.math.atan2(vy.toDouble(), vx.toDouble())).toFloat() else number("Particle Rotation Random", 0f) * randomC + randomAngularVelocity * age
-                        val trailX = vx * trailLength * 0.001f
-                        val trailY = vy * trailLength * 0.001f
+                        val trailVector = resolveParticleTrailVector(vx, vy, trailLength)
+                        val trailX = trailVector.x
+                        val trailY = trailVector.y
                         val normalTrail = resolveParticleMirrorVector(trailX, trailY, false, false)
                         fun drawParticleAt(x: Float, y: Float, drawAngle: Float = visualAngle, trail: com.vooc.visualizer.studio.ParticleVector = normalTrail) {
                             paint.color = particleColor

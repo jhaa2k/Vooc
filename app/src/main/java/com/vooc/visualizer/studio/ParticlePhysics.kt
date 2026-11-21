@@ -35,6 +35,31 @@ internal fun resolveParticleEmissionTiming(
     return ParticleEmissionTiming(age.coerceIn(0f, lifetime), true)
 }
 
+internal data class ParticleMotionState(val x: Float, val y: Float, val travelTime: Float)
+
+/** Shared deterministic motion integration used by both the live preview and export renderer. */
+internal fun resolveParticleMotion(
+    spawnX: Float, spawnY: Float,
+    velocityX: Float, velocityY: Float,
+    gravityX: Float, gravityY: Float,
+    windX: Float, windY: Float,
+    age: Float, drag: Float,
+    waveOffset: Float, turbulence: Float,
+    randomA: Float, randomB: Float
+): ParticleMotionState {
+    fun safe(value: Float) = value.takeIf { it.isFinite() } ?: 0f
+    val t = safe(age).coerceAtLeast(0f)
+    val d = safe(drag).coerceIn(0f, 0.999f)
+    val travel = if (d > 0f) (1f - kotlin.math.exp(-d * t)) / d else t
+    val wave = safe(waveOffset)
+    val turbulenceAmount = safe(turbulence)
+    val x = safe(spawnX) + safe(velocityX) * travel * 0.01f + safe(gravityX) * t * t * 0.005f +
+        safe(windX) * t * t * 0.005f + wave + kotlin.math.sin(t * 7f + safe(randomA) * 19f) * turbulenceAmount * t * 0.01f
+    val y = safe(spawnY) + safe(velocityY) * travel * 0.01f + safe(gravityY) * t * t * 0.005f +
+        safe(windY) * t * t * 0.005f + kotlin.math.cos(t * 6f + safe(randomB) * 17f) * turbulenceAmount * t * 0.01f
+    return ParticleMotionState(safe(x), safe(y), travel)
+}
+
 internal data class ParticleAxisState(val position: Float, val velocity: Float)
 
 /** Folds an unconstrained particle coordinate back into the scene after boundary impacts. */

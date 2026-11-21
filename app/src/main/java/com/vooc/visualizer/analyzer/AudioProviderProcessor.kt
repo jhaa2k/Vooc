@@ -154,6 +154,7 @@ class AudioProviderProcessor {
         }
 
         if (cfg.repeatSamples && count > source.size) {
+            // Repeat the already frequency-mapped output, never raw FFT bins.
             for (i in source.size until count) generated[i] = generated[i % source.size]
         }
 
@@ -165,7 +166,9 @@ class AudioProviderProcessor {
         }
 
         if (smoothed.size != count) smoothed = FloatArray(count)
-        val alpha = cfg.smooth.coerceIn(0f, 1f)
+        // Normalize smoothing to elapsed time (60 Hz reference), so live preview and
+        // offline export produce the same response even when their analysis cadence differs.
+        val alpha = cfg.smooth.coerceIn(0f, 1f).pow(dt * 60f)
         for (i in 0 until count) {
             smoothed[i] = if (!primed) filtered[i] else alpha * smoothed[i] + (1f - alpha) * filtered[i]
         }
@@ -187,7 +190,7 @@ class AudioProviderProcessor {
         val target = if (cfg.analysisMode != ProviderAnalysisMode.SPECTRUM && cfg.beatDetectionEnabled && frame.beat.beat) {
             max(normalizedLevel, frame.beat.pulse)
         } else 0f
-        val beatAlpha = cfg.beatSmooth
+        val beatAlpha = cfg.beatSmooth.coerceIn(0f, 1f).pow(dt * 60f)
         beatValue = beatAlpha * beatValue + (1f - beatAlpha) * target
         if (cfg.analysisMode == ProviderAnalysisMode.SPECTRUM || !cfg.beatDetectionEnabled) beatValue = 0f
 

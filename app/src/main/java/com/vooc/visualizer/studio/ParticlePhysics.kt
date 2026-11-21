@@ -26,7 +26,7 @@ internal fun reflectParticleAxis(position: Float, velocity: Float, extent: Float
     val safeHitCount = hitCount.coerceAtLeast(1.0)
     // More than 64 impacts already makes practical bounce energy negligible;
     // cap the exponent while retaining the exact parity for the direction.
-    val direction = if (wrapped > extent) -1f else 1f
+    val direction = if (wrapped >= extent) -1f else 1f
     val damping = safeBounce.toDouble().pow(safeHitCount.coerceAtMost(64.0)).toFloat()
     return ParticleAxisState(folded.toFloat().coerceIn(0f, safeExtent), safeVelocity * direction * damping)
 }

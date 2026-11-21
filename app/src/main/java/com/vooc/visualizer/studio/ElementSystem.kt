@@ -853,7 +853,7 @@ object ElementPropertyCatalog {
         number("Rotation Speed", "Particles", 0.0, -3600.0, 3600.0),
         bool("Collision", "Particles", false),
         number("Bounce", "Particles", 0.5, 0.0, 1.0),
-        text("Spawn Area", "Particles", "Point", listOf("Point", "HorizontalLine", "Rectangle", "Ellipse", "Circle", "Line", "Edge")),
+        text("Spawn Area", "Particles", "Circle", listOf("Point", "HorizontalLine", "Rectangle", "Ellipse", "Circle", "Line", "Edge")),
         number("Spawn Area Width", "Particles", 1.0, 0.0, 10000.0),
         number("Spawn Area Height", "Particles", 1.0, 0.0, 10000.0),
         number("Particle Size Random", "Particles", 0.0, 0.0, 1.0),

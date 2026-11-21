@@ -3032,7 +3032,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val trailLength = number("Trail Length", 0f).coerceIn(0f, 256f) * size.width / 1080f
                         val particleScale = number("Particle Scale", 100f).coerceAtLeast(0f) / 100f * scale
                         val particleLayerScaleVector = props["Scale"] as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
-                        val particleLayerScale = particleLayerScale(
+                        val particleLayerScale = resolveParticleLayerScale(
                             particleLayerScaleVector.x.toFloat(), particleLayerScaleVector.y.toFloat(),
                             props["Scale Is Uniform"] == ElementValue.Bool(true), particleScale
                         )

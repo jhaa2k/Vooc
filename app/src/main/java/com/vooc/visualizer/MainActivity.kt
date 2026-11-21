@@ -2591,9 +2591,11 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val barWidth = requestedWidth.coerceIn(0.5f, (slot - gap).coerceAtLeast(0.5f))
                         val heightScale = number("Height Scale", 1f).coerceIn(0f, 10f)
                         val maxHeightScale = number("Max Height Scale", 1f).coerceIn(0f, 1f)
-                        val maxHeight = (number("Max Height", size.height * 0.35f) * scaleY * heightScale * maxHeightScale).coerceIn(1f, size.height * 0.95f)
+                        // Keep bar geometry in the same 1080-wide design space used by video export.
+                        val barDesignScale = size.width / 1080f
+                        val maxHeight = (number("Max Height", size.height * 0.35f) * barDesignScale * scaleY * heightScale * maxHeightScale).coerceIn(1f, size.height * 0.95f)
                         val minHeightScale = number("Min Height Scale", 0f).coerceIn(0f, 1f)
-                        val minHeight = maxOf(number("Min Height", 0f), maxHeight * minHeightScale).coerceIn(0f, maxHeight)
+                        val minHeight = maxOf(number("Min Height", 0f) * barDesignScale, maxHeight * minHeightScale).coerceIn(0f, maxHeight)
                         val design = textValue("Bar Design", "Rounded Rect")
                         val orientation = textValue("Orientation", "Vertical")
                         val alignment = textValue("Alignment", "Bottom")

@@ -66,16 +66,18 @@ internal fun particleForceDelta(
     val safeDirectionX = directionX.takeIf { it.isFinite() } ?: 0f
     val safeDirectionY = directionY.takeIf { it.isFinite() } ?: 0f
     val scale = maxOf(kotlin.math.abs(safeDx), kotlin.math.abs(safeDy))
-    val distance = if (scale > 0f) {
-        scale * kotlin.math.sqrt((safeDx / scale).pow(2) + (safeDy / scale).pow(2))
-    } else 0f
-    val divisor = distance.coerceAtLeast(1f)
+    val scaledX = if (scale > 0f) safeDx / scale else 0f
+    val scaledY = if (scale > 0f) safeDy / scale else 0f
+    val scaledLength = kotlin.math.sqrt(scaledX.pow(2) + scaledY.pow(2))
+    val distanceIsLarge = scale > 0f && scale >= 1f / scaledLength
+    val radialX = if (distanceIsLarge) scaledX / scaledLength else safeDx
+    val radialY = if (distanceIsLarge) scaledY / scaledLength else safeDy
     val amount = (safeStrength * safeAge).takeIf { it.isFinite() } ?: 0f
     return when (mode) {
-        "Attract", "Radial" -> ParticleForceDelta(safeDx / divisor * amount, safeDy / divisor * amount)
-        "Repel" -> ParticleForceDelta(-safeDx / divisor * amount, -safeDy / divisor * amount)
+        "Attract", "Radial" -> ParticleForceDelta(radialX * amount, radialY * amount)
+        "Repel" -> ParticleForceDelta(-radialX * amount, -radialY * amount)
         "Directional" -> ParticleForceDelta(safeDirectionX * amount, safeDirectionY * amount)
-        "Vortex" -> ParticleForceDelta(-safeDy / divisor * amount, safeDx / divisor * amount)
+        "Vortex" -> ParticleForceDelta(-radialY * amount, radialX * amount)
         else -> ParticleForceDelta(0f, 0f)
     }
 }

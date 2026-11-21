@@ -2984,9 +2984,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val forcePosition = props["Force Field Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
                         val forceMode = textValue("Force Field", "None")
                         val forceStrength = number("Force Field Strength", 0f)
+                        val particleBandSize = (elementSamples.size / 5).coerceAtLeast(1)
+                        val mid = elementSamples.drop(particleBandSize * 2).take(particleBandSize).average().toFloat().coerceIn(0f, 1f)
                         val speedSource = when (textValue("Measure Overall Speed (Measure What)", "Nothing")) {
                             "Beat" -> providerFrame?.beatValue ?: frame?.beat?.pulse ?: 0f
                             "Bass" -> bass
+                            "Mid" -> mid
                             "Treble" -> treble
                             "RMS", "Overall Audio Level" -> frame?.rms ?: 0f
                             "Peak" -> frame?.peak ?: 0f

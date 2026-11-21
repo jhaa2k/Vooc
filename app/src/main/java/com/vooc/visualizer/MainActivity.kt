@@ -106,6 +106,7 @@ import com.vooc.visualizer.analyzer.AudioProviderFrame
 import com.vooc.visualizer.analyzer.AudioProviderProcessor
 import com.vooc.visualizer.analyzer.SpectrumBarsRuntime
 import com.vooc.visualizer.analyzer.SpectrumMapper
+import com.vooc.visualizer.analyzer.analyzerConfigSource
 import com.vooc.visualizer.analyzer.applyTo
 import com.vooc.visualizer.analyzer.toAudioProviderConfig
 import com.vooc.visualizer.analyzer.FftSize
@@ -567,7 +568,7 @@ private fun VoocStudio(
     val providerProcessors = remember(providerElements.map { it.id }) {
         providerElements.associate { it.id to AudioProviderProcessor() }
     }
-    val providerConfig = providerConfigs.first()
+    val providerConfig = providerConfigs.analyzerConfigSource() ?: com.vooc.visualizer.analyzer.AudioProviderConfig()
     val needsStereoReactivity = providerConfigs.any { it.channelMode != com.vooc.visualizer.analyzer.ProviderChannelMode.MONO_MIX } ||
         project.document.elements.any { element ->
         val source = (element.properties["Audio Reactivity Source"] as? ElementValue.Text)?.value

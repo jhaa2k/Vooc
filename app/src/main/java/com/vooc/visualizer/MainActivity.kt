@@ -2958,9 +2958,12 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         val spawnWidth = number("Spawn Area Width", 1f).coerceIn(0f, 10000f) * size.width * 0.25f
                         val spawnHeight = number("Spawn Area Height", 1f).coerceIn(0f, 10000f) * size.height * 0.25f
                         val spawnArea = textAlias("Particle Emitter Shape", "Point", "Spawn Area")
+                        val systemPosition = props["Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
+                        val particleCenterX = systemPosition.x.toFloat().coerceIn(0f, 1f) * size.width
+                        val particleCenterY = systemPosition.y.toFloat().coerceIn(0f, 1f) * size.height
                         val emitterPosition = props["Emitter Position"] as? ElementValue.Vector2 ?: ElementValue.Vector2(0.5, 0.5)
-                        val emitterX = center.x + (emitterPosition.x.toFloat() - 0.5f) * size.width
-                        val emitterY = center.y + (emitterPosition.y.toFloat() - 0.5f) * size.height
+                        val emitterX = particleCenterX + (emitterPosition.x.toFloat() - 0.5f) * size.width
+                        val emitterY = particleCenterY + (emitterPosition.y.toFloat() - 0.5f) * size.height
                         val emitterRotation = number("Emitter Rotation", 0f) * PI.toFloat() / 180f
                         val emitterRadius = number("Emitter Radius", 100f).coerceAtLeast(0f) * size.width / 1080f
                         val emitterInnerRadius = number("Emitter Inner Radius", 0f).coerceIn(0f, number("Emitter Radius", 100f)) * size.width / 1080f
@@ -3077,7 +3080,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val localY = spawnOffset.y
                             val spawnX = emitterX + localX * cos(emitterRotation) - localY * sin(emitterRotation)
                             val spawnY = emitterY + localX * sin(emitterRotation) + localY * cos(emitterRotation)
-                            val radialAngle = kotlin.math.atan2(spawnY - center.y, spawnX - center.x)
+                            val radialAngle = kotlin.math.atan2(spawnY - particleCenterY, spawnX - particleCenterX)
                             val angle = when {
                                 randomVector -> randomA * 2f * PI.toFloat()
                                 relativeToCenter -> radialAngle + number("Vector Angle Z", 0f) * PI.toFloat() / 180f + (randomA - 0.5f) * spreadAngle
@@ -3087,8 +3090,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                             val velocity = particleSpeed * (1f + (randomC * 2f - 1f) * speedRandom) / particleMass
                             var vx = cos(angle) * velocity
                             var vy = sin(angle) * velocity
-                            val fieldX = center.x + forcePosition.x.toFloat() * size.width - center.x
-                            val fieldY = center.y + forcePosition.y.toFloat() * size.height - center.y
+                            val fieldX = particleCenterX + forcePosition.x.toFloat() * size.width - center.x
+                            val fieldY = particleCenterY + forcePosition.y.toFloat() * size.height - center.y
                             val dx = fieldX - spawnX
                             val dy = fieldY - spawnY
                             val forceDelta = particleForceDelta(

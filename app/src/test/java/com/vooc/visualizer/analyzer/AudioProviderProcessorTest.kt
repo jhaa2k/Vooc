@@ -93,4 +93,26 @@ class AudioProviderProcessorTest {
         assertEquals(result60, result30, 1e-4f)
     }
 
+    @Test fun stereoProviderUsesRawMagnitudeLikeMonoProvider() {
+        val raw = FloatArray(1024) { if (it in 10..20) 0.8f else 0.1f }
+        val displayed = FloatArray(1024) { 0.02f }
+        val stereoFrame = AnalysisFrame(
+            timeSec = 0.0, sampleRate = 44100, fftSize = 2048,
+            binWidthHz = 44100f / 2048, spectrum = displayed, rawMagnitude = raw,
+            phase = FloatArray(1024), db = FloatArray(1024), bands = FloatArray(3),
+            bandLabels = listOf("Bass", "Mid", "Treble"), beat = BeatState.NONE,
+            rms = 0.2f, peak = 0.5f,
+            channels = mapOf(
+                ChannelSelect.MIX to ChannelAnalysis(displayed, FloatArray(3), 0.2f, 0.5f, raw),
+                ChannelSelect.LEFT to ChannelAnalysis(displayed, FloatArray(3), 0.2f, 0.5f, raw),
+                ChannelSelect.RIGHT to ChannelAnalysis(displayed, FloatArray(3), 0.2f, 0.5f, raw)
+            ),
+            waveform = FloatArray(256)
+        )
+        val config = AudioProviderConfig(sampleOutCount = 64, smooth = 0f, preSmooth = 0f, filterRadius = 0, outputMultiplier = 1f)
+        val mono = AudioProviderProcessor().process(stereoFrame, config.copy(channelMode = ProviderChannelMode.MONO_MIX))
+        val left = AudioProviderProcessor().process(stereoFrame, config.copy(channelMode = ProviderChannelMode.LEFT))
+        assertEquals(mono.samples[20], left.samples[20], 1e-6f)
+    }
+
 }

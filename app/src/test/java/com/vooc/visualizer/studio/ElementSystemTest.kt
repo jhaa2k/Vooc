@@ -9,6 +9,15 @@ import org.junit.Test
 
 class ElementSystemTest {
     @Test
+    fun barDesignDimensionsScaleConsistentlyAcrossCanvasWidths() {
+        assertEquals(300f, scaleBarDesignDimension(300f, 1080f), 0.0001f)
+        assertEquals(600f, scaleBarDesignDimension(300f, 2160f), 0.0001f)
+        assertEquals(150f, scaleBarDesignDimension(300f, 540f), 0.0001f)
+        assertEquals(0f, scaleBarDesignDimension(Float.NaN, 1080f), 0.0001f)
+        assertEquals(300f, scaleBarDesignDimension(300f, Float.NaN), 0.0001f)
+    }
+
+    @Test
     fun everyCatalogHasUniqueNamesValidDefaultsAndConsistentBounds() {
         val invalidDefaults = mutableListOf<String>()
         val invalidEnumDefaults = mutableListOf<String>()

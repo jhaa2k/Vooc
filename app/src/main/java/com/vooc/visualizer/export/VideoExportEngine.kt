@@ -1688,7 +1688,7 @@ object VideoExportEngine {
                         fun drawParticleAt(x: Float, y: Float) {
                             paint.color = particleColor
                             paint.alpha = particleAlpha
-                            paint.xfermode = if (screenBlend) android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SCREEN) else if (additiveBlend) android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD) else null
+                            paint.xfermode = if (exclusionBlend && android.os.Build.VERSION.SDK_INT >= 29) null else if (particleContentBlendMode == android.graphics.PorterDuff.Mode.SRC_OVER) null else android.graphics.PorterDuffXfermode(particleContentBlendMode)
                             paint.style = Paint.Style.FILL
                             if (trailLength > 0f) {
                                 paint.strokeWidth = (particleHeight * 0.35f * trailWidth).coerceAtLeast(0.5f)

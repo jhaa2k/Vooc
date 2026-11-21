@@ -55,6 +55,18 @@ class ParticlePhysicsTest {
         assertEquals(-40f, result.y, 0.0001f)
     }
 
+    @Test fun ellipseEmitterUsesConfiguredWidthAndHeightWithUniformAreaRadius() {
+        val result = particleSpawnOffset("Ellipse", 0.25f, 0.25f, 100f, 40f, 60f, 0f, 0f, (Math.PI / 2.0).toFloat())
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(20f, result.y, 0.0001f)
+    }
+
+    @Test fun circleEmitterUsesConfiguredRadiusWithUniformAreaRadius() {
+        val result = particleSpawnOffset("Circle", 0.25f, 0.25f, 100f, 40f, 80f, 0f, 0f, (Math.PI / 2.0).toFloat())
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(40f, result.y, 0.0001f)
+    }
+
     @Test fun ringEmitterUsesConfiguredInnerAndOuterRadius() {
         val result = particleSpawnOffset("Ring", 1f, 0.5f, 100f, 80f, 60f, 20f, 0f, (Math.PI / 2.0).toFloat())
         assertEquals(0f, result.x, 0.0001f)

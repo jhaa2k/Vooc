@@ -1861,8 +1861,8 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                     drawRect(brush, blendMode = blend)
                 }
                 "Image" -> {
-                    val image = elementImages[background.id]
                     val originalImage = elementOriginalImages[background.id]
+                    val image = elementImages[background.id] ?: originalImage
                     fun drawBackgroundBitmap(bitmap: androidx.compose.ui.graphics.ImageBitmap, applyOverlay: Boolean) {
                         val imageRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
                         val frameRatio = size.width / size.height.coerceAtLeast(1f)

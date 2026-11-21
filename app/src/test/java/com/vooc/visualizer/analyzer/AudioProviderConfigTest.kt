@@ -35,6 +35,14 @@ class AudioProviderConfigTest {
     }
 
     @Test
+    fun firstEnabledProviderOwnsSharedAnalyzerSettings() {
+        val disabled = AudioProviderConfig(providerEnabled = false, fftSize = 4096)
+        val enabled = AudioProviderConfig(providerEnabled = true, fftSize = 1024)
+        assertEquals(enabled, listOf(disabled, enabled).analyzerConfigSource())
+        assertEquals(disabled, listOf(disabled).analyzerConfigSource())
+    }
+
+    @Test
     fun providerAppliesFftWindowChannelAndBeatSettingsToAnalyzer() {
         val provider = AudioProviderConfig(
             fftSize = 4096,

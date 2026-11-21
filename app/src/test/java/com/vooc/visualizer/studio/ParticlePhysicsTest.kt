@@ -4,6 +4,36 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ParticlePhysicsTest {
+    @Test fun sharedParticleMotionAppliesVelocityGravityAndWind() {
+        val result = resolveParticleMotion(
+            100f, 200f, 20f, -10f, 4f, 8f, 2f, -2f,
+            2f, 0f, 3f, 0f, 0f, 0f
+        )
+        assertEquals(100f + 20f * 2f * 0.01f + 4f * 4f * 0.005f + 2f * 4f * 0.005f + 3f, result.x, 0.0001f)
+        assertEquals(200f - 10f * 2f * 0.01f + 8f * 4f * 0.005f - 2f * 4f * 0.005f, result.y, 0.0001f)
+        assertEquals(2f, result.travelTime, 0.0001f)
+    }
+
+    @Test fun sharedParticleMotionAppliesExponentialDragTravelTime() {
+        val result = resolveParticleMotion(
+            0f, 0f, 100f, 0f, 0f, 0f, 0f, 0f,
+            2f, 0.5f, 0f, 0f, 0f, 0f
+        )
+        val expectedTravel = (1f - kotlin.math.exp(-1f)) / 0.5f
+        assertEquals(expectedTravel, result.travelTime, 0.0001f)
+        assertEquals(expectedTravel, result.x, 0.0001f)
+    }
+
+    @Test fun sharedParticleMotionSanitizesNonFiniteInputs() {
+        val result = resolveParticleMotion(
+            Float.NaN, Float.POSITIVE_INFINITY, Float.NaN, Float.NEGATIVE_INFINITY,
+            Float.NaN, Float.POSITIVE_INFINITY, Float.NaN, Float.NEGATIVE_INFINITY,
+            Float.NaN, Float.NaN, Float.NaN, Float.NaN, Float.NaN, Float.NaN
+        )
+        assertEquals(0f, result.x, 0f)
+        assertEquals(0f, result.y, 0f)
+        assertEquals(0f, result.travelTime, 0f)
+    }
     @Test fun particleTrailGeometryScalesVelocityByConfiguredLength() {
         val result = resolveParticleTrailVector(120f, -40f, 25f)
         assertEquals(3f, result.x, 0.0001f)

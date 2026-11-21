@@ -2176,7 +2176,7 @@ object VideoExportEngine {
                                 }
                                 if (points.size >= 3) close()
                             }
-                            else -> addRoundRect(rect, number("Corner Radius", 0f) * shapeScale, number("Corner Radius", 0f) * width / 1080f, android.graphics.Path.Direction.CW)
+                            else -> addRoundRect(rect, number("Corner Radius", 0f) * shapeScale, number("Corner Radius", 0f) * shapeScale, android.graphics.Path.Direction.CW)
                         }
                     }
                     val shapeExclusionBlend = textValue("Blend Mode Content", "Alpha") == "Exclusion"

@@ -1741,7 +1741,7 @@ object VideoExportEngine {
                 StudioElementType.IMAGE -> {
                     val uriText = listOf("Import Image", "Custom Image", "Image Source / File", "Target Image")
                         .firstNotNullOfOrNull { key -> (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() } }.orEmpty()
-                    val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText]
+                    val image = imageCache["${uriText}#${element.id}"] ?: imageCache[uriText] ?: imageCache["generated:${element.id}"]
                     if (image != null) {
                         val imageScale = element.value("Scale") as? ElementValue.Vector2 ?: ElementValue.Vector2(1.0, 1.0)
                         val imageScaleX = imageScale.x.toFloat().coerceIn(0f, 10f)

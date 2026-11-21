@@ -306,12 +306,15 @@ class ElementSystemTest {
         val composition = ElementPropertyCatalog.forElement(StudioElementType.COMPOSITION).map { it.name }.toSet()
         assertEquals(listOf("Solid Color", "Gradient", "Image"), ElementPropertyCatalog.forElement(StudioElementType.BACKGROUND).first { it.name == "Source Type" }.options)
         assertTrue(background.containsAll(setOf(
-            "Source Type", "Image File / Source", "Fit Mode (Scale Type)", "Edge Blur (Image Fill)",
+            "Source Type", "Image File / Source", "Fit Mode (Scale Type)",
             "Background Fit Alignment", "Background Tile", "Background Tile Scale",
-            "Background Image Offset X", "Background Image Offset Y", "Background Blur Quality",
-            "Background Brightness", "Background Contrast", "Background Saturation",
-            "Background Grayscale", "Background Invert", "Background Gradient Type",
-            "Background Gradient Start", "Background Gradient End", "Background Gradient Angle"
+            "Background Image Offset X", "Background Image Offset Y",
+            "Background Gradient Type", "Background Gradient Start",
+            "Background Gradient End", "Background Gradient Angle"
+        )))
+        assertFalse(background.containsAll(setOf(
+            "Edge Blur (Image Fill)", "Background Blur Quality", "Background Brightness",
+            "Background Contrast", "Background Saturation", "Background Grayscale", "Background Invert"
         )))
         assertTrue(mirror.containsAll(setOf(
             "Mirror Enabled", "Mirror Origin", "Mirror Center", "Mirror Rotation",

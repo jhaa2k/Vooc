@@ -138,7 +138,13 @@ internal fun particleSpawnOffset(
             val circleRadius = safeRadius * radialFactor
             ParticleSpawnOffset(kotlin.math.cos(angle) * circleRadius, kotlin.math.sin(angle) * circleRadius)
         }
-        "Ring" -> ParticleSpawnOffset(kotlin.math.cos(angle) * radialDistance, kotlin.math.sin(angle) * radialDistance)
+        "Ring" -> {
+            // Uniform-area sampling avoids over-populating the inner edge of an annulus.
+            val innerSquared = safeInnerRadius * safeInnerRadius
+            val outerSquared = safeRadius * safeRadius
+            val ringRadius = kotlin.math.sqrt(innerSquared + (outerSquared - innerSquared) * b)
+            ParticleSpawnOffset(kotlin.math.cos(angle) * ringRadius, kotlin.math.sin(angle) * ringRadius)
+        }
         "Line", "HorizontalLine" -> ParticleSpawnOffset((a * 2f - 1f) * safeWidth, 0f)
         "Edge" -> {
             // Sample uniformly along the rectangle perimeter so long sides receive

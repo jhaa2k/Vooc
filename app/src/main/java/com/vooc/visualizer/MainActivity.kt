@@ -4,6 +4,7 @@ import com.vooc.visualizer.studio.replacePreservingOrder
 import com.vooc.visualizer.studio.buildNormalizedImageShapePath
 import com.vooc.visualizer.studio.BackgroundImageProcessor
 import com.vooc.visualizer.studio.MirrorEffectProcessor
+import com.vooc.visualizer.studio.GeneratedAlbumArt
 
 import android.net.Uri
 import android.Manifest
@@ -1722,7 +1723,9 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 } else if (element.type == StudioElementType.BACKGROUND) {
                     (element.value("Image File / Source") as? ElementValue.Text)?.value.orEmpty()
                 } else (element.value("Target Image") as? ElementValue.Text)?.value.orEmpty()
-                if (uriText.isBlank()) null else runCatching {
+                if (element.type == StudioElementType.IMAGE && (uriText.isBlank() || GeneratedAlbumArt.isForced(element))) {
+                    runCatching { GeneratedAlbumArt.create(element).asImageBitmap() }.getOrNull()?.let { element.id to it }
+                } else if (uriText.isBlank()) null else runCatching {
                     context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
                 }.getOrNull()?.let { element.id to it }
             }.toMap()
@@ -1742,7 +1745,17 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                 val uriText = uriKeys.firstNotNullOfOrNull { key ->
                     (element.value(key) as? ElementValue.Text)?.value?.takeIf { it.isNotBlank() }
                 }.orEmpty()
-                if (uriText.isBlank()) null else {
+                if (element.type == StudioElementType.IMAGE && (uriText.isBlank() || GeneratedAlbumArt.isForced(element))) {
+                    val generated = runCatching { GeneratedAlbumArt.create(element) }.getOrNull()
+                    generated?.let { source ->
+                        val maskUri = (element.value("Mask Image") as? ElementValue.Text)?.value.orEmpty()
+                        val maskBitmap = if (maskUri.isNotBlank()) context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { BitmapFactory.decodeStream(it) } else null
+                        val processed = processImageForPreview(source, element, maskBitmap)
+                        maskBitmap?.recycle()
+                        if (processed !== source) source.recycle()
+                        element.id to processed.asImageBitmap()
+                    }
+                } else if (uriText.isBlank()) null else {
                     val bitmap = runCatching {
                         context.contentResolver.openInputStream(Uri.parse(uriText))?.use { stream ->
                             val decoded = BitmapFactory.decodeStream(stream) ?: return@use null

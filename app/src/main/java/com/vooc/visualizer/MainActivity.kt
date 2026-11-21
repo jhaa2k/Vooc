@@ -3552,7 +3552,7 @@ private fun VisualizerPreview(modifier: Modifier, layers: List<VisualLayer>, ele
                         if (shadowEnabled || shapeBlur > 0f) {
                             val shadowColor = runCatching { android.graphics.Color.parseColor(textValue("Shape Shadow Color", "#99000000")) }.getOrDefault(android.graphics.Color.BLACK)
                             val shadowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                color = if (shadowEnabled) shadowColor else android.graphics.Color.TRANSPARENT
+                                color = if (shadowEnabled) shadowColor else fillColor.toArgb()
                                 alpha = (255f * fillAlpha).toInt().coerceIn(0, 255)
                                 val blurRadius = (number("Shape Shadow Blur", 8f) * shapeScale + shapeBlur).coerceAtLeast(0f)
                                 if (blurRadius > 0f) setShadowLayer(blurRadius, number("Shape Shadow Offset X", 0f) * shapeScale, number("Shape Shadow Offset Y", 4f) * shapeScale, shadowColor)

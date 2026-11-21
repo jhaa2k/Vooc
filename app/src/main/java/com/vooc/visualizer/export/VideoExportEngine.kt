@@ -944,8 +944,10 @@ object VideoExportEngine {
             val posMotion = motionFor("Measure Pos (Measure What)")
             val scaleMotion = motionFor("Measure Scale (Measure What)")
             val rotMotion = motionFor("Measure Rot (Measure What)")
-            val cx = width * (0.5f + (position.x.toFloat() + reactivity.xOffset) / 200f + posMotion.offsetX)
-            val cy = height * (0.5f + (position.y.toFloat() + reactivity.yOffset) / 200f + posMotion.offsetY)
+            val positionOffsetX = if (element.type == StudioElementType.PARTICLES) particlePositionOffset(position.x.toFloat()) else position.x.toFloat() / 200f
+            val positionOffsetY = if (element.type == StudioElementType.PARTICLES) particlePositionOffset(position.y.toFloat()) else position.y.toFloat() / 200f
+            val cx = width * (0.5f + positionOffsetX + reactivity.xOffset / 200f + posMotion.offsetX)
+            val cy = height * (0.5f + positionOffsetY + reactivity.yOffset / 200f + posMotion.offsetY)
             val scale = (number("Scale", 100f) / 100f * scaleMotion.scale * reactivity.scaleMultiplier).coerceIn(0f, 10f)
             val imageAnimationMode = textValue("Measure Animation Speed (Measure What)", "Nothing")
             val imageAnimationMotion = if (element.type == StudioElementType.IMAGE) motionFor("Measure Animation Speed (Measure What)") else null

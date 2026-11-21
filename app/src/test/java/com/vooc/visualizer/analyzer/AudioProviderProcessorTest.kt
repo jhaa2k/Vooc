@@ -93,6 +93,25 @@ class AudioProviderProcessorTest {
         assertEquals(result60, result30, 1e-4f)
     }
 
+    @Test fun backwardTimestampResetsTemporalSmoothingAndBeatState() {
+        val config = AudioProviderConfig(sampleOutCount = 32, smooth = 0.9f, filterRadius = 0)
+        val processor = AudioProviderProcessor()
+        processor.process(frame(FloatArray(1024) { 1f }, time = 2.0), config)
+        val afterSeek = processor.process(frame(FloatArray(1024) { 0.1f }, time = 0.0), config)
+        val fresh = AudioProviderProcessor().process(frame(FloatArray(1024) { 0.1f }, time = 0.0), config)
+        assertEquals(fresh.samples[10], afterSeek.samples[10], 1e-6f)
+        assertEquals(0f, afterSeek.beatValue, 0f)
+    }
+
+    @Test fun largeForwardTimestampGapResetsTemporalSmoothing() {
+        val config = AudioProviderConfig(sampleOutCount = 32, smooth = 0.9f, filterRadius = 0)
+        val processor = AudioProviderProcessor()
+        processor.process(frame(FloatArray(1024) { 1f }, time = 1.0), config)
+        val afterGap = processor.process(frame(FloatArray(1024) { 0.1f }, time = 1.5), config)
+        val fresh = AudioProviderProcessor().process(frame(FloatArray(1024) { 0.1f }, time = 1.5), config)
+        assertEquals(fresh.samples[10], afterGap.samples[10], 1e-6f)
+    }
+
     @Test fun stereoProviderUsesRawMagnitudeLikeMonoProvider() {
         val raw = FloatArray(1024) { if (it in 10..20) 0.8f else 0.1f }
         val displayed = FloatArray(1024) { 0.02f }
